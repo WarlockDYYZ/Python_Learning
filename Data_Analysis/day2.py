@@ -569,6 +569,9 @@ print(df1)
 print("df2：")
 print(df2)
 # 使用align方法对齐
+# 行列数相同，空位补NaN
+# align() 是 pandas 用于将两个 DataFrame/Series 按索引和列对齐的核心方法
+# 它会返回两个新对象，拥有完全相同的行索引和列名，方便后续加减乘除等运算
 df1_aligned, df2_aligned = df1.align(df2)
 print("对齐后：")
 print("df1对齐后：")
@@ -576,6 +579,7 @@ print(df1_aligned)
 print("df2对齐后：")
 print(df2_aligned)
 print(50 * "=")
+
 # 4. 缺失值处理
 df = pd.DataFrame({
    'A': [1, 2, None, 4],
@@ -588,7 +592,10 @@ print(df)
 print("检测缺失值：")
 print(df.isna())
 print("缺失值统计：")
-print(df.isna().sum())  # 每列缺失值数量
+# 每列缺失值数量
+print(df.isna().sum())
+# 每行缺失值数量
+print(df.isna().sum(axis=1))
 # 删除含有缺失值的行
 df_clean = df.dropna()
 print("删除含有缺失值的行：")
@@ -610,6 +617,7 @@ df_bfill = df.fillna(method='bfill')
 print("后向填充（bfill）：")
 print(df_bfill)
 print(50 * "=")
+
 # 5. 数据排序
 df = pd.DataFrame({
    '姓名': ['张三', '李四', '王五', '赵六'],
