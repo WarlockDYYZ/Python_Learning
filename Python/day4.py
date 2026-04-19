@@ -827,357 +827,442 @@ penguin = Penguin()
 penguin.fly()  # 输出：我会飞, 企鹅应该不会飞
 penguin.swim()  # 输出：我会游泳
 penguin.walk()  # 输出：我会走路
+print("*" * 50)
+
 
 # super()函数使用
-#    # 父类
-# class Parent:
-#     def __init__(self, value):
-#          self.value = value
-#          print(f"Parent初始化，value = {value}")
-#    # 子类
-# class Child(Parent):
-#     def __init__(self, value, extra):
-#          super().__init__(value)  # 调用父类的__init__方法
-#          self.extra = extra
-#          print(f"Child初始化，extra = {extra}")
-#    # 创建子类对象
-# child = Child(10, "额外信息")
-# print(f"value = {child.value}, extra = {child.extra}")
-# 练习题
+# 父类
+class Parent:
+    def __init__(self, value):
+        self.value = value
+        print(f"Parent初始化，value = {value}")
+
+
+# 子类
+class Child(Parent):
+    def __init__(self, value, extra):
+        super().__init__(value)  # 调用父类的__init__方法
+        self.extra = extra
+        print(f"Child初始化，extra = {extra}")
+
+
+# 创建子类对象
+child = Child(10, "额外信息")
+print(f"value = {child.value}, extra = {child.extra}")
+print("*" * 50)
+
+
 # 练习
 # 4：员工继承体系
-#    # 定义一个Employee类（员工）：
-#    # 属性：姓名(name)、工号(employee_id)、部门(department)
-#    # 方法：
-#    # - __init__: 初始化属性
-#    # - work: 打印"员工在工作"
-#    # 定义一个Manager类（经理），继承自Employee：
-#    # 新增属性：管理的员工列表(managed_employees)
-#    # 重写work方法：打印"经理在管理"，并调用每个下属的work方法
-#    # 定义一个Developer类（开发者），继承自Employee：
-#    # 新增属性：编程语言(programming_language)
-#    # 重写work方法：打印"开发者在编写代码"
-# class Employee:
-#     def __init__(self, name, employee_id, department):
-#          self.name = name
-#          self.employee_id = employee_id
-#          self.department = department
-#
-#     def work(self):
-#          print(f"{self.name}（工号：{self.employee_id}）在工作")
-# class Manager(Employee):
-#     def __init__(self, name, employee_id, department, managed_employees=[]):
-#          super().__init__(name, employee_id, department)
-#          self.managed_employees = managed_employees
-#
-#     def work(self):
-#          print(f"{self.name}（经理）在管理")
-#          for employee in self.managed_employees:
-#                employee.work()
-# class Developer(Employee):
-#     def __init__(self, name, employee_id, department, programming_language):
-#          super().__init__(name, employee_id, department)
-#          self.programming_language = programming_language
-#
-#     def work(self):
-#          print(f"{self.name}（开发者）在编写{self.programming_language}代码")
-#    # 创建员工对象
-# dev1 = Developer("张三", "001", "研发部", "Python")
-# dev2 = Developer("李四", "002", "研发部", "Java")
-# manager = Manager("王五", "003", "研发部", [dev1, dev2])
-#    # 调用work方法（多态体现）
-# dev1.work()  # 输出：张三（开发者）在编写Python代码
-# dev2.work()  # 输出：李四（开发者）在编写Java代码
-# manager.work()  # 输出：王五（经理）在管理，然后调用两个开发者的work方法
+# 定义一个Employee类（员工）：
+# 属性：姓名(name)、工号(employee_id)、部门(department)
+# 方法：
+# - __init__: 初始化属性
+# - work: 打印"员工在工作"
+# 定义一个Manager类（经理），继承自Employee：
+# 新增属性：管理的员工列表(managed_employees)
+# 重写work方法：打印"经理在管理"，并调用每个下属的work方法
+# 定义一个Developer类（开发者），继承自Employee：
+# 新增属性：编程语言(programming_language)
+# 重写work方法：打印"开发者在编写代码"
+class Employee:
+    def __init__(self, name, employee_id, department):
+        self.name = name
+        self.employee_id = employee_id
+        self.department = department
+
+    def work(self):
+        print(f"{self.name}（工号：{self.employee_id}）在工作")
+
+
+class Manager(Employee):
+    def __init__(self, name, employee_id, department, managed_employees=[]):
+        super().__init__(name, employee_id, department)
+        self.managed_employees = managed_employees
+
+    def work(self):
+        print(f"{self.name}（经理）在管理")
+        for employee in self.managed_employees:
+            employee.work()
+
+
+class Developer(Employee):
+    def __init__(self, name, employee_id, department, programming_language):
+        super().__init__(name, employee_id, department)
+        self.programming_language = programming_language
+
+    def work(self):
+        print(f"{self.name}（开发者）在编写{self.programming_language}代码")
+
+
+# 创建员工对象
+dev1 = Developer("张三", "001", "研发部", "Python")
+dev2 = Developer("李四", "002", "研发部", "Java")
+manager = Manager("王五", "003", "研发部", [dev1, dev2])
+# 调用work方法（多态体现）
+dev1.work()  # 输出：张三（开发者）在编写Python代码
+dev2.work()  # 输出：李四（开发者）在编写Java代码
+manager.work()  # 输出：王五（经理）在管理，然后调用两个开发者的work方法
+print("*" * 50)
+
+
 # 练习
 # 5：几何图形继承体系
-#    # 定义一个Shape类（图形）：
-#    # 方法：
-#    # - get_area: 计算面积（抽象方法，抛出NotImplementedError）
-#    # - get_perimeter: 计算周长（抽象方法，抛出NotImplementedError）
-#    # 定义一个Rectangle类（矩形），继承自Shape：
-#    # 属性：长(length)、宽(width)
-#    # 重写get_area和get_perimeter方法
-#    # 定义一个Square类（正方形），继承自Rectangle：
-#    # 重写初始化方法，只需接收边长
-#    # 定义一个Circle类（圆形），继承自Shape：
-#    # 属性：半径(radius)
-#    # 重写get_area和get_perimeter方法
-# import math
-# class Shape:
-#     def get_area(self):
-#          raise NotImplementedError("子类必须实现get_area方法")
-#
-#     def get_perimeter(self):
-#          raise NotImplementedError("子类必须实现get_perimeter方法")
-# class Rectangle(Shape):
-#     def __init__(self, length, width):
-#          self.length = length
-#          self.width = width
-#
-#     def get_area(self):
-#          return self.length * self.width
-#
-#     def get_perimeter(self):
-#          return 2 * (self.length + self.width)
-# class Square(Rectangle):
-#     def __init__(self, side_length):
-#          super().__init__(side_length, side_length)
-# class Circle(Shape):
-#     def __init__(self, radius):
-#          self.radius = radius
-#
-#     def get_area(self):
-#          return math.pi * self.radius ** 2
-#
-#     def get_perimeter(self):
-#          return 2 * math.pi * self.radius
-#    # 创建不同图形对象
-# rect = Rectangle(6, 4)
-# square = Square(5)
-# circle = Circle(3)
-#    # 多态调用
-# shapes = [rect, square, circle]
-# for shape in shapes:
-#     print(f"面积：{shape.get_area():.2f}，周长：{shape.get_perimeter():.2f}")
+# 定义一个Shape类（图形）：
+# 方法：
+# - get_area: 计算面积（抽象方法，抛出NotImplementedError）
+# - get_perimeter: 计算周长（抽象方法，抛出NotImplementedError）
+# 定义一个Rectangle类（矩形），继承自Shape：
+# 属性：长(length)、宽(width)
+# 重写get_area和get_perimeter方法
+# 定义一个Square类（正方形），继承自Rectangle：
+# 重写初始化方法，只需接收边长
+# 定义一个Circle类（圆形），继承自Shape：
+# 属性：半径(radius)
+# 重写get_area和get_perimeter方法
+class Shape:
+    def get_area(self):
+        raise NotImplementedError("子类必须实现get_area方法")
+
+    def get_perimeter(self):
+        raise NotImplementedError("子类必须实现get_perimeter方法")
+
+
+class Rectangle(Shape):
+    def __init__(self, length, width):
+        self.length = length
+        self.width = width
+
+    def get_area(self):
+        return self.length * self.width
+
+    def get_perimeter(self):
+        return 2 * (self.length + self.width)
+
+
+class Square(Rectangle):
+    def __init__(self, side_length):
+        super().__init__(side_length, side_length)
+
+
+class Circle(Shape):
+    def __init__(self, radius):
+        self.radius = radius
+
+    def get_area(self):
+        return math.pi * self.radius ** 2
+
+    def get_perimeter(self):
+        return 2 * math.pi * self.radius
+
+
+# 创建不同图形对象
+rect = Rectangle(6, 4)
+square = Square(5)
+circle = Circle(3)
+# 多态调用
+shapes = [rect, square, circle]
+for shape in shapes:
+    print(f"面积：{shape.get_area():.2f}，周长：{shape.get_perimeter():.2f}")
+print("*" * 50)
+
+
 # 练习
 # 6：动物继承体系
-#    # 定义一个Animal类（动物）：
-#    # 属性：名称(name)、年龄(age)
-#    # 方法：
-#    # - __init__: 初始化属性
-#    # - eat: 打印"动物在吃东西"
-#    # - sleep: 打印"动物在睡觉"
-#    # 定义一个Bird类（鸟类），继承自Animal：
-#    # 新增属性：是否会飞(can_fly)
-#    # 重写eat方法：打印"鸟类在啄食"
-#    # 新增方法：fly: 打印"鸟类在飞翔"
-#    # 定义一个Fish类（鱼类），继承自Animal：
-#    # 新增属性：生活环境(habitat)
-#    # 重写eat方法：打印"鱼类在觅食"
-#    # 新增方法：swim: 打印"鱼类在游泳"
-# class Animal:
-#     def __init__(self, name, age):
-#          self.name = name
-#          self.age = age
-#
-#     def eat(self):
-#          print(f"{self.name}（{self.age}岁）在吃东西")
-#
-#     def sleep(self):
-#          print(f"{self.name}（{self.age}岁）在睡觉")
-# class Bird(Animal):
-#     def __init__(self, name, age, can_fly=True):
-#          super().__init__(name, age)
-#          self.can_fly = can_fly
-#
-#     def eat(self):
-#          print(f"{self.name}（鸟）在啄食")
-#
-#     def fly(self):
-#          if self.can_fly:
-#                print(f"{self.name}在天空飞翔")
-#          else:
-#                print(f"{self.name}不会飞")
-# class Fish(Animal):
-#     def __init__(self, name, age, habitat):
-#          super().__init__(name, age)
-#          self.habitat = habitat
-#
-#     def eat(self):
-#          print(f"{self.name}（鱼）在觅食")
-#
-#     def swim(self):
-#          print(f"{self.name}在{self.habitat}中游泳")
-#    # 创建动物对象
-# bird1 = Bird("麻雀", 2)
-# bird2 = Bird("企鹅", 3, False)
-# fish1 = Fish("金鱼", 1, "鱼缸")
-# fish2 = Fish("鲨鱼", 5, "海洋")
-#    # 多态调用
-# animals = [bird1, bird2, fish1, fish2]
-# for animal in animals:
-#     animal.eat()
-#     animal.sleep()
-#     if isinstance(animal, Bird):
-#          animal.fly()
-#     elif isinstance(animal, Fish):
-#          animal.swim()
-#     print()
+# 定义一个Animal类（动物）：
+# 属性：名称(name)、年龄(age)
+# 方法：
+# - __init__: 初始化属性
+# - eat: 打印"动物在吃东西"
+# - sleep: 打印"动物在睡觉"
+# 定义一个Bird类（鸟类），继承自Animal：
+# 新增属性：是否会飞(can_fly)
+# 重写eat方法：打印"鸟类在啄食"
+# 新增方法：fly: 打印"鸟类在飞翔"
+# 定义一个Fish类（鱼类），继承自Animal：
+# 新增属性：生活环境(habitat)
+# 重写eat方法：打印"鱼类在觅食"
+# 新增方法：swim: 打印"鱼类在游泳"
+class Animal:
+    def __init__(self, name, age):
+        self.name = name
+        self.age = age
+
+    def eat(self):
+        print(f"{self.name}（{self.age}岁）在吃东西")
+
+    def sleep(self):
+        print(f"{self.name}（{self.age}岁）在睡觉")
+
+
+class Bird(Animal):
+    def __init__(self, name, age, can_fly=True):
+        super().__init__(name, age)
+        self.can_fly = can_fly
+
+    def eat(self):
+        print(f"{self.name}（鸟）在啄食")
+
+    def fly(self):
+        if self.can_fly:
+            print(f"{self.name}在天空飞翔")
+        else:
+            print(f"{self.name}不会飞")
+
+
+class Fish(Animal):
+    def __init__(self, name, age, habitat):
+        super().__init__(name, age)
+        self.habitat = habitat
+
+    def eat(self):
+        print(f"{self.name}（鱼）在觅食")
+
+    def swim(self):
+        print(f"{self.name}在{self.habitat}中游泳")
+
+
+# 创建动物对象
+bird1 = Bird("麻雀", 2)
+bird2 = Bird("企鹅", 3, False)
+fish1 = Fish("金鱼", 1, "鱼缸")
+fish2 = Fish("鲨鱼", 5, "海洋")
+# 多态调用
+animals = [bird1, bird2, fish1, fish2]
+for animal in animals:
+    animal.eat()
+    animal.sleep()
+    if isinstance(animal, Bird):
+        animal.fly()
+    elif isinstance(animal, Fish):
+        animal.swim()
+    print()
+print("*" * 50)
+
+
 # 5.3
-# 封装与特殊方法（30
-# 分钟）
+# 封装与特殊方法
 # 复习要点
 # - 私有属性和公有属性的定义
 # - @ property装饰器的使用
 # - 特殊方法（魔术方法）的重载
+
+# 封装 = 把数据和操作数据的方法打包在一起，同时把内部细节藏起来，只留安全的接口给外面用。
+# 用最简单的三句话记：
+# 打包：把变量（属性）和函数（方法）放在一个类里
+# 隐藏：不想让外面随便改的东西，设为私有
+# 公开：只留安全的方法给外部调用（get/set）
+# 用下划线约定：
+# 变量名：公开，外部随便访问 / 修改
+# _变量名：约定为内部使用，不建议外部改
+# __变量名：私有变量，外部不能直接访问 / 修改
+
 # 封装示例
-#    # 封装示例：学生类
-# class Student:
-#     def __init__(self, name, age):
-#          self.name = name  # 公有属性
-#          self._age = age    # 受保护属性
-#          self.__score = 0  # 私有属性（双下划线）
-#
-#     def get_score(self):
-#          return self.__score
-#
-#     def set_score(self, score):
-#          if 0 <= score <= 100:
-#                self.__score = score
-#          else:
-#                raise ValueError("成绩必须在0-100分之间")
-#    # 创建学生对象
-# stu = Student("张三", 18)
-# stu.set_score(85)
-# print(stu.get_score())  # 输出：85
+# 学生类
+class Student:
+    def __init__(self, name, age):
+        self.name = name  # 公有属性
+        self._age = age  # 受保护属性
+        self.__score = 0  # 私有属性（双下划线）
+
+    def get_score(self):
+        return self.__score
+
+    def set_score(self, score):
+        if 0 <= score <= 100:
+            self.__score = score
+        else:
+            raise ValueError("成绩必须在0-100分之间")
+
+
+# 创建学生对象
+stu = Student("张三", 18)
+stu.set_score(85)
+print(stu.get_score())  # 输出：85
 # print(stu._age)  # 可以访问，但不建议
-#    # print(stu.__score)      # 无法直接访问，会报错
+# print(stu.__score)  # 无法直接访问，会报错
+print("*" * 50)
+
+
 # 特殊方法示例
-#    # 特殊方法示例：向量类
-# class Vector:
-#     def __init__(self, x, y):
-#          self.x = x
-#          self.y = y
-#
-#     def __add__(self, other):  # 重载加法操作符
-#          return Vector(self.x + other.x, self.y + other.y)
-#
-#     def __sub__(self, other):  # 重载减法操作符
-#          return Vector(self.x - other.x, self.y - other.y)
-#
-#     def __str__(self):  # 重载str()方法
-#          return f"({self.x}, {self.y})"
-#
-#     def __len__(self):  # 重载len()方法
-#          return int((self.x**2 + self.y**2) ** 0.5)
-#    # 使用向量类
-# v1 = Vector(3, 4)
-# v2 = Vector(1, 2)
-# v3 = v1 + v2  # 等价于 v1.__add__(v2)
-# v4 = v1 - v2  # 等价于 v1.__sub__(v2)
-# print(v3)  # 输出：(4, 6)
-# print(v4)  # 输出：(2, 2)
-# print(len(v1))  # 输出：5（向量长度）
-# 练习题
+# 向量类
+class Vector:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    # __add__是Python语言本身规定的特殊方法名
+    # class Vector 隐式继承自 object
+    # 但object.__add__并没有实现加法逻辑
+    # 自己的类里重新实现它 → 这叫方法重载
+    # __add__ 是 Python 内置的「魔法方法」，所有类默认都继承自 object，object 里并没有实现 __add__，只是规定了这个名字的方法对应 + 运算符
+    # 其他操作符类似
+    # v1 + v2 等价于 v1.__add__(v2)
+    def __add__(self, other):  # 重载加法操作符
+        return Vector(self.x + other.x, self.y + other.y)
+
+    def __sub__(self, other):  # 重载减法操作符
+        return Vector(self.x - other.x, self.y - other.y)
+
+    def __str__(self):  # 重载str()方法
+        return f"({self.x}, {self.y})"
+
+    def __len__(self):  # 重载len()方法
+        return int((self.x ** 2 + self.y ** 2) ** 0.5)
+
+
+# 使用向量类
+v1 = Vector(3, 4)
+v2 = Vector(1, 2)
+v3 = v1 + v2  # 等价于 v1.__add__(v2)
+v4 = v1 - v2  # 等价于 v1.__sub__(v2)
+print(v3)  # 输出：(4, 6)
+print(v4)  # 输出：(2, 2)
+print(len(v1))  # 输出：5（向量长度）
+print("*" * 50)
+
+
 # 练习
 # 7：使用 @ property
 # 装饰器
-#    # 定义一个Temperature类：
-#    # 属性：
-#    # - 华氏温度(fahrenheit)
-#    # - 摄氏温度(celsius) - 使用@property装饰器实现
-#    # 方法：
-#    # - 初始化时可以传入华氏温度或摄氏温度
-#    # - 提供温度转换功能
-# class Temperature:
-#     def __init__(self, value, unit='c'):
-#          if unit == 'c':
-#                self._celsius = value
-#          else:
-#                self._celsius = (value - 32) * 5/9
-#
-#     @property
-#     def celsius(self):
-#          return self._celsius
-#
-#     @celsius.setter
-#     def celsius(self, value):
-#          self._celsius = value
-#
-#     @property
-#     def fahrenheit(self):
-#          return self._celsius * 9/5 + 32
-#
-#     @fahrenheit.setter
-#     def fahrenheit(self, value):
-#          self._celsius = (value - 32) * 5/9
-#    # 创建温度对象
-# temp1 = Temperature(25, 'c')  # 25摄氏度
-# temp2 = Temperature(77, 'f')  # 77华氏度
-# print(f"temp1: {temp1.celsius}°C = {temp1.fahrenheit}°F")
-# print(f"temp2: {temp2.celsius}°C = {temp2.fahrenheit}°F")
-#    # 修改温度
-# temp1.fahrenheit = 86  # 设置为86华氏度
-# print(f"修改后 temp1: {temp1.celsius}°C = {temp1.fahrenheit}°F")
-# temp2.celsius = 30  # 设置为30摄氏度
-# print(f"修改后 temp2: {temp2.celsius}°C = {temp2.fahrenheit}°F")
+# 定义一个Temperature类：
+# 属性：
+# - 华氏温度(fahrenheit)
+# - 摄氏温度(celsius) - 使用@property装饰器实现
+# 方法：
+# - 初始化时可以传入华氏温度或摄氏温度
+# - 提供温度转换功能
+class Temperature:
+    def __init__(self, value, unit='c'):
+        if unit == 'c':
+            self._celsius = value
+        else:
+            self._celsius = (value - 32) * 5 / 9
+
+    # @property (读取器 - Getter)
+    # 作用：可以像访问属性一样读取值
+    # 本来要写 temp.get_celsius()
+    # 现在直接写 temp.celsius
+    @property
+    def celsius(self):
+        return self._celsius
+
+    # @xxx.setter (设置器 - Setter)
+    # 作用：可以像修改属性一样赋值
+    # 本来要写 temp.set_celsius(30)
+    # 现在直接写 temp.celsius = 30
+    @celsius.setter
+    def celsius(self, value):
+        self._celsius = value
+
+    # 读: fahrenheit：根据内部的_celsius计算出华氏度返回
+    # 写: fahrenheit：把传入的华氏度，转成摄氏度存进_celsius
+    @property
+    def fahrenheit(self):
+        return self._celsius * 9 / 5 + 32
+
+    @fahrenheit.setter
+    def fahrenheit(self, value):
+        self._celsius = (value - 32) * 5 / 9
+
+
+# 创建温度对象
+temp1 = Temperature(25, 'c')  # 25摄氏度
+temp2 = Temperature(77, 'f')  # 77华氏度
+print(f"temp1: {temp1.celsius}°C = {temp1.fahrenheit}°F")
+print(f"temp2: {temp2.celsius}°C = {temp2.fahrenheit}°F")
+# 修改温度
+temp1.fahrenheit = 86  # 设置为86华氏度
+print(f"修改后 temp1: {temp1.celsius}°C = {temp1.fahrenheit}°F")
+temp2.celsius = 30  # 设置为30摄氏度
+print(f"修改后 temp2: {temp2.celsius}°C = {temp2.fahrenheit}°F")
+print("*" * 50)
+
+
 # 练习
 # 8：实现一个分数类
-#    # 定义一个Fraction类（分数）：
-#    # 属性：分子(numerator)、分母(denominator)
-#    # 方法：
-#    # - __init__: 初始化分数（自动约分）
-#    # - __str__: 返回分数的字符串表示
-#    # - __add__: 重载加法操作符
-#    # - __sub__: 重载减法操作符
-#    # - __mul__: 重载乘法操作符
-#    # - __truediv__: 重载除法操作符
-#    # - 实现分数的比较操作（==, >, <等）
-# class Fraction:
-#     def __init__(self, numerator, denominator):
-#          # 处理分母为0的情况
-#          if denominator == 0:
-#                raise ValueError("分母不能为0")
-#
-#          # 计算最大公约数并约分
-#          gcd = self._gcd(numerator, denominator)
-#          self.numerator = numerator // gcd
-#          self.denominator = denominator // gcd
-#
-#     def _gcd(self, a, b):
-#          # 计算最大公约数（欧几里得算法）
-#          while b:
-#                a, b = b, a % b
-#          return a
-#
-#     def __str__(self):
-#          if self.denominator == 1:
-#                return f"{self.numerator}"
-#          return f"{self.numerator}/{self.denominator}"
-#
-#     def __add__(self, other):
-#          # 分数加法：通分后相加
-#          new_denominator = self.denominator * other.denominator
-#          new_numerator = (self.numerator * other.denominator +
-#                                other.numerator * self.denominator)
-#          return Fraction(new_numerator, new_denominator)
-#
-#     def __sub__(self, other):
-#          # 分数减法：通分后相减
-#          new_denominator = self.denominator * other.denominator
-#          new_numerator = (self.numerator * other.denominator -
-#                                other.numerator * self.denominator)
-#          return Fraction(new_numerator, new_denominator)
-#
-#     def __mul__(self, other):
-#          # 分数乘法：分子乘分子，分母乘分母
-#          new_numerator = self.numerator * other.numerator
-#          new_denominator = self.denominator * other.denominator
-#          return Fraction(new_numerator, new_denominator)
-#
-#     def __truediv__(self, other):
-#          # 分数除法：乘以倒数
-#          new_numerator = self.numerator * other.denominator
-#          new_denominator = self.denominator * other.numerator
-#          return Fraction(new_numerator, new_denominator)
-#
-#     def __eq__(self, other):
-#          return self.numerator == other.numerator and self.denominator == other.denominator
-#
-#     def __gt__(self, other):
-#          # 比较分数大小：通分后比较分子
-#          return self.numerator * other.denominator > other.numerator * self.denominator
-#
-#     def __lt__(self, other):
-#          return self.numerator * other.denominator < other.numerator * self.denominator
-#    # 创建分数对象
-# frac1 = Fraction(1, 2)  # 1/2
-# frac2 = Fraction(1, 3)  # 1/3
-# print(f"{frac1} + {frac2} = {frac1 + frac2}")  # 输出：1/2 + 1/3 = 5/6
-# print(f"{frac1} - {frac2} = {frac1 - frac2}")  # 输出：1/2 - 1/3 = 1/6
-# print(f"{frac1} × {frac2} = {frac1  * frac2}")  # 输出：1/2 × 1/3 = 1/6
-# print(f"{frac1} ÷ {frac2} = {frac1 / frac2}")  # 输出：1/2 ÷ 1/3 = 3/2
-# print(f"{frac1} > {frac2}: {frac1 > frac2}")  # 输出：True
-# print(f"{frac1} < {frac2}: {frac1 < frac2}")  # 输出：False
-# print(f"{frac1} == {frac2}: {frac1 == frac2}")  # 输出：False
+# 定义一个Fraction类（分数）：
+# 属性：分子(numerator)、分母(denominator)
+# 方法：
+# - __init__: 初始化分数（自动约分）
+# - __str__: 返回分数的字符串表示
+# - __add__: 重载加法操作符
+# - __sub__: 重载减法操作符
+# - __mul__: 重载乘法操作符
+# - __truediv__: 重载除法操作符
+# - 实现分数的比较操作（==, >, <等）
+class Fraction:
+    def __init__(self, numerator, denominator):
+        # 处理分母为0的情况
+        if denominator == 0:
+            raise ValueError("分母不能为0")
+
+        # 计算最大公约数并约分
+        gcd = self._gcd(numerator, denominator)
+        self.numerator = numerator // gcd
+        self.denominator = denominator // gcd
+
+    @staticmethod
+    def _gcd(a, b):
+        # 计算最大公约数（欧几里得算法）
+        while b:
+            a, b = b, a % b
+        return a
+
+    def __str__(self):
+        # 分母为1，直接返回分子
+        if self.denominator == 1:
+            return f"{self.numerator}"
+        return f"{self.numerator}/{self.denominator}"
+
+    def __add__(self, other):
+        # 分数加法：通分后相加
+        new_denominator = self.denominator * other.denominator
+        new_numerator = (self.numerator * other.denominator +
+                         other.numerator * self.denominator)
+        # 构造函数__init__中会进行约分
+        return Fraction(new_numerator, new_denominator)
+
+    def __sub__(self, other):
+        # 分数减法：通分后相减
+        new_denominator = self.denominator * other.denominator
+        new_numerator = (self.numerator * other.denominator -
+                         other.numerator * self.denominator)
+        return Fraction(new_numerator, new_denominator)
+
+    def __mul__(self, other):
+        # 分数乘法：分子乘分子，分母乘分母
+        new_numerator = self.numerator * other.numerator
+        new_denominator = self.denominator * other.denominator
+        return Fraction(new_numerator, new_denominator)
+
+    def __truediv__(self, other):
+        # 分数除法：乘以倒数
+        new_numerator = self.numerator * other.denominator
+        new_denominator = self.denominator * other.numerator
+        return Fraction(new_numerator, new_denominator)
+
+    def __eq__(self, other):
+        return self.numerator == other.numerator and self.denominator == other.denominator
+
+    # 对应 >
+    def __gt__(self, other):
+        # 比较分数大小：通分后比较分子
+        # 通分后分母一样，不作比较
+        return self.numerator * other.denominator > other.numerator * self.denominator
+
+    # 对应 <
+    def __lt__(self, other):
+        return self.numerator * other.denominator < other.numerator * self.denominator
+
+
+# 创建分数对象
+frac1 = Fraction(1, 2)  # 1/2
+frac2 = Fraction(1, 3)  # 1/3
+print(f"{frac1} + {frac2} = {frac1 + frac2}")  # 输出：1/2 + 1/3 = 5/6
+print(f"{frac1} - {frac2} = {frac1 - frac2}")  # 输出：1/2 - 1/3 = 1/6
+print(f"{frac1} × {frac2} = {frac1 * frac2}")  # 输出：1/2 × 1/3 = 1/6
+print(f"{frac1} ÷ {frac2} = {frac1 / frac2}")  # 输出：1/2 ÷ 1/3 = 3/2
+print(f"{frac1} > {frac2}: {frac1 > frac2}")  # 输出：True
+print(f"{frac1} < {frac2}: {frac1 < frac2}")  # 输出：False
+print(f"{frac1} == {frac2}: {frac1 == frac2}")  # 输出：False
