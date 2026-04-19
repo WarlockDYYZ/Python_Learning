@@ -1,4 +1,7 @@
 from functools import reduce
+import time
+import math
+
 
 # 函数基础与高级特性
 # 4.1 函数定义与参数传递
@@ -20,6 +23,8 @@ def student_info(name: str, age: int):
 
 
 student_info("Alice", 20)  # 正确：按位置传入
+
+
 # 下面虽然参数位置错误，但还是会正常输出
 # Python 的类型注解（:str / :int）只是「提示」，不是「强制规定」！
 # 它不会阻止你传错类型
@@ -224,7 +229,7 @@ print("*" * 50)
 
 # 2. 使用map()和Lambda计算列表中每个数的立方
 numbers = [1, 2, 3, 4, 5]
-cubes = map(lambda x: x **3, numbers)
+cubes = map(lambda x: x ** 3, numbers)
 print(list(cubes))  # 输出：[1, 8, 27, 64, 125]
 print("*" * 50)
 
@@ -242,462 +247,588 @@ print("*" * 50)
 # 练习Lambda在排序中的应用
 # 1. 对字典列表按年龄排序
 people = [
-             {"name": "Alice", "age": 30},
-             {"name": "Bob", "age": 25},
-             {"name": "Charlie", "age": 35}
+    {"name": "Alice", "age": 30},
+    {"name": "Bob", "age": 25},
+    {"name": "Charlie", "age": 35}
 ]
 people_sorted_by_age = sorted(people, key=lambda x: x["age"])
 print(people_sorted_by_age)  # 按年龄升序
 print("*" * 50)
 
 # 2. 对元组列表按第二个元素降序排序
-# tuples = [(1, 3), (2, 2), (3, 1)]
-# tuples_sorted = sorted(tuples, key=lambda x: x[1], reverse = True)
-# print(tuples_sorted)  # 按第二个元素降序
+tuples = [(1, 3), (2, 2), (3, 1)]
+# sorted(iterable, key=None, reverse=False)
+# reverse（可选，默认 False）,False → 升序（从小到大）True → 降序（从大到小）
+# 作用：对序列排序，返回一个新的排好序的列表
+# 不会修改原数据，和列表的 .sort() 不一样
+tuples_sorted = sorted(tuples, key=lambda x: x[1], reverse=True)
+print(tuples_sorted)  # 按第二个元素降序
+print("*" * 50)
+
 # 3. 对字符串列表按长度排序
-# strings = ["apple", "banana", "cherry", "date"]
-# strings_sorted = sorted(strings, key=lambda x: len(x))
-# print(strings_sorted)  # 按长度升序
-# 练习
-# 6：复杂
-# Lambda
-# 表达式
-#    # 1. 定义一个Lambda，判断一个数是否为偶数
-# is _even = lambda x: x % 2 == 0
-# print( is_even(4))  # 输出：True
-# print( is_even(5))  # 输出：False
+strings = ["apple", "banana", "cherry", "date"]
+strings_sorted = sorted(strings, key=lambda x: len(x))
+print(strings_sorted)  # 按长度升序
+print("*" * 50)
+
+# 练习Lambda表达式
+# Lambda函数，匿名很重要，以下仅用于学习演示
+# 1. 定义一个Lambda，判断一个数是否为偶数
+is_even = lambda x: x % 2 == 0
+print(is_even(4))  # 输出：True
+print(is_even(5))  # 输出：False
+print("*" * 50)
 #    # 2. 定义一个Lambda，判断一个年份是否为闰年
-# is _leap_year = lambda year: year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
-# print( is_leap_year(2020))  # 输出：True
-# print( is_leap_year(2021))  # 输出：False
+is_leap_year = lambda year: year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+print(is_leap_year(2020))  # 输出：True
+print(is_leap_year(2021))  # 输出：False
+print("*" * 50)
 #    # 3. 定义一个Lambda，计算BMI（身体质量指数）
-# bmi_calculator = lambda weight, height: weight / (height  *  * 2)
-# print(bmi_calculator(70, 1.75))  # 输出：22.857...
+bmi_calculator = lambda weight, height: weight / (height ** 2)
+print(bmi_calculator(70, 1.75))  # 输出：22.857...
+print("*" * 50)
+
+
 # 4.3
-# 函数高级特性（45
-# 分钟）
+# 函数高级特性
 # 复习要点
 # - 装饰器的定义和使用
 # - 生成器与迭代器的原理和应用
 # - 函数的嵌套定义和闭包
-# 装饰器基础
-#    # 装饰器本质是一个高阶函数，接受函数作为参数并返回新函数
-# def decorator(func):
-#     def wrapper(*args, **kwargs):
-#          # 在调用原函数前执行的代码
-#          print("装饰器开始执行")
-#          result = func(*args, **kwargs)
-#          # 在调用原函数后执行的代码
-#          print("装饰器执行结束")
-#          return result
-#     return wrapper
-#    # 使用装饰器
-# @decorator
-# def say
-#      _hello(name):
-#     print(f"Hello, {name}!")
-#     return "Hello"
-# say_hello("Alice")
+# 装饰器基础: 装饰器本质是一个高阶函数，接受函数作为参数并返回新函数
+def decorator(func):
+    def wrapper(*args, **kwargs):
+        # 在调用原函数前执行的代码
+        print("装饰器开始执行")
+        result = func(*args, **kwargs)
+        # 在调用原函数后执行的代码
+        print("装饰器执行结束")
+        return result
+
+    return wrapper
+
+
+# 使用装饰器
+@decorator
+def say_hello(name):
+    print(f"Hello, {name}!")
+    return "Hello"
+
+
+say_hello("Alice")
+print("*" * 50)
+
+
 # 生成器与迭代器
-#    # 生成器函数：使用yield关键字
-# def generator
-#      _function():
-#     yield 1
-#     yield 2
-#     yield 3
-#    # 创建生成器对象
-# gen = generator_function()
-# print(next(gen))  # 输出：1
-# print(next(gen))  # 输出：2
-# print(next(gen))  # 输出：3
-#    # 生成器表达式
-# gen_expression = (x for x in range(1, 10) if x % 2 == 0)
-# print(list(gen_expression))  # 输出：[2, 4, 6, 8]
+# 生成器是一种可以按需逐个产生值、而不是一次性创建所有值的迭代器
+# 它使用 yield 关键字返回数据，暂停并保留函数状态，下次调用时从暂停处继续执行
+# 核心特点
+# 占用内存极小：一边循环一边生成，不把所有结果存在内存里
+# 惰性计算：只有迭代到它时才计算下一个值
+# 是迭代器，可以用 for 遍历、next() 获取下一个值
+# 函数中只要有 yield，就是生成器函数
+
+# 生成器函数：使用yield关键字
+def generator_function():
+    yield 1
+    yield 2
+    yield 3
+
+
+# 创建生成器对象
+gen = generator_function()
+print(next(gen))  # 输出：1
+print(next(gen))  # 输出：2
+print(next(gen))  # 输出：3
+print("*" * 50)
+
+# 生成器表达式
+gen_expression = (x for x in range(1, 10) if x % 2 == 0)
+print(list(gen_expression))  # 输出：[2, 4, 6, 8]
+print("*" * 50)
+
+
 # 闭包应用
-#    # 闭包示例：计算移动平均值
-# def moving
-#      _average():
-#     values = []
-#     def calculate_average(new_value):
-#          values.append(new_value)
-#          return sum(values) / len(values)
-#     return calculate_average
-#    # 创建闭包实例
-# avg_calculator = moving_average()
-# print(avg_calculator(10))  # 输出：10.0
-# print(avg_calculator(20))  # 输出：15.0
-# print(avg_calculator(30))  # 输出：20.0
-# 练习题
+# 闭包就是：函数嵌套函数时，内层函数引用了外层函数的变量，并且外层函数把内层函数返回出去，这样就形成了闭包
+# 函数 + 它引用的外部环境变量 → 捆绑在一起 = 闭包
+# 外部函数已经执行完，外部函数中变量也不会被销毁
+# 这种带着环境一起带走的函数，就是闭包
+# 闭包有什么用
+# 1. 保留状态,比如计数器，不用全局变量也能记住当前数字。
+# 2. 装饰器的底层就是闭包
+# def decorator(func):
+#     def wrapper():
+#         ...
+#     return wrapper
+# 这就是标准闭包：wrapper 引用了外层 func
+# 3. 避免全局变量污染
+
+# 闭包示例：计算移动平均值
+def moving_average():
+    values = []
+
+    def calculate_average(new_value):
+        values.append(new_value)
+        return sum(values) / len(values)
+
+    return calculate_average
+
+
+# 创建闭包实例
+avg_calculator = moving_average()
+print(avg_calculator(10))  # 输出：10.0
+print(avg_calculator(20))  # 输出：15.0
+print(avg_calculator(30))  # 输出：20.0
+print("*" * 50)
+
+
 # 练习
 # 7：创建装饰器
-#    # 1. 创建一个计时装饰器，计算函数执行时间
-# import time
-# def timer
-#      _decorator(func):
-#     def wrapper(*args, **kwargs):
-#          start_time = time.time()
-#          result = func(*args, **kwargs)
-#          end_time = time.time()
-#          print(f"{func.__name__} 执行时间：{end_time - start_time:.4f}秒")
-#          return result
-#     return wrapper
-#    # 使用装饰器
-# @timer
-# _decorator
-# def heavy
-#      _function(n):
-#     result = 0
-#     for i in range(n):
-#          result += i
-#     return result
-# print(heavy_function(1000000))  # 计算1到100万的和
-#    # 2. 创建一个日志装饰器，记录函数调用信息
-# def logger
-#      _decorator(func):
-#     def wrapper(*args, **kwargs):
-#          print(f"调用函数：{func.__name__}")
-#          print(f"参数：args={args}, kwargs={kwargs}")
-#          result = func(*args, **kwargs)
-#          print(f"返回值：{result}")
-#          return result
-#     return wrapper
-# @logger
-# _decorator
-# def add(a, b):
-#     return a + b
-# @logger
-# _decorator
-# def multiply(a, b, c=1):
-#     return a * b * c
-# add(3, 5)
-# multiply(2, 3, 4)
+# 1. 创建一个计时装饰器，计算函数执行时间
+
+
+def timer_decorator(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        print(f"{func.__name__} 执行时间：{end_time - start_time:.4f}秒")
+        return result
+
+    return wrapper
+
+
+# 使用装饰器
+@timer_decorator
+def heavy_function(n):
+    result = 0
+    for i in range(n):
+        result += i
+    return result
+
+
+print(heavy_function(1000000))  # 计算1到100万的和
+print("*" * 50)
+
+
+# 2. 创建一个日志装饰器，记录函数调用信息
+def logger_decorator(func):
+    def wrapper(*args, **kwargs):
+        print(f"调用函数：{func.__name__}")
+        print(f"参数：args={args}, kwargs={kwargs}")
+        result = func(*args, **kwargs)
+        print(f"返回值：{result}")
+        return result
+
+    return wrapper
+
+
+@logger_decorator
+def add(a, b):
+    return a + b
+
+
+@logger_decorator
+def multiply(a, b, c=1):
+    return a * b * c
+
+
+add(3, 5)
+multiply(2, 3, 4)
+print("*" * 50)
+
+
 # 练习
 # 8：生成器应用
-#    # 1. 创建一个斐波那契数列生成器
-# def fibonacci
-#      _generator():
-#     a, b = 0, 1
-#     while True:
-#          yield a
-#          a, b = b, a + b
+# 1. 创建一个斐波那契数列生成器
+def fibonacci_generator():
+    a, b = 0, 1
+    while True:
+        yield a
+        a, b = b, a + b
+
+
 #    # 使用生成器
-# fib_gen = fibonacci_generator()
-# for  _ in range(10):
-#     print(next(fib_gen), end=" ")  # 输出：0 1 1 2 3 5 8 13 21 34
-# # 2. 创建一个质数生成器
-# def prime
-#      _generator():
-#     yield 2  # 2是最小的质数
-#     candidate = 3
-#     while True:
-#          is_prime = True
-#          for i in range(2, int(candidate**0.5) + 1):
-#                if candidate % i == 0:
-#                     is_prime = False
-#                     break
-#          if is_prime:
-#                yield candidate
-#          candidate += 2  # 只检查奇数
-#    # 使用质数生成器
-# prime_gen = prime_generator()
-# for  _ in range(10):
-#     print(next(prime_gen), end=" ")  # 输出前10个质数
-#    # 3. 使用生成器处理大文件
-# def read
-#      _large_file(file_path):
-#     with open(file_path, 'r') as f:
-#          for line in f:
-#                yield line.strip()
-#    # 模拟大文件处理
+fib_gen = fibonacci_generator()
+for _ in range(10):
+    print(next(fib_gen), end=" ")  # 输出：0 1 1 2 3 5 8 13 21 34
+print("\n" + "*" * 50)
+
+
+# 2. 创建一个质数生成器
+def prime_generator():
+    # 第一个返回值就是
+    # 2（唯一的偶质数）
+    # 执行到这里，函数暂停，把
+    # 2
+    # 抛出去
+    # 下次调用再从这里继续往下走
+    yield 2  # 2是最小的质数
+    candidate = 3
+    while True:
+        is_prime = True
+        for i in range(2, int(candidate ** 0.5) + 1):
+            if candidate % i == 0:
+                is_prime = False
+                break
+        # 是质数 → 用yield 返回, 作用类似return
+        # 函数暂停，等待下次调用
+        if is_prime:
+            yield candidate
+        candidate += 2  # 只检查奇数
+
+
+# 使用质数生成器
+prime_gen = prime_generator()
+for _ in range(10):
+    print(next(prime_gen), end=" ")  # 输出前10个质数
+print("\n" + "*" * 50)
+
+
+# 3. 使用生成器处理大文件
+def read_large_file(file_path):
+    with open(file_path, 'r') as f:
+        for line in f:
+            yield line.strip()
+
+
+# 模拟大文件处理, 没有这个文件
 # for line in read_large_file('large_file.txt'):
 #     print(line)  # 逐行处理，不占用大量内存
+# print("*" * 50)
+
+
 # 练习
 # 9：闭包和函数嵌套
-#    # 1. 使用闭包创建计数器
-# def counter():
-#     count = 0
-#     def increment():
-#          nonlocal count  # 使用nonlocal关键字修改外部变量
-#          count += 1
-#          return count
-#     return increment
-#    # 创建计数器实例
-# counter1 = counter()
-# print(counter1())  # 输出：1
-# print(counter1())  # 输出：2
-# print(counter1())  # 输出：3
-#    # 2. 函数嵌套示例：创建数学函数
-# def create
-#      _math_function(operation):
-#     def add(a, b):
-#          return a + b
-#
-#     def multiply(a, b):
-#          return a * b
-#
-#     def subtract(a, b):
-#          return a - b
-#
-#     if operation == '+':
-#          return add
-#     elif operation == '*':
-#          return multiply
-#     elif operation == '-':
-#          return subtract
-#    # 创建不同的数学函数
-# add_func = create_math_function('+')
-# multiply_func = create_math_function('*')
-# subtract_func = create_math_function('-')
-# print(add_func(5, 3))  # 输出：8
-# print(multiply_func(4, 6))  # 输出：24
-# print(subtract_func(10, 7))  # 输出：3
-# 第
-# 5
-# 天：面向对象编程基础（2 - 3
-# 小时）
-# 5.1
-# 类与对象（60
-# 分钟）
+# 1. 使用闭包创建计数器
+def counter():
+    count = 0
+
+    def increment():
+        nonlocal count  # 使用nonlocal关键字修改外部变量
+        count += 1
+        return count
+
+    return increment
+
+
+# 创建计数器实例
+counter1 = counter()
+print(counter1())  # 输出：1
+print(counter1())  # 输出：2
+print(counter1())  # 输出：3
+print("*" * 50)
+
+
+# 2. 函数嵌套示例：创建数学函数
+def create_math_function(operation):
+    def add(a, b):
+        return a + b
+
+    def multiply(a, b):
+        return a * b
+
+    def subtract(a, b):
+        return a - b
+
+    if operation == '+':
+        return add
+    elif operation == '*':
+        return multiply
+    elif operation == '-':
+        return subtract
+
+
+# 创建不同的数学函数
+add_func = create_math_function('+')
+multiply_func = create_math_function('*')
+subtract_func = create_math_function('-')
+# 返回函数本身，函数需要两个参数
+print(add_func(5, 3))  # 输出：8
+print(multiply_func(4, 6))  # 输出：24
+print(subtract_func(10, 7))  # 输出：3
+print("*" * 50)
+
+
+# 面向对象编程基础
+# 5.1 类与对象
 # 复习要点
 # - 类的定义和对象实例化
 # - 构造方法__init__和析构方法__del__
 # - 实例属性和类属性的区别
 # - 实例方法、类方法和静态方法
+
+
 # 类定义基础
-#    # 定义一个Person类
-# class Person:
-#     # 类属性
-#     species = "人类"
-#
-#     # 构造方法
-#     def __init__(self, name, age, gender):
-#          # 实例属性
-#          self.name = name
-#          self.age = age
-#          self.gender = gender
-#
-#     # 实例方法
-#     def eat(self, food):
-#          print(f"{self.name}正在吃{food}")
-#
-#     def work(self):
-#          print(f"{self.name}正在工作")
-#
-#     # 类方法
-#     @classmethod
-#     def change_species(cls, new_species):
-#          cls.species = new_species
-#
-#     # 静态方法
-#     @staticmethod
-#     def is_adult(age):
-#          return age >= 18
+# 定义一个Person类
+class Person:
+    # 类属性
+    species = "人类"
+
+    # 构造方法
+    def __init__(self, name, age, gender):
+        # 实例属性
+        self.name = name
+        self.age = age
+        self.gender = gender
+
+    # 实例方法
+    def eat(self, food):
+        print(f"{self.name}正在吃{food}")
+
+    def work(self):
+        print(f"{self.name}正在工作")
+
+    # 类方法
+    @classmethod
+    def change_species(cls, new_species):
+        cls.species = new_species
+
+    # 静态方法
+    @staticmethod
+    def is_adult(age):
+        return age >= 18
+
+
 # 对象实例化与使用
-#    # 创建对象
-# person1 = Person("张三", 25, "男")
-# person2 = Person("李四", 30, "女")
-#    # 访问实例属性
-# print(person1.name)  # 输出：张三
-# print(person2.age)  # 输出：30
-#    # 调用实例方法
-# person1.eat("米饭")  # 输出：张三正在吃米饭
-# person2.work()  # 输出：李四正在工作
-#    # 访问类属性
-# print(Person.species)  # 输出：人类
-# print(person1.species)  # 输出：人类（对象也可访问类属性）
-#    # 调用类方法
-# Person.change_species("智人")
-# print(Person.species)  # 输出：智人
-#    # 调用静态方法
-# print(Person. is_adult(25))  # 输出：True
-# print(Person. is_adult(17))  # 输出：False
+# 创建对象
+person1 = Person("张三", 25, "男")
+person2 = Person("李四", 30, "女")
+# 访问实例属性
+print(person1.name)  # 输出：张三
+print(person2.age)  # 输出：30
+# 调用实例方法
+person1.eat("米饭")  # 输出：张三正在吃米饭
+person2.work()  # 输出：李四正在工作
+# 访问类属性
+print(Person.species)  # 输出：人类
+print(person1.species)  # 输出：人类（对象也可访问类属性）
+# 调用类方法
+Person.change_species("智人")
+print(Person.species)  # 输出：智人
+# 调用静态方法
+print(Person.is_adult(25))  # 输出：True
+print(Person.is_adult(17))  # 输出：False
+print("*" * 50)
+
+
 # 练习题
 # 练习
 # 1：定义学生类
-#    # 定义一个Student类，包含以下属性和方法：
-#    # 属性：姓名(name)、年龄(age)、学号(student_id)、成绩(score)
-#    # 方法：
-#    # - __init__: 初始化属性
-#    # - get_info: 返回学生基本信息字符串
-#    # - set_score: 设置成绩（需检查成绩是否在0-100范围内）
-#    # - get_grade: 返回成绩等级（90+优秀，80-89良好，70-79中等，60-69及格，60以下不及格）
-#    # - is_passed: 判断是否及格
-# class Student:
-#     def __init__(self, name, age, student_id):
-#          self.name = name
-#          self.age = age
-#          self.student_id = student_id
-#          self.score = 0  # 默认成绩为0
-#
-#     def get_info(self):
-#          return f"姓名：{self.name}，年龄：{self.age}岁，学号：{self.student_id}，成绩：{self.score}分"
-#
-#     def set_score(self, score):
-#          if 0 <= score <= 100:
-#                self.score = score
-#          else:
-#                raise ValueError("成绩必须在0-100分之间")
-#
-#     def get_grade(self):
-#          if self.score >= 90:
-#                return "优秀"
-#          elif self.score >= 80:
-#                return "良好"
-#          elif self.score >= 70:
-#                return "中等"
-#          elif self.score >= 60:
-#                return "及格"
-#          else:
-#                return "不及格"
-#
-#     def is_passed(self):
-#          return self.score >= 60
-#    # 创建学生对象并测试
-# stu1 = Student("王五", 18, "2026001")
-# stu1.set_score(85)
-# print(stu1.get_info())  # 输出：姓名：王五，年龄：18岁，学号：2026001，成绩：85分
-# print(f"成绩等级：{stu1.get_grade()}")  # 输出：良好
-# print(f"是否及格：{'是' if stu1. is_passed() else '否'}")  # 输出：是
-# stu2 = Student("赵六", 17, "2026002")
-# stu2.set_score(55)
-# print(stu2.get_info())  # 输出：姓名：赵六，年龄：17岁，学号：2026002，成绩：55分
-# print(f"成绩等级：{stu2.get_grade()}")  # 输出：不及格
-# print(f"是否及格：{'是' if stu2. is_passed() else '否'}")  # 输出：否
+# 定义一个Student类，包含以下属性和方法：
+# 属性：姓名(name)、年龄(age)、学号(student_id)、成绩(score)
+# 方法：
+# - __init__: 初始化属性
+# - get_info: 返回学生基本信息字符串
+# - set_score: 设置成绩（需检查成绩是否在0-100范围内）
+# - get_grade: 返回成绩等级（90+优秀，80-89良好，70-79中等，60-69及格，60以下不及格）
+# - is_passed: 判断是否及格
+class Student:
+    def __init__(self, name, age, student_id):
+        self.name = name
+        self.age = age
+        self.student_id = student_id
+        self.score = 0  # 默认成绩为0
+
+    def get_info(self):
+        return f"姓名：{self.name}，年龄：{self.age}岁，学号：{self.student_id}，成绩：{self.score}分"
+
+    def set_score(self, score):
+        if 0 <= score <= 100:
+            self.score = score
+        else:
+            raise ValueError("成绩必须在0-100分之间")
+
+    def get_grade(self):
+        if self.score >= 90:
+            return "优秀"
+        elif self.score >= 80:
+            return "良好"
+        elif self.score >= 70:
+            return "中等"
+        elif self.score >= 60:
+            return "及格"
+        else:
+            return "不及格"
+
+    def is_passed(self):
+        return self.score >= 60
+
+
+# 创建学生对象并测试
+stu1 = Student("王五", 18, "2026001")
+stu1.set_score(85)
+print(stu1.get_info())  # 输出：姓名：王五，年龄：18岁，学号：2026001，成绩：85分
+print(f"成绩等级：{stu1.get_grade()}")  # 输出：良好
+print(f"是否及格：{'是' if stu1.is_passed() else '否'}")  # 输出：是
+stu2 = Student("赵六", 17, "2026002")
+stu2.set_score(55)
+print(stu2.get_info())  # 输出：姓名：赵六，年龄：17岁，学号：2026002，成绩：55分
+print(f"成绩等级：{stu2.get_grade()}")  # 输出：不及格
+print(f"是否及格：{'是' if stu2.is_passed() else '否'}")  # 输出：否
+print("*" * 50)
+
+
 # 练习
 # 2：定义几何图形类
-#    # 定义一个Circle类（圆形）：
-#    # 属性：半径(radius)
-#    # 方法：
-#    # - __init__: 初始化半径
-#    # - get_area: 计算面积
-#    # - get_circumference: 计算周长
-#    # 定义一个Rectangle类（矩形）：
-#    # 属性：长(length)、宽(width)
-#    # 方法：
-#    # - __init__: 初始化长和宽
-#    # - get_area: 计算面积
-#    # - get_perimeter: 计算周长
-# import math
-# class Circle:
-#     def __init__(self, radius):
-#          self.radius = radius
-#
-#     def get_area(self):
-#          return math.pi * self.radius ** 2
-#
-#     def get_circumference(self):
-#          return 2 * math.pi * self.radius
-# class Rectangle:
-#     def __init__(self, length, width):
-#          self.length = length
-#          self.width = width
-#
-#     def get_area(self):
-#          return self.length * self.width
-#
-#     def get_perimeter(self):
-#          return 2 * (self.length + self.width)
-#    # 测试代码
-# circle = Circle(5)
-# print(f"圆的面积：{circle.get_area():.2f}")  # 输出：78.54
-# print(f"圆的周长：{circle.get_circumference():.2f}")  # 输出：31.42
-# rectangle = Rectangle(6, 4)
-# print(f"矩形的面积：{rectangle.get_area()}")  # 输出：24
-# print(f"矩形的周长：{rectangle.get_perimeter()}")  # 输出：20
+# 定义一个Circle类（圆形）：
+# 属性：半径(radius)
+# 方法：
+# - __init__: 初始化半径
+# - get_area: 计算面积
+# - get_circumference: 计算周长
+# 定义一个Rectangle类（矩形）：
+# 属性：长(length)、宽(width)
+# 方法：
+# - __init__: 初始化长和宽
+# - get_area: 计算面积
+# - get_perimeter: 计算周长
+class Circle:
+    def __init__(self, radius):
+        self.radius = radius
+
+    def get_area(self):
+        return math.pi * self.radius ** 2
+
+    def get_circumference(self):
+        return 2 * math.pi * self.radius
+
+
+class Rectangle:
+    def __init__(self, length, width):
+        self.length = length
+        self.width = width
+
+    def get_area(self):
+        return self.length * self.width
+
+    def get_perimeter(self):
+        return 2 * (self.length + self.width)
+
+
+# 测试代码
+circle = Circle(5)
+print(f"圆的面积：{circle.get_area():.2f}")  # 输出：78.54
+print(f"圆的周长：{circle.get_circumference():.2f}")  # 输出：31.42
+rectangle = Rectangle(6, 4)
+print(f"矩形的面积：{rectangle.get_area()}")  # 输出：24
+print(f"矩形的周长：{rectangle.get_perimeter()}")  # 输出：20
+print("*" * 50)
+
+
 # 练习
 # 3：定义银行账户类
-#    # 定义一个BankAccount类：
-#    # 属性：账号(account_number)、余额(balance)、客户姓名(customer_name)
-#    # 方法：
-#    # - __init__: 初始化属性（余额默认0）
-#    # - deposit: 存款（增加余额）
-#    # - withdraw: 取款（减少余额，不能透支）
-#    # - get_balance: 获取当前余额
-#    # - get_account_info: 返回账户信息
-# class BankAccount:
-#     def __init__(self, account_number, customer_name, balance=0):
-#          self.account_number = account_number
-#          self.customer_name = customer_name
-#          self.balance = balance
-#
-#     def deposit(self, amount):
-#          if amount > 0:
-#                self.balance += amount
-#                print(f"存入{amount}元，当前余额：{self.balance}元")
-#          else:
-#                print("存款金额必须大于0")
-#
-#     def withdraw(self, amount):
-#          if amount > 0:
-#                if self.balance >= amount:
-#                     self.balance -= amount
-#                     print(f"取出{amount}元，当前余额：{self.balance}元")
-#                else:
-#                     print("余额不足，无法取款")
-#          else:
-#                print("取款金额必须大于0")
-#
-#     def get_balance(self):
-#          return self.balance
-#
-#     def get_account_info(self):
-#          return f"账户名：{self.customer_name}，账号：{self.account_number}，余额：{self.balance}元"
-#    # 创建账户并操作
-# account = BankAccount("6228480000000000000", "张三", 1000)
-# print(account.get_account_info())  # 输出账户信息
-# account.deposit(500)  # 存入500
-# account.withdraw(300)  # 取出300
-# account.withdraw(2000)  # 余额不足，无法取出
-# print(f"当前余额：{account.get_balance()}元")  # 输出：1200
-# 5.2
-# 继承与多态（60
-# 分钟）
+# 定义一个BankAccount类：
+# 属性：账号(account_number)、余额(balance)、客户姓名(customer_name)
+# 方法：
+# - __init__: 初始化属性（余额默认0）
+# - deposit: 存款（增加余额）
+# - withdraw: 取款（减少余额，不能透支）
+# - get_balance: 获取当前余额
+# - get_account_info: 返回账户信息
+class BankAccount:
+    def __init__(self, account_number, customer_name, balance=0):
+        self.account_number = account_number
+        self.customer_name = customer_name
+        self.balance = balance
+
+    def deposit(self, amount):
+        if amount > 0:
+            self.balance += amount
+            print(f"存入{amount}元，当前余额：{self.balance}元")
+        else:
+            print("存款金额必须大于0")
+
+    def withdraw(self, amount):
+        if amount > 0:
+            if self.balance >= amount:
+                self.balance -= amount
+                print(f"取出{amount}元，当前余额：{self.balance}元")
+            else:
+                print("余额不足，无法取款")
+        else:
+            print("取款金额必须大于0")
+
+    def get_balance(self):
+        return self.balance
+
+    def get_account_info(self):
+        return f"账户名：{self.customer_name}，账号：{self.account_number}，余额：{self.balance}元"
+
+
+# 创建账户并操作
+account = BankAccount("6228480000000000000", "张三", 1000)
+print(account.get_account_info())  # 输出账户信息
+account.deposit(500)  # 存入500
+account.withdraw(300)  # 取出300
+account.withdraw(2000)  # 余额不足，无法取出
+print(f"当前余额：{account.get_balance()}元")  # 输出：1200
+print("*" * 50)
+
+
+# 5.2 继承与多态
 # 复习要点
 # - 单继承和多继承的语法
 # - 方法重写（Override）
-# - super()
-# 函数的使用
+# - super()函数的使用
 # - 多态的实现和应用
+
 # 继承基础
-#    # 父类（基类）
-# class Animal:
-#     def __init__(self, name):
-#          self.name = name
-#
-#     def speak(self):
-#          print(f"{self.name}发出声音")
-#    # 子类（派生类）继承Animal类
-# class Dog(Animal):
-#     def speak(self):  # 重写父类方法
-#          print(f"{self.name}汪汪叫")
-# class Cat(Animal):
-#     def speak(self):  # 重写父类方法
-#          print(f"{self.name}喵喵叫")
-#    # 创建子类对象
-# dog = Dog("大黄")
-# cat = Cat("小白")
-#    # 调用speak方法（多态体现）
-# dog.speak()  # 输出：大黄汪汪叫
-# cat.speak()  # 输出：小白喵喵叫
+# 父类（基类）
+class Animal:
+    def __init__(self, name):
+        self.name = name
+
+    def speak(self):
+        print(f"{self.name}发出声音")
+
+
+# 子类（派生类）继承Animal类
+class Dog(Animal):
+    def speak(self):  # 重写父类方法
+        print(f"{self.name}汪汪叫")
+
+
+class Cat(Animal):
+    def speak(self):  # 重写父类方法
+        print(f"{self.name}喵喵叫")
+
+
+# 创建子类对象
+dog = Dog("大黄")
+cat = Cat("小白")
+# 调用speak方法（多态体现）
+dog.speak()  # 输出：大黄汪汪叫
+cat.speak()  # 输出：小白喵喵叫
+
+
 # 多继承示例
-#    # 多继承示例
-# class Flyable:
-#     def fly(self):
-#          print("我会飞")
-# class Swimmable:
-#     def swim(self):
-#          print("我会游泳")
-#    # 企鹅类继承Flyable和Swimmable
-# class Penguin(Flyable, Swimmable):
-#     def walk(self):
-#          print("我会走路")
-#    # 创建企鹅对象
-# penguin = Penguin()
-# penguin.fly()  # 输出：我会飞
-# penguin.swim()  # 输出：我会游泳
-# penguin.walk()  # 输出：我会走路
-# super()
-# 函数使用
+class Flyable:
+    @staticmethod
+    def fly():
+        print("我会飞")
+
+
+class Swimmable:
+    @staticmethod
+    def swim():
+        print("我会游泳")
+
+
+# 企鹅类继承Flyable和Swimmable
+class Penguin(Flyable, Swimmable):
+    @staticmethod
+    def walk():
+        print("我会走路")
+
+
+# 创建企鹅对象
+penguin = Penguin()
+penguin.fly()  # 输出：我会飞, 企鹅应该不会飞
+penguin.swim()  # 输出：我会游泳
+penguin.walk()  # 输出：我会走路
+
+# super()函数使用
 #    # 父类
 # class Parent:
 #     def __init__(self, value):
