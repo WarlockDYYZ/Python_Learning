@@ -198,3 +198,141 @@ with open('people.txt', 'r', encoding='utf-8') as f:
     for row in reader:
         print(f"姓名：{row[0]}，年龄：{row[1]}，城市：{row[2]}")
 print("*" * 50)
+
+# 6.2 异常处理机制
+# 复习要点
+# - 异常处理的基本语法（try-except-else-finally）
+# - 常见异常类型（FileNotFoundError、ZeroDivisionError、ValueError 等）
+# - 自定义异常类
+# - 异常的传递机制
+
+# 异常处理基本语法
+# 基本异常处理结构
+try:
+    # 可能抛出异常的代码
+    x = 10 / 0
+except ZeroDivisionError as e:
+    # 处理除零异常
+    print(f"发生除零错误：{e}")
+except ValueError as e:
+    # 处理值错误
+    print(f"发生值错误：{e}")
+except Exception as e:
+    # 处理其他所有异常
+    print(f"发生其他异常：{e}")
+else:
+    # 没有异常时执行
+    print("代码执行成功")
+finally:
+    # 无论是否发生异常都会执行
+    print("finally块执行")
+print("*" * 50)
+
+# 常见异常类型
+# 常见异常类型及触发场景
+exceptions = {
+    'FileNotFoundError': '文件不存在',
+    'ZeroDivisionError': '除以零',
+    'ValueError': '值错误（如类型转换失败）',
+    'TypeError': '类型错误（如字符串和数字相加）',
+    'IndexError': '索引越界',
+    'KeyError': '字典键不存在',
+    'AttributeError': '对象没有该属性',
+    'IOError': '输入输出错误',
+    'MemoryError': '内存不足',
+    'TimeoutError': '操作超时'
+}
+for exc_type, desc in exceptions.items():
+    print(f"{exc_type}: {desc}")
+print("*" * 50)
+
+
+# 自定义异常
+# 自定义异常类
+class InvalidAgeError(Exception):
+    """年龄无效异常"""
+
+    def __init__(self, age, message="年龄必须在0-150之间"):
+        self.age = age
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"{self.age} 是无效的年龄。{self.message}"
+
+
+# 使用自定义异常
+try:
+    # age = int(input("请输入年龄："))
+    age = 10000
+    if age < 0 or age > 150:
+        raise InvalidAgeError(age)
+    print(f"输入的年龄是：{age}")
+except InvalidAgeError as e:
+    print(f"自定义异常：{e}")
+# 输入 199.9 → 得到字符串 "199.9" → 传给 int() 转换失败→ 触发 except ValueError
+except ValueError:
+    print("错误：请输入有效的整数年龄")
+print("*" * 50)
+
+
+# 练习 4：异常处理实战
+# 1. 安全的文件读取函数
+def safe_read_file(file_path):
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        print(f"错误：文件 {file_path} 不存在")
+        return None
+    except PermissionError:
+        print(f"错误：没有权限读取文件 {file_path}")
+        return None
+    except Exception as e:
+        print(f"读取文件时发生错误：{e}")
+        return None
+
+
+# 测试
+content = safe_read_file('example.txt')
+if content:
+    print("文件内容：")
+    print(content)
+
+
+# 2. 安全的除法函数
+def safe_divide(a, b):
+    try:
+        if b == 0:
+            raise ValueError("除数不能为0")
+        return a / b
+    except TypeError:
+        print("错误：参数必须是数字")
+        return None
+    except ValueError as e:
+        print(f"错误：{e}")
+        return None
+
+
+# 测试
+print(safe_divide(10, 2))  # 输出：5.0
+print(safe_divide(10, 0))  # 输出：错误：除数不能为0
+print(safe_divide(10, '2'))  # 输出：错误：参数必须是数字
+print()
+
+
+# 3. 安全的类型转换函数
+def safe_convert_to_int(value):
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        print(f"无法将 {value} 转换为整数")
+        return None
+
+
+# 测试
+print(safe_convert_to_int("123"))  # 输出：123
+print(safe_convert_to_int("abc"))  # 输出：无法将 abc 转换为整数
+# 与前面不同，该处的3.14为数字类型可以转换，上方"123",转换后为整数可以转换，"1.23"就无法转换
+print(safe_convert_to_int(3.14))  # 输出：3
+print(safe_convert_to_int(True))  # 输出：1
