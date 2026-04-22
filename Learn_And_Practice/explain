@@ -4,3 +4,4 @@
 Clear: 重复在网站下载相同的数据表时，如果不及时清理下载数据，下载的文件会有后缀如XXXXX(12).txt,消除这个后缀，固定文件名，方便后续处理
 Clear_rename: 类似Clear
 upgrade_rate: 浓墨重彩的一笔，利用上个星期学的知识，使用pandas分组统计透视展开，计算升级率
+calculate_matched_consumption: 连个不同的表根据相同列，相加所选对应的值，并保存为.xlsx

@@ -666,7 +666,15 @@ print("resize为1x5后（用0填充）: ")
 print(arr)
 # 调整为3x3，元素不足
 try:
-    arr.resize(3, 3)
+    # arr.resize(3, 3)不会抛异常，它会自动用0补齐，把数组强行变成3x3
+    # resize(3, 3) 直接修改原数组
+    # reshape(3, 3)
+    # 必须元素数量完全匹配
+    # 不匹配 → 直接报错
+    # 不修改原数组，返回新数组
+    # 用括号包起来，代表一个形状元组, 不会出现编辑器错误
+    arr.resize((3, 3))
+    print(arr)
 except ValueError as e:
     print("错误: ", e)
 print("*" * 50)
