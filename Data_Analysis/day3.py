@@ -360,3 +360,332 @@ def is_view(arr):
 
 print(f"view是否为视图：{is_view(view)}")
 print(f"copy是否为视图：{is_view(copy)}")
+print("*" * 50)
+
+
+# 3. 索引、切片与形状操作
+# 3.1 一维数组索引与切片
+
+# 3.1.1 基本索引操作
+# 正向索引
+# 一维数组的基本索引（从0开始）
+# 类似列表
+arr = np.array([85, 92, 78, 90, 88, 76, 95, 81, 89, 93])
+print("原始数组：", arr)
+print("第1个元素（索引0）：", arr[0])
+print("第3个元素（索引2）：", arr[2])
+print("第5个元素（索引4）：", arr[4])
+print("." * 50)
+# 负向索引
+# 负索引从数组末尾开始计数
+print("最后一个元素（索引-1）：", arr[-1])
+print("倒数第二个元素（索引-2）：", arr[-2])
+print("倒数第五个元素（索引-5）：", arr[-5])
+print("." * 50)
+# 索引赋值
+# 通过索引修改数组元素
+print("修改前：", arr)
+arr[4] = 99  # 将第5个元素改为99
+arr[-1] = 100  # 将最后一个元素改为100
+print("修改后：", arr)
+print("*" * 50)
+
+
+# 3.1.2 切片操作详解
+# 基本切片语法
+# 切片语法：arr[start:stop:step]
+# start：起始索引（包含，默认0）
+# stop：结束索引（不包含，默认数组长度）
+# step：步长（默认1）
+arr = np.array([85, 92, 78, 90, 88, 76, 95, 81, 89, 93])
+print("前5个元素：", arr[:5])  # 0-4索引
+print("第3-7个元素（不包含7）：", arr[2:6])  # 2-5索引
+print("所有偶数索引元素：", arr[::2])  # 步长2
+print("所有元素：", arr[:])
+# 等同于arr.copy()
+# arr.copy()作用：完整复制一个 NumPy 数组，生成一个全新、独立的副本
+print("." * 50)
+
+# 步长切片:
+print("反向数组: ", arr[::-1])  # 步长-1，实现反转
+print("每隔一个元素取一个（从索引1开始）: ", arr[1::2])
+print("从后往前每隔一个元素: ", arr[-1::-2])
+print("." * 50)
+
+# 切片赋值:
+# 切片赋值会修改原数组（因为切片是视图）
+print("切片赋值前: ", arr)
+arr[2: 5] = [100, 100, 100]  # 将索引2-4的元素设为100
+print("切片赋值后: ", arr)
+# 可以使用标量进行切片赋值
+arr[5: 8] = 90
+print("再次切片赋值后: ", arr)
+print("*" * 50)
+
+
+# 3.2 多维数组索引与切片
+# 3.2.1 二维数组索引基本索引
+# 二维数组的索引: arr[row, column]
+temp_2d = np.array([
+    [5.2, 6.1, 7.3, 8.2],
+    [4.8, 5.5, 6.7, 7.9],
+    [6.3, 7.2, 8.1, 9.0]
+])
+print("二维温度数组: ")
+print(temp_2d)
+# 访问单个元素
+print("第1天第2小时温度: ", temp_2d[0, 1])  # 行0，列1
+print("第2天第3小时温度: ", temp_2d[1, 2])  # 行1，列2
+print("第3天第4小时温度: ", temp_2d[2, 3])  # 行2，列3
+# 行和列的访问: 
+# 访问整行
+print("第2天所有小时温度: ", temp_2d[1, :])  # 行1，所有列
+# 不指定时默认操作行
+print("第2天所有小时温度（简写）: ", temp_2d[1])
+# 访问整列
+print("所有天的第3小时温度: ", temp_2d[:, 2])  # 所有行，列2
+print("所有天的第1小时温度: ", temp_2d[:, 0])
+# 访问子数组
+sub_arr = temp_2d[0: 2, 1: 3]  # 行0-1，列1-2
+print("子数组（第1-2天，第2-3小时）: ")
+print(sub_arr)
+print("*" * 50)
+
+# 3.2.2 多维数组切片
+# 三维数组索引 
+# 三维数组: 2个班级 × 3个学生 × 4门科目分数
+scores_3d = np.array([
+    [
+        [85, 92, 78, 90],  # 班级1，学生1
+        [88, 76, 95, 81],  # 班级1，学生2
+        [89, 93, 79, 87]  # 班级1，学生3
+    ],
+    [
+        [77, 89, 91, 84],  # 班级2，学生1
+        [82, 94, 75, 88],  # 班级2，学生2
+        [90, 86, 83, 92]  # 班级2，学生3
+    ]
+])
+print("三维数组形状: ", scores_3d.shape)  # (2, 3, 4)
+# 访问单个元素: 班级0，学生1，科目2
+print("1班2号学生3门科目分数: ", scores_3d[0, 1, 2])
+# 访问整个班级的所有学生
+print("2班所有学生所有科目: ")
+print(scores_3d[1, :, :])
+# 访问所有班级的特定学生
+print("所有班级的2号学生: ")
+print(scores_3d[:, 1, :])
+# 访问特定班级的特定科目
+print("1班所有学生的前2门科目: ")
+print(scores_3d[0, :, :2])
+# 其中 ":" 应该是全部的意思
+print("." * 50)
+
+# 高级切片技巧
+# 使用...表示多个冒号
+print("等价于scores_3d[0, :, :]: ", scores_3d[0, ...])
+print("等价于scores_3d[:, :, 2]: ", scores_3d[..., 2])
+print("等价于scores_3d[1, :, :2]: ", scores_3d[1, ..., : 2])
+print("*" * 50)
+
+
+# 3.3高级索引操作
+# 3.3.1 整数数组索引
+# 一维整数数组索引
+# 整数数组索引允许使用另一个数组来指定要选取的元素位置
+arr = np.array([85, 92, 78, 90, 88, 76, 95, 81, 89, 93])
+# 选取索引1、3、5的元素
+indices = [1, 3, 5]
+selected = arr[indices]
+print("原数组: ", arr)
+print("选取的索引: ", indices)
+print("选取的元素: ", selected)
+# 可以使用数组作为索引
+index_arr = np.array([2, 4, 6])
+selected_arr = arr[index_arr]
+print("使用数组索引选取的元素: ", selected_arr)
+print("." * 50)
+
+# 二维整数数组索引
+# 二维数组的整数数组索引
+temp_2d = np.array([
+    [5.2, 6.1, 7.3, 8.2],
+    [4.8, 5.5, 6.7, 7.9],
+    [6.3, 7.2, 8.1, 9.0]
+])
+# 选取第0行和第2行的第1列和第3列
+rows = [0, 2]
+cols = [1, 3]
+# 行列索引会按列表索引自行组合为, (0, 1)、(2, 3)
+selected_temp = temp_2d[rows, cols]
+print("二维数组: ")
+print(temp_2d)
+print("选取的元素: ", selected_temp)
+# 注意: 返回的是一维数组，元素为(0,1)和(2,3)位置的值
+print("." * 50)
+
+# 多维整数数组索引
+# 使用np.ix_函数获取子矩阵
+# np.ix_ 是用来帮你快速选中「多行 + 多列」交叉位置的工具
+# 会把普通列表变成能广播的索引，专门用于二维数组精准取值
+sub_temp = temp_2d[np.ix_([0, 2], [1, 3])]
+print("使用np.ix_获取的子矩阵: ")
+print(sub_temp)
+print("形状: ", sub_temp.shape)  # (2, 2)
+print("*" * 50)
+
+
+# 3.3.2 布尔索引
+# 基本布尔索引
+# 布尔索引通过布尔数组筛选元素
+arr = np.array([85, 92, 78, 90, 88, 76, 95, 81, 89, 93])
+# 找出分数≥90的元素
+mask = arr >= 90
+print("布尔掩码: ", mask)
+high_scores = arr[mask]
+print("90分以上的分数: ", high_scores)
+# 直接使用条件表达式进行布尔索引
+high_scores_direct = arr[arr >= 90]
+print("直接使用条件表达式: ", high_scores_direct)
+print("." * 50)
+
+# 复合条件
+# 使用逻辑运算组合多个条件
+# 找出80≤分数<90的元素
+mask1 = arr >= 80
+mask2 = arr < 90
+combined_mask = np.logical_and(mask1, mask2)
+mid_scores = arr[combined_mask]
+print("80-90分之间的分数: ", mid_scores)
+# 等价写法
+mid_scores_direct = arr[(arr >= 80) & (arr < 90)]
+print("等价写法: ", mid_scores_direct)
+# 找出分数<60或≥90的元素
+low_or_high = arr[(arr < 60) | (arr >= 90)]
+print("不及格或优秀的分数: ", low_or_high)
+not_num = arr[arr != 81]
+print("提出成绩为81的分数: ", not_num)
+print("." * 50)
+
+# 二维数组布尔索引
+# 二维数组的布尔索引
+temp_2d = np.array([
+    [5.2, 6.1, 7.3, 8.2],
+    [4.8, 5.5, 6.7, 7.9],
+    [6.3, 7.2, 8.1, 9.0]
+])
+# 找出温度>7℃的所有值
+# 输出为1行
+temp_high = temp_2d[temp_2d > 7]
+print("温度>7℃的所有值: ", temp_high)
+# 找出温度在5-7℃之间的值
+temp_medium = temp_2d[(temp_2d >= 5) & (temp_2d <= 7)]
+print("温度在5-7℃之间的值: ", temp_medium)
+print("*" * 50)
+
+
+# 3.4 数组形状修改
+# 3.4 .1 reshape 函数
+# 基本 reshape 操作
+# reshape在不改变数据的情况下修改数组形状
+arr = np.arange(12)
+print("原始数组: ", arr)
+# 重塑为3行4列的二维数组
+arr_2d = arr.reshape(3, 4)
+print("重塑为3x4数组: ")
+print(arr_2d)
+# 重塑为2行2列3层的三维数组
+arr_3d = arr.reshape(2, 2, 3)
+print("重塑为2x2x3数组: ")
+print(arr_3d)
+print("." * 50)
+
+# 自动计算维度
+# 使用-1让NumPy自动计算维度
+arr = np.arange(12)
+# 重塑为4行，列数自动计算
+arr_auto = arr.reshape(4, -1)
+print("自动计算列数: ")
+print(arr_auto)
+print("形状: ", arr_auto.shape)
+# 重塑为3层，其他维度自动计算
+arr_auto2 = arr.reshape(-1, 2, 2)
+print("自动计算其他维度: ")
+print(arr_auto2)
+print("形状: ", arr_auto2.shape)
+print("." * 50)
+
+# 注意事项
+# reshape要求元素总数不变
+try:
+    arr.reshape(3, 5)  # 3*5=15≠12，会报错
+except ValueError as e:
+    print("错误: ", e)
+print("*" * 50)
+
+
+# 3.4.2 其他形状操作函数
+# ravel 和 flatten
+# ravel和flatten都用于展平数组
+arr_2d = np.array([[1, 2, 3], [4, 5, 6]])
+# ravel返回视图
+ravel_view = arr_2d.ravel()
+print("原数组: ")
+print(arr_2d)
+print("ravel返回的视图: ", ravel_view)
+# 修改视图会影响原数组
+ravel_view[0] = 100
+print("修改ravel视图后: ")
+print("原数组: ")
+print(arr_2d)
+print("视图: ", ravel_view)
+
+# flatten返回副本
+arr_2d = np.array([[1, 2, 3], [4, 5, 6]])  # 重置数组
+flatten_copy = arr_2d.flatten()
+print("flatten返回的副本: ", flatten_copy)
+# 修改副本不影响原数组
+flatten_copy[0] = 100
+print("修改flatten副本后: ")
+print("原数组: ")
+print(arr_2d)
+print("副本: ", flatten_copy)
+print("." * 50)
+
+# resize 函数
+# resize会改变原数组的形状和大小
+arr = np.array([1, 2, 3, 4])
+print("原数组: ", arr)
+# 调整为2x2，原数组被修改
+arr.resize(2, 2)
+print("resize为2x2后: ")
+print(arr)
+# 调整为1x5，元素不足时用0填充
+arr.resize(1, 5)
+print("resize为1x5后（用0填充）: ")
+print(arr)
+# 调整为3x3，元素不足
+try:
+    arr.resize(3, 3)
+except ValueError as e:
+    print("错误: ", e)
+print("*" * 50)
+
+# transpose 和 T 属性
+# 转置数组
+arr_2d = np.array([[1, 2, 3], [4, 5, 6]])
+print("原数组: ")
+print(arr_2d)
+# 转置
+transposed = arr_2d.transpose()
+print("转置后: ")
+print(transposed)
+# 使用T属性
+transposed_t = arr_2d.T
+print("使用T属性转置: ")
+print(transposed_t)
+# 三维数组的转置
+arr_3d = np.array([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
+print("三维数组原形状: ", arr_3d.shape)
+transposed_3d = arr_3d.transpose(1, 0, 2)
+print("转置后形状: ", transposed_3d.shape)
