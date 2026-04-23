@@ -1,4 +1,5 @@
 import numpy as np
+import time
 
 # 4 数组运算与广播机制
 # 4.1 算术运算
@@ -42,8 +43,10 @@ print("向量点积: ", dot_product)  # 1*4 + 2*5 + 3*6 = 32
 print("." * 50)
 
 # 二维数组的矩阵乘法
-mat1 = np.array([[1, 2], [3, 4]])
-mat2 = np.array([[5, 6], [7, 8]])
+mat1 = np.array([[1, 2],
+                 [3, 4]])
+mat2 = np.array([[5, 6],
+                 [7, 8]])
 mat_product = np.dot(mat1, mat2)
 print("矩阵乘法: ")
 print(mat_product)
@@ -60,10 +63,11 @@ print("矩阵: ")
 print(mat)
 print("转置: ")
 print(mat.T)
-# 矩阵的迹
+# 矩阵的迹 主对角线元素之和
 print("迹: ", np.trace(mat))
 # 矩阵的逆（需要方阵）
 try:
+    # np.linalg.inv(矩阵) = 求逆矩阵，必须是方阵、行列式不能为 0
     inv_mat = np.linalg.inv(mat)
     print("逆矩阵: ")
     print(inv_mat)
@@ -72,9 +76,13 @@ except np.linalg.LinAlgError as e:
 # 矩阵的行列式
 # 行列式 ≠ 0 → 矩阵可逆
 # 行列式 = 0 → 矩阵奇异，不可逆
+# np.linalg.det()   # 行列式
+# np.linalg.inv()   # 逆矩阵
+# np.trace()        # 矩阵的迹（对角线和）
 det = np.linalg.det(mat)
 print("行列式: ", det)
 print("*" * 50)
+
 
 # 4.2 逻辑与比较运算
 # 比较运算
@@ -83,6 +91,7 @@ arr1 = np.array([1, 2, 3, 4])
 arr2 = np.array([4, 3, 2, 1])
 print("数组1: ", arr1)
 print("数组2: ", arr2)
+# 逐项比较
 print("等于: ", arr1 == arr2)
 print("不等于: ", arr1 != arr2)
 print("大于: ", arr1 > arr2)
@@ -97,6 +106,7 @@ print("." * 50)
 # 逻辑运算（注意使用位运算符&、|、~）
 arr = np.array([1, 2, 3, 4, 5])
 # 找出大于2且小于5的元素
+# mask 为布尔列表，根据表的值在数组中筛选
 mask = (arr > 2) & (arr < 5)
 print("布尔掩码: ", mask)
 print("满足条件的元素: ", arr[mask])
@@ -109,6 +119,7 @@ mask3 = ~((arr >= 3) & (arr <= 4))
 print("非运算掩码: ", mask3)
 print("满足条件的元素: ", arr[mask3])
 print("*" * 50)
+
 
 # 4.3 广播机制详解
 # 4.3.1 广播规则
@@ -134,13 +145,22 @@ arr1 = np.array([[1, 2, 3], [4, 5, 6]])  # 2x3
 arr2 = np.array([10, 20, 30])  # 1x3（广播为2x3）
 print("数组1形状: ", arr1.shape)
 print("数组2形状: ", arr2.shape)
+print(arr1 + arr2)
 print("相加结果形状: ", (arr1 + arr2).shape)
 # 示例3: 另一个广播示例
 arr3 = np.array([[1], [2], [3]])  # 3x1
 arr4 = np.array([10, 20, 30])  # 1x3
 print("数组3形状: ", arr3.shape)
 print("数组4形状: ", arr4.shape)
-print("相乘结果形状: ", (arr3 * arr4).shape)
+print(arr3 * arr4)
+# [1]
+# [2] x [10, 20, 30]
+# [3]
+# ||
+# [[10 20 30]
+#  [20 40 60]
+#  [30 60 90]]
+print("相乘结果形状: ", (arr1 * arr2).shape)
 print("*" * 50)
 
 
@@ -164,9 +184,10 @@ def check_broadcast(arr1, arr2):
 
 
 # 测试各种情况
-arr_a = np.array([1, 2, 3])
-arr_b = np.array([[1], [2], [3]])
-arr_c = np.array([1, 2])
+# 应该就是是否满足矩阵乘法要求的数学格式
+arr_a = np.array([1, 2, 3])  # 1 x 3
+arr_b = np.array([[1], [2], [3]])  # 3 x 1
+arr_c = np.array([1, 2])  # 1 * 2
 print("arr_a和arr_b可以广播: ", check_broadcast(arr_a, arr_b))
 print("arr_a和arr_c可以广播: ", check_broadcast(arr_a, arr_c))
 print("arr_b和arr_c可以广播: ", check_broadcast(arr_b, arr_c))
@@ -175,6 +196,21 @@ print("*" * 50)
 # 4.3.2 广播应用实例
 # 数据标准化
 # 使用广播进行数据标准化（(数据-均值)/标准差）
+
+# 1. 0-1 标准化（最常用） 所有数 → 0 ~ 1 之间
+# X-Xmin/Xman-Xmin
+# 2. Z-Score 标准化（均值 0，方差 1）
+# X-mean/std
+# 3. 按列/行标准化（机器学习常用） axis=0 → 按列、axis=1 → 按行
+# col_min = mat.min(axis=0)
+# col_max = mat.max(axis=0)
+# mat_col_norm = (mat - col_min) / (col_max - col_min)
+
+# 机器学习 / 数据分析默认必须按列算
+# 行：每一行 = 一条样本
+# 列：每一列 = 一个特征/指标
+
+# Z-Score
 data = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
 print("原始数据: ")
 print(data)
@@ -188,15 +224,24 @@ standardized = (data - mean) / std
 print("标准化后的数据: ")
 print(standardized)
 print("形状: ", standardized.shape)
-print("*" * 50)
+print("." * 50)
 
 # RGB 颜色调整
 # 广播在图像处理中的应用
 # 假设有一个256x256x3的RGB图像
+# 256 * 256, 3个通道
 image = np.random.randint(0, 256, size=(256, 256, 3), dtype=np.uint8)
 # 创建一个调整数组（3个元素，分别对应R、G、B通道）
 adjust = np.array([1.2, 1.1, 0.9])  # 调整亮度
+
 # 应用调整（广播）
+# NumPy 会自动把 adjust 扩展成
+# (256, 256, 3)
+# 每个像素的 R × 1.2
+# 每个像素的 G × 1.1
+# 每个像素的 B × 0.9
+# 完全自动，不用写循环
+
 adjusted_image = image * adjust
 print("原图像形状: ", image.shape)
 print("调整数组形状: ", adjust.shape)
@@ -204,7 +249,18 @@ print("调整后图像形状: ", adjusted_image.shape)
 # 显示调整前后的像素值
 print("原像素值: ", image[0, 0])
 print("调整后像素值: ", adjusted_image[0, 0])
-print("*" * 50)
+
+# 只要最后一维大小相同，就能自动匹配
+# (256,256,3) × (3,) → 自动广播 → (256,256,3)
+# 这就是 NumPy 处理图像最常用、最简洁、最高效的写法
+
+# 提醒（非常重要）
+# image 是 uint8（0~255 整数）乘以小数后会变成 float 类型，值可能超过 255 或低于 0
+# 如果要转回正常图像，需要
+# adjusted_image = np.clip(adjusted_image, 0, 255).astype(np.uint8)
+
+print("." * 50)
+
 
 # 4.4 通用函数（ufunc）
 # 通用函数介绍
@@ -608,8 +664,6 @@ print("*" * 50)
 # 6.2.1 向量化运算优化
 # 避免显式循环
 # 对比循环和向量化运算的性能
-import time
-
 # 创建两个大数组
 size = 1000000
 arr1 = np.random.rand(size)
@@ -680,7 +734,7 @@ subcopy = big_arr[: 1000, :1000].copy()  # 复制数据
 copy_time = time.time() - start
 print(f"获取视图时间: {view_time:.4f}秒")
 print(f"获取副本时间: {copy_time:.4f}秒")
-print(f"视图操作快{copy_time / view_time:.1f}倍")
+# print(f"视图操作快{copy_time / view_time:.1f}倍")
 # 验证内存使用
 print(f"视图内存大小: {subview.nbytes / 1024 / 1024:.1f}MB")
 print(f"副本内存大小: {subcopy.nbytes / 1024 / 1024:.1f}MB")
