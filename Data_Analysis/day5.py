@@ -236,6 +236,7 @@ print("s_int.iloc[2]:", s_int.iloc[2])  # 位置索引
 # 索引是整数时，[] 优先当标签用；要按位置取必须用 .iloc，要保险就永远用 .loc / .iloc
 print(50 * "*")
 
+
 # 2.4 Series 的运算操作
 # Series 支持多种运算操作，充分利用了向量化特性
 # 算术运算
@@ -270,8 +271,10 @@ print(50 * ".")
 
 # 逻辑运算
 print("s_a > 2:")
+# 返回 True 或 False
 print(s_a > 2)
 print("s_a[s_a > 2]:")
+# 根据返回的bool值筛选
 print(s_a[s_a > 2])  # 布尔索引
 # 输出结果:
 # s_a > 2:
@@ -366,9 +369,10 @@ print(50 * ".")
 
 # 其他常用方法
 # unique() - 获取唯一值
+# 保留原始顺序，返回数组
 s_unique = pd.Series([1, 2, 2, 3, 3, 3])
 print("唯一值:", s_unique.unique())
-# value_counts() - 统计值的出现次数
+# value_counts() - 统计值的出现次数, 降序排序, Pandas Series / DataFrame 专用
 print("值的计数:")
 print(s_unique.value_counts())
 # describe() - 生成统计摘要
@@ -441,6 +445,11 @@ print("用前向值填充（ffill）:")
 print(s_missing.fillna(method='ffill'))
 print("用后向值填充（bfill）:")
 print(s_missing.fillna(method='bfill'))
+
+# ffill 前向	开头 NaN 保留，尾部正常补
+# bfill 后向	末尾 NaN 保留，开头正常补
+# 双填充 (ffill+bfill)	首尾全部补全，无空值
+
 # 输出结果:
 # 删除缺失值后:
 # a    10.0
@@ -482,6 +491,9 @@ print("包含'P'的元素:")
 print(s_str[s_str.str.contains('P')])
 print("以'H'开头的元素:")
 print(s_str[s_str.str.startswith('H')])
+
+# 一般来说一定还有 endswith()
+
 # 输出结果:
 # 转换为大写:
 # 0    HELLO
@@ -503,9 +515,6 @@ print(s_str[s_str.str.startswith('H')])
 # 0    Hello
 # dtype: object
 print(50 * "*")
-
-# 验证输出及知识补充
-#################################################################################
 
 
 # Pandas DataFrame 基础
@@ -646,7 +655,7 @@ df1.info()
 #  2   Score   4 non-null      float64
 #  3   City    4 non-null      object
 # dtypes: float64(1), int64(1), object(2)
-# memory usage: 208.0+ bytes
+# memory usage: 256.0+ bytes
 print(50 * ".")
 
 # 值的获取
@@ -701,6 +710,20 @@ print(f"类型: {type(df1[['Name', 'Score']])}")
 # 2  Charlie   78.5
 # 3    David   88.0
 # 类型: <class 'pandas.core.frame.DataFrame'>
+
+# df1[['Name', 'Score']]
+# 作用：从 df1 里同时选出 Name 和 Score 两列
+# 输出：一个新的 DataFrame（小表格）
+# 语法规则：双层方括号 [[ ]]
+# 单层 [ ] → 选一列（返回 Series）
+# df1['Name']
+# 双层 [[ ]] → 选多列（返回 DataFrame）
+# df1[['Name', 'Score']]
+
+# 选一列：df['列名']
+# 选多列：df[['列1', '列2', '列3']]
+# 多列必须双层括号
+
 print(50 * ".")
 
 # 行选择 - loc 与 iloc
@@ -728,6 +751,12 @@ print(df1.loc[[0, 2, 3]])
 # 0    Alice   25   85.5   Beijing
 # 2  Charlie   35   78.5  Guangzhou
 # 3    David   40   88.0  Shenzhen
+
+# loc[i] → 单行 → Series
+# loc[[i]] → 单行（集合）→ DataFrame
+# loc[i1:i2] → 多行 → DataFrame
+# 行、列规则完全一致
+
 print(50 * ".")
 
 # 基于位置的行选择（.iloc[]）
@@ -758,7 +787,7 @@ print("选择第0-1行，前2列（iloc）:")
 print(df1.iloc[0:2, 0:2])
 print("选择第0行，'Score'列（loc）:")
 print(df1.loc[0, 'Score'])
-print("选择第0行，第2列（iloc）:")
+print("选择第0行，第2列（iloc, 位置索引）:")
 print(df1.iloc[0, 2])
 # 输出结果:
 # 选择第0-1行，'Name'和'Age'列（loc）:

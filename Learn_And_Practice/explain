@@ -4,4 +4,6 @@
 2026/04/21 Clear: 重复在网站下载相同的数据表时，如果不及时清理下载数据，下载的文件会有后缀如XXXXX(12).txt,消除这个后缀，固定文件名，方便后续处理
 2026/04/21 Clear_rename: 类似Clear
 2026/04/22 upgrade_rate: 浓墨重彩的一笔，利用上个星期学的知识，使用pandas分组统计透视展开，计算升级率
-calculate_matched_consumption: 连个不同的表根据相同列，相加所选对应的值，并保存为.xlsx
+2026/04/23 calculate_matched_consumption: 连个不同的表根据相同列，相加所选对应的值，并保存为.xlsx
+2026/04/24 find_column_number: 很老派的库，思想简洁，代码规范，不错，忘了什么时候做的了
+2026/04/24 quantile_application: 为了方便阅读13行代码，优化一下应该可以压缩到10行以内，说明是一个小功能，就是根据表格的数据计算分位数，主要昨天学的还是Series，DataFrame应该是这几天学的，之前有了解，也算是预习了
