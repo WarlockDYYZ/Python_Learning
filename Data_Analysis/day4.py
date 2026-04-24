@@ -995,6 +995,7 @@ print(f"循环方法时间: {loop_time:.4f}秒")
 print(f"广播方法快{loop_time / broadcast_time:.1f}倍")
 # 验证结果一致性
 result_stack = np.stack(result_loop, axis=0)
+# np.allclose 是 NumPy 中用于判断两个数组是否近似相等的函数，非常适合处理浮点数比较（因为浮点数直接 == 比较经常由于精度问题而失败）
 print(f"结果是否一致: {np.allclose(result_broadcast, result_stack)}")
 print(50 * ".")
 
@@ -1005,6 +1006,12 @@ samples = 100
 height = 256
 width = 256
 channels = 3
+
+# 单张灰度图	(256, 256)	只有亮度，无颜色
+# 单张 RGB 图	(256, 256, 3)	一张彩色照片
+# 批量 RGB 图	(100, 256, 256, 3)	一批彩色照片（你的数据）
+# 批量灰度图	(100, 256, 256, 1)	医学影像、手写数字
+
 # 创建数据和均值、标准差
 data = np.random.rand(samples, height, width, channels)
 means = np.array([0.485, 0.456, 0.406])  # 通道均值
