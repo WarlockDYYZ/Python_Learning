@@ -806,11 +806,16 @@ print(50 * ".")
 
 # 布尔索引
 # 这是最强大的索引方式之一
+# 在年龄列筛选值大于30的行
 print("年龄大于30岁的行:")
 print(df1[df1['Age'] > 30])
 print("成绩在80-90之间的行:")
+# [条件1 逻辑符号 条件2 ...]
 print(df1[(df1['Score'] >= 80) & (df1['Score'] <= 90)])
 print("来自北京或上海的行:")
+
+# isin: 判断数据是否在指定列表 / 集合里，返回布尔值（True/False），是 pandas 最常用的筛选神器
+# df['列名'].isin([值1, 值2, 值3])
 print(df1[df1['City'].isin(['Beijing', 'Shanghai'])])
 # 输出结果:
 # 年龄大于30岁的行:
@@ -831,10 +836,12 @@ print(50 * "*")
 
 # 3.4 DataFrame 的基本操作
 # 新增列
+# 与字典添加新元素类似
 df1['Gender'] = ['F', 'M', 'M', 'M']
 print("新增Gender列后:")
 print(df1)
 # 基于现有列计算新增列
+# 解释: 取出 df1 里的 分数列 -> 对每一个分数都执行后面的函数(.apply()) -> 匿名函数，x 就代表 每一个分数 -> 逻辑判断
 df1['Score_Level'] = df1['Score'].apply(lambda x: 'A' if x >= 90 else ('B' if x >= 80 else 'C'))
 print("新增Score_Level列:")
 print(df1)
@@ -854,11 +861,12 @@ print(50 * ".")
 
 # 修改列
 # 修改列值
+# 对应列(Score)每个值均会 + 1
 df1['Score'] = df1['Score'] + 1
 print("Score列加1后:")
 print(df1)
-# 修改特定行的值
-df1.loc[0, 'Score'] = 86.5
+# 修改特定行的值, 0行的score
+df1.loc[0, 'Score'] = 96.5
 print("修改第0行Score值:")
 print(df1)
 # 批量修改
@@ -874,7 +882,7 @@ print(df1)
 # 3    David   40   89.0  Shenzhen      M          B
 # 修改第0行Score值:
 #      Name  Age  Score      City Gender Score_Level
-# 0    Alice   25   86.5   Beijing      F          B
+# 0    Alice   25   96.5   Beijing      F          B
 # 1      Bob   30   91.0  Shanghai      M          A
 # 2  Charlie   35   79.5  Guangzhou      M          C
 # 3    David   40   89.0  Shenzhen      M          B
@@ -897,6 +905,12 @@ print("删除Gender列（使用pop）:")
 print(df1)
 print("被删除的Gender列:")
 print(gender)
+
+# 只想删掉、不用：用 del
+# 删掉 + 还要用这列数据：用 pop()
+# 两者都是原地修改，不会生成新 DataFrame
+# col = df1['Gender']   # 提取，不删除
+
 # 输出结果:
 # 删除Score_Level列后:
 #      Name  Age  Score      City Gender
@@ -920,6 +934,15 @@ print(50 * ".")
 
 # 重命名列
 # 重命名列（方法1: rename）
+
+# rename()
+# 修改 列名 / 行索引
+# rename(columns={}) → 改列
+# rename(index={}) → 改行
+# 默认：不修改原数据，返回新数据
+# inplace=True 才会原地修改
+# df1.rename(columns={"Score": "成绩"}, inplace=True)
+
 df_renamed = df1.rename(columns={
    'Name': 'Full_Name',
    'Age': 'Years_Old'
@@ -930,6 +953,17 @@ print(df_renamed)
 df1.columns = ['Full_Name', 'Years_Old', 'Score_Point', 'Location']
 print("重命名列（方法2）:")
 print(df1)
+
+# 两种修改方式的区别
+# 1. df.rename(columns={旧:新})
+# 只改你指定的列，其他不动！
+# ✅ 优点：安全、精准、不会改错列
+# ❌ 缺点：要写字典，稍微麻烦
+# 2. df.columns = [新名1, 新名2, 新名3]
+# 直接覆盖所有列名，必须一次性写全！
+# ✅ 优点：一次性全改，非常快
+# ❌ 缺点：必须写全所有列名，少一个、多一个都会报错！
+
 # 输出结果:
 # 重命名列（方法1）:
 #      Full_Name  Age  Score      City
@@ -957,6 +991,7 @@ df_math = pd.DataFrame({
 print("df_math:")
 print(df_math)
 print("df_math + 5:")
+# 广播？每个元素都 + 5
 print(df_math + 5)
 print("df_math * 2:")
 print(df_math * 2)
@@ -991,10 +1026,18 @@ print(50 * ".")
 
 # 比较运算
 print("df_math > 10:")
+
+# df_math
+# 返回一个：形状完全一样、全部是 True / False 的布尔 DataFrame
+# 可以用来筛选
+# 把大于10的位置保留原值，不满足的变成 NaN
+# df_math[df_math > 10]
+
 print(df_math > 10)
 print("df_math[df_math > 10]:")
 print(df_math[df_math > 10])
 print("df_math['B'] >= 20:")
+# 筛选‘B’列
 print(df_math['B'] >= 20)
 # 输出结果:
 # df_math > 10:
@@ -1021,7 +1064,9 @@ print(50 * ".")
 # 类似 NumPy 的广播机制，Pandas 也支持广播运算
 # 创建一个Series，用于广播运算
 s_broadcast = pd.Series([100, 200, 300], index=['A', 'B', 'C'])
+print(s_broadcast)
 print("df_math + s_broadcast:")
+# 根据对应标签相加
 print(df_math + s_broadcast)
 # 输出结果:
 # df_math + s_broadcast:
@@ -1078,6 +1123,10 @@ print(df_stats.std())
 print(50 * ".")
 
 # 按轴运算
+
+# print(df_stats)
+# 记混了默认操作的是列即 axis=0，axis=1是行
+
 print("按行求和（axis=1）:")
 print(df_stats.sum(axis=1))
 print("每行的均值（axis=1）:")
@@ -1106,7 +1155,74 @@ print("唯一值（对于非数值列）:")
 df_str = pd.DataFrame({
    'City': ['Beijing', 'Shanghai', 'Beijing', 'Shenzhen']
 })
-print(df_str['City'].unique())
+
+# 1. unique()
+# 作用：获取唯一值（去重）适用：Series / DataFrame 单列
+# 返回值： numpy.ndarray 数组
+# 保留原始出现顺序
+# 只输出唯一元素，无数值、无数值统计
+
+# 2. value_counts()
+# 作用：统计元素出现次数适用：Series / 单列
+# 返回值：pandas.Series
+# 索引：元素本身
+# 数值：该元素出现次数
+# 默认：降序排列
+
+# 确认的知识的补充
+# DataFrame ＝ 多个「列级」Series 横向拼接而成
+# 1. 结构本质
+# Series：一维结构
+#     1 列 + 索引
+#     单个数据列
+# DataFrame：二维结构
+#     多列 + 索引
+#     每一列 都是一个独立的 Series
+# 2. 关键对应关系
+# 结构	    维度	    组成
+# Series	1 维	索引 + 一组数据
+# DataFrame	2 维	行索引 + 多个 Series 列
+# 3. 补充重点
+# 按列取：df["A"] → Series
+# 按行取：df.loc[0] → 也是 Series（行 Series）
+# 单列加括号 df[["A"]] → 还是 DataFrame，用列表包裹列名，虽然只选一列，但返回：DataFrame（二维表格）
+
+# 稍有一些，抽象，举例
+# 1. 单行 → Series
+# df.loc[数字] 👉 单行 → Series
+# df = pd.DataFrame({
+#     "A":[1,2,3],
+#     "B":[10,20,30],
+#     "C":[100,200,300]
+# })
+# # 取索引为1的单行
+# row = df.loc[1]
+# print(row)
+# print(type(row)
+# 输出结果：
+# A     2
+# B    20
+# C   200
+# Name: 1, dtype: int64
+# <class 'pandas.core.series.Series'>
+# print(df_str['City'].unique())
+# 2. 列Series
+# df_math = pd.DataFrame({
+#     'A': [1, 2, 3, 4],
+#     'B': [10, 20, 30, 40],
+#     'C': [100, 200, 300, 400]
+# })
+# # 取单列 → 列Series
+# s = df_math['A']
+# print(s)
+# print(type(s))
+# 0    1
+# 1    2
+# 2    3
+# 3    4
+# Name: A, dtype: int64
+# <class 'pandas.core.series.Series'>
+
 print("值的计数:")
 print(df_str['City'].value_counts())
 # 输出结果:
