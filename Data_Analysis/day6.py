@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+import datetime
 
 
 # 数据输入输出
@@ -430,304 +432,437 @@ print(outliers)
 # 3. Z-Score 法:计算数据点与均值的标准差倍数，通常绝对值大于 3 的被视为异常值
 print_star()
 
-
-# 2.4
-# 数据类型检查
+# 2.4 数据类型检查
 # 数据类型错误会导致计算错误或内存浪费。使用以下方法检查数据类型:
-# - dtypes属性:查看各列的数据类型(142)
-# - info()
-# 方法:查看数据结构、数据类型、非空值数量和内存使用情况(152)
-# # 查看数据类型
-# print("数据类型:")
-# print(df.dtypes)
-# # 查看详细信息
-# print("数据结构信息:")
-# df.info()
-# # 检查是否有混合类型列
-# print("检查混合类型:")
-# for col in df.columns:
-#     if df[col].dtype == 'object':
-#         unique_types = set(type(x) for x in df[col].dropna())
-#         if len(unique_types) > 1:
-#             print(f"{col}列包含混合类型:{unique_types}")
-# 2.5
-# 数据完整性检查
+# - dtypes属性:查看各列的数据类型
+# - info()方法:查看数据结构、数据类型、非空值数量和内存使用情况
+# 查看数据类型
+print("数据类型:")
+print(df.dtypes)
+print_dot()
+
+# 查看详细信息
+print("数据结构信息:")
+df.info()
+print_dot()
+# 举例说明
+# 0   id            254 non-null    str
+# 列序号0，列名id，有 254 个非空值，数据类型str
+# 注意：入职日期 目前是 str（文本），如果需要按时间分析（如计算工龄），后续可能需要转换为日期格式。
+
+# 检查是否有混合类型列
+# 此处生成的数据没有
+print("检查混合类型:")
+for col in df.columns:
+    if df[col].dtype == 'object':
+        unique_types = set(type(x) for x in df[col].dropna())
+        if len(unique_types) > 1:
+            print(f"{col}列包含混合类型:{unique_types}")
+print_star()
+# 输出
+# 检查混合类型:
+# **************************************************
+
+
+# 2.5 数据完整性检查
 # 数据完整性检查包括:
-# 1.
-# 数据形状检查:使用shape属性查看数据的行数和列数(150)
-# 2.
-# 非空值检查:使用info()
-# 方法查看各列的非空值数量(152)
-# 3.
-# 数值范围检查:检查数值是否在合理范围内
-# 4.
-# 逻辑一致性检查:检查相关列之间的逻辑关系
-# # 检查数据形状
-# print(f"数据形状:{df.shape}")
-# print(f"行数:{df.shape[0]}")
-# print(f"列数:{df.shape[1]}")
-# # 检查数值范围
-# print("数值范围检查:")
-# numeric_cols = df.select_dtypes(include=['int', 'float']).columns
-# for col in numeric_cols:
-#     min_val = df[col].min()
-#     max_val = df[col].max()
-#     print(f"{col}:最小值{min_val}，最大值{max_val}")
-# # 逻辑检查示例:入职日期不能晚于当前日期
-# print("逻辑检查:")
-# import datetime
-# current_date = datetime.date.today()
-# invalid_dates = df[df['hire_date'] > current_date]
-# print(f"发现{len(invalid_dates)}条入职日期晚于当前日期的记录")
+# 1. 数据形状检查:使用shape属性查看数据的行数和列数
+# 2. 非空值检查:使用info() 方法查看各列的非空值数量
+# 3. 数值范围检查:检查数值是否在合理范围内
+# 4. 逻辑一致性检查:检查相关列之间的逻辑关系
+# 检查数据形状
+print(f"数据形状:{df.shape}")
+print(f"行数:{df.shape[0]}")
+print(f"列数:{df.shape[1]}")
+print_dot()
+
+# 检查数值范围
+print("数值范围检查:")
+numeric_cols = df.select_dtypes(include=['int', 'float']).columns
+for col in numeric_cols:
+    min_val = df[col].min()
+    max_val = df[col].max()
+    print(f"{col}:最小值{min_val}，最大值{max_val}")
+# 逻辑检查示例:入职日期不能晚于当前日期
+print("逻辑检查:")
+print_dot()
+
+# 1. 确保列是日期格式
+# pd.to_datetime(...)：这是 Pandas 处理日期的核心函数。它会把列中的文本（如 "2023-01-01"）转换成真正的日期对象
+# errors='coerce'：这是一个保险措施。如果你的数据里混有 "未知"、"2099-99-99" 这种无法识别的日期，加上这个参数会让 Pandas 把它们变成“缺失值”（NaT），而不是直接让程序崩溃报错。
+# 类型匹配：转换后，对象可以进行大小比较
+df['hire_date'] = pd.to_datetime(df['hire_date'], errors='coerce')
+
+# 2. 获取当前日期，并转换为字符串格式
+# Pandas 的日期时间类型不能直接与 Python 原生的 datetime.date 对象进行比较
+# 使用 isoformat() 得到 'YYYY-MM-DD' 格式，这是 Pandas 最喜欢的标准格式
+current_date = datetime.date.today().isoformat()
+
+# datetime.date.today().isoformat()：这会生成类似 '2026-04-27' 的字符串
+# Pandas 的智能比较：当你用字符串（如 '2026-04-27'）去比较 datetime64 列时
+# Pandas 会自动把这个字符串当作时间点来处理，从而避免了类型不匹配的错误
+invalid_dates = df[df['hire_date'] > current_date]
+print(f"发现{len(invalid_dates)}条入职日期晚于当前日期的记录")
+print_star()
+
 # 三、核心清洗操作
-# 3.1
-# 缺失值处理
-# 3.1
-# .1
-# 删除缺失值
-# 删除缺失值是处理缺失数据最直接的方法，适用于缺失率较低的情况（通常低于
-# 5 %）(166)。
-# Pandas
-# 提供了dropna方法来删除缺失值:
+# 3.1 缺失值处理
+# 3.1.1 删除缺失值
+# 删除缺失值是处理缺失数据最直接的方法，适用于缺失率较低的情况（通常低于5 %）
+# Pandas 提供了dropna方法来删除缺失值:
 # DataFrame.dropna(axis=0, how='any', thresh=None, subset=None, inplace=False)
 # 参数说明:
-# - axis:0
-# 表示删除行，1
-# 表示删除列
-# - how:'any'
-# 表示只要有缺失值就删除，'all'
-# 表示所有值都缺失才删除
+# - axis:0 表示删除行，1 表示删除列
+# - how:'any' 表示只要有缺失值就删除，'all' 表示所有值都缺失才删除
 # - thresh:保留至少有thresh个非缺失值的行 / 列
-# - subset:指定检查的列子集(160)
-# # 删除所有包含缺失值的行
-# df_cleaned = df.dropna()
-# # 删除所有值都缺失的行
-# df_cleaned = df.dropna(how='all')
-# # 只删除特定列有缺失值的行
-# df_cleaned = df.dropna(subset=['name', 'email'])
-# # 保留至少有3个非缺失值的行
-# df_cleaned = df.dropna(thresh=3)
-# 3.1
-# .2
-# 填充缺失值
-# 当缺失率较高或删除会损失重要信息时，可以使用填充方法。Pandas
-# 的fillna方法提供了多种填充策略:
+# - subset:指定检查的列子集
+
+# 删除所有包含缺失值的行
+df_cleaned = df.dropna()
+print(df_cleaned)
+print_dot()
+# 删除所有值都缺失的行
+df_cleaned = df.dropna(how='all')
+print(df_cleaned)
+print_dot()
+# 只删除特定列有缺失值的行
+df_cleaned = df.dropna(subset=['name', 'tel', '交通补贴'])
+print(df_cleaned)
+print_dot()
+# 保留至少有3个非缺失值的行, 要将测试数据删除到3个一下，才会删除，暂时不删了，了解函数功能即可
+df_cleaned = df.dropna(thresh=3)
+print(df_cleaned)
+print_star()
+
+# 3.1.2 填充缺失值
+# 当缺失率较高或删除会损失重要信息时，可以使用填充方法
+# Pandas 的 fillna 方法提供了多种填充策略:
 # DataFrame.fillna(value=None, method=None, axis=None, inplace=False, limit=None, downcast=None)
 # 常用的填充方法:
-# 1.
-# 常数填充:使用固定值填充，如
-# 0、"未知"
-# 等(163)
-# 2.
-# 前向填充（ffill）:使用前面的有效值填充(163)
-# 3.
-# 后向填充（bfill）:使用后面的有效值填充(163)
-# 4.
-# 统计值填充:使用均值、中位数、众数等填充(165)
-# # 用0填充数值型缺失值
-# df['age'] = df['age'].fillna(0)
-# # 用"未知"填充字符串型缺失值
-# df['address'] = df['address'].fillna('未知')
-# # 前向填充
-# df['salary'] = df['salary'].ffill()
-# # 后向填充
-# df['salary'] = df['salary'].bfill()
-# # 用均值填充
-# df['age'] = df['age'].fillna(df['age'].mean())
-# # 用中位数填充
-# df['income'] = df['income'].fillna(df['income'].median())
-# # 用众数填充分类变量
-# df['category'] = df['category'].fillna(df['category'].mode()[0])
-# 3.1
-# .3
-# 插值法填充
-# 对于连续型数据，可以使用插值法更精确地估算缺失值。Pandas
-# 的interpolate方法支持多种插值方法:
+# 1. 常数填充:使用固定值填充，如0、"未知"等
+# 2. 前向填充（ffill）:使用前面的有效值填充
+# 3. 后向填充（bfill）:使用后面的有效值填充
+# 4. 统计值填充:使用均值、中位数、众数等填充
+
+print("原数据：")
+print(df)
+# 用0填充数值型缺失值
+df['age'] = df['age'].fillna(0)
+# 用"未知"填充字符串型缺失值
+df['address'] = df['address'].fillna('未知')
+# 前向填充
+df['salary'] = df['salary'].ffill()
+# 后向填充
+df['salary'] = df['salary'].bfill()
+# 用均值填充
+df['age'] = df['age'].fillna(df['age'].mean())
+# 用中位数填充
+df['income'] = df['income'].fillna(df['income'].median())
+# 用众数填充分类变量
+df['category'] = df['category'].fillna(df['category'].mode()[0])
+print("填充后：")
+print(df)
+print_star()
+# 运行结果应该是正确的，编辑器输出不能预览全部，改了几条数据，结算是对的
+
+
+# 3.1.3 插值法填充
+# 对于连续型数据，可以使用插值法更精确地估算缺失值
+# Pandas 的 interpolate 方法支持多种插值方法:
 # DataFrame.interpolate(method='linear', axis=0, limit=None, inplace=False, limit_direction=None, ...)
 # 常用方法:
 # - 'linear':线性插值（默认）
 # - 'time':时间序列插值
 # - 'quadratic':二次多项式插值
-# - 'cubic':三次样条插值(159)
-# # 线性插值
-# df['temperature'] = df['temperature'].interpolate()
-# # 时间序列插值
-# df['sales'] = df['sales'].interpolate(method='time')
-# # 限制插值范围（最多连续填充3个缺失值）
-# df['value'] = df['value'].interpolate(limit=3)
-# # 仅填充被有效值包围的缺失值
-# df['value'] = df['value'].interpolate(limit_direction='inside')
-# 3.2
-# 重复值处理
+# - 'cubic':三次样条插值
+# 核心目的都是“估算并填充缺失的数据”，但根据数据特性和业务需求，采用不同的算法和限制条件
+
+# 线性插值
+# 含义：这是 interpolate() 的默认模式（method='linear'）。它假设数据的变化是直线的
+# 原理：它会根据缺失值前后两个最近的已知数据点，画一条直线，计算中间点的数值
+# 适用场景：气温、身高、体重等变化相对平滑、连续的数据
+# 例子：
+# 周一 20度，周三 24度。
+# 周二的缺失值会被填为 22度（20和24的中间值）
+df['temperature'] = df['temperature'].interpolate()
+
+# 时间序列插值 (销售)
+# 含义：指定 method='time'。这不仅看数据的顺序，还会考虑索引（时间）的具体间隔
+# 原理：如果你的时间序列不是等间隔的（比如缺了周末，或者记录时间不固定），普通的线性插值会出错。这个模式会根据实际经过的时间长度来加权计算
+# 适用场景：销售额、股票价格等时间序列数据，特别是当数据索引是日期时间类型，且可能存在非等间隔采样时
+# 例子：
+# 1月1日卖了100元，1月4日卖了400元（中间隔了3天）
+# 1月2日的估算值会更靠近100，而不是简单的平均值
+# 原始数据：时间间隔不均匀
+data = {
+    'time': ['2023-01-01 08:00', '2023-01-01 09:00', '2023-01-01 14:00', '2023-01-01 15:00'],
+    'temp': [20.0, np.nan, np.nan, 26.0]
+}
+df_time = pd.DataFrame(data)
+# 【关键步骤 1】：将 'time' 列转换为 datetime 对象
+df_time['time'] = pd.to_datetime(df_time['time'])
+# 【关键步骤 2】：将 'time' 列设为索引
+df_time.set_index('time', inplace=True)
+print("--- 设置时间索引后的数据 ---")
+print(df_time)
+# 【关键步骤 3】：指定 method='time'
+# 这告诉 Pandas：请根据索引的时间差来计算权重，而不是简单的行号差
+# 新建一列保存插值结果
+# df_time['temp_interpolated'] = df_time['temp'].interpolate(method='time')
+# 再缺失值的列插值
+df_time['temp'] = df_time['temp'].interpolate(method='time')
+print("\n--- 插值结果 ---")
+print(df_time)
+print_dot()
+
+# 限制插值范围（最多连续填充3个缺失值）
+# 含义：limit=3 是一个“安全阀”。它规定最多只能连续填充 3 个缺失值
+# 原理：如果连续缺失的数据超过 3 个（比如连着缺了 5 个），interpolate 只会填补前 3 个，剩下的 2 个依然保持为 NaN
+# 适用场景：当缺失数据过多时，插值的结果会变得非常不准确（纯属猜测，网上查的）。设置限制可以保留部分缺失值，提醒你这些数据不可靠
+df['value'] = df['value'].interpolate(limit=3)
+print(df)
+print_dot()
+
+# 仅填充被有效值包围的缺失值
+# 含义：limit_direction='inside'（通常配合 limit_area='inside' 理解，但在代码语境中通常指只填充被有效数据“包围”的区域）
+# 原理：
+# Inside (内部)：如果缺失值在数据的中间（前后都有数据），则填充
+# Outside (外部)：如果缺失值在数据的开头或结尾（前面没数据或后面没数据），则不填充
+# 适用场景：你不想对数据的起始阶段或结束阶段进行“外推”预测，因为那通常比“内插”更危险、更不准确。你只想修补中间偶尔出现的断层
+
+# 两个参数
+# limit_direction：控制插值的方向（向前、向后、双向）。它的可选值只能是 'forward'、'backward' 或 'both'
+# limit_area：控制插值的区域（只补中间、只补两头）。它的可选值才是 'inside'、'outside' 或 None
+df['value'] = df['value'].interpolate(limit_area='inside')
+print_star()
+
+# 总结
+# 代码特征	    核心逻辑	        形象比喻
+# 默认 (线性)	两点之间连直线	    缺了一块砖，按直线补齐
+# method='time'	按时间长短算斜率	考虑路程远近，计算平均速度
+# limit=3	    缺太多就不补了	    补衣服：破洞小就补，破太大就不补了
+# limit_direction='inside'	只补中间，不补两头	只修补中间断掉的链条，不延伸链条的首尾
+
+
+# 3.2 重复值处理
 # 处理重复值的完整流程包括:
-# 1.
-# 识别重复值:使用duplicated方法标记重复行(110)
-# 2.
-# 查看重复数据:筛选出重复行进行分析
-# 3.
-# 删除重复值:使用drop_duplicates方法删除重复行(110)
-# # 查看所有重复行（不包括首次出现）
-# duplicates_df = df[df.duplicated(keep=False)]
-# print(f"重复行数量:{len(duplicates_df)}")
-# print("重复行示例:")
-# print(duplicates_df.head())
-# # 删除重复行，保留第一个出现的
-# df_cleaned = df.drop_duplicates()
-# # 删除重复行，保留最后一个出现的
-# df_cleaned = df.drop_duplicates(keep='last')
-# # 基于特定列删除重复
-# df_cleaned = df.drop_duplicates(subset=['id'])
-# # 删除所有列都相同的重复行
-# df_cleaned = df.drop_duplicates(keep=False)
-# 3.3
-# 数据类型转换
-# 数据类型转换是数据清洗的重要环节，Pandas
-# 提供了多种方法:
-# 1.
-# astype方法:强制转换数据类型(171)
-# 2.
-# to_numeric方法:智能转换为数值类型，可处理异常值(169)
-# 3.
-# to_datetime方法:转换为日期时间类型(195)
-# 3.3
-# .1
+# 1. 识别重复值:使用duplicated方法标记重复行
+# 2. 查看重复数据:筛选出重复行进行分析
+# 3. 删除重复值:使用drop_duplicates方法删除重复行
+# 查看所有重复行（不包括首次出现）
+duplicates_df = df[df.duplicated(keep=False)]
+print(f"重复行数量:{len(duplicates_df)}")
+print("重复行示例:")
+print(duplicates_df.head())
+# 删除重复行，保留第一个出现的
+df_cleaned = df.drop_duplicates()
+# 删除重复行，保留最后一个出现的
+df_cleaned = df.drop_duplicates(keep='last')
+# 基于特定列删除重复
+df_cleaned = df.drop_duplicates(subset=['id'])
+# 删除所有列都相同的重复行
+df_cleaned = df.drop_duplicates(keep=False)
+print_star()
+
+# 3.3 数据类型转换
+# 数据类型转换是数据清洗的重要环节，Pandas 提供了多种方法:
+# 1. astype方法:强制转换数据类型(171)
+# 2. to_numeric方法:智能转换为数值类型，可处理异常值(169)
+# 3. to_datetime方法:转换为日期时间类型(195)
+
+# 3.3.1
 # 数值类型转换
 # 使用to_numeric处理包含异常值的转换:
-# # 将字符串列转换为数值，错误值转换为NaN
-# df['price'] = pd.to_numeric(df['price'], errors='coerce')
-# # 转换并尝试向下转换以节省内存
-# df['quantity'] = pd.to_numeric(df['quantity'], downcast='integer')
-# # 转换为特定数值类型
-# df['age'] = df['age'].astype('int32')
-# df['weight'] = df['weight'].astype('float32')
-# 3.3
-# .2
-# 字符串类型处理
-# Pandas
-# 的字符串方法提供了强大的文本处理能力:
+# 将字符串列转换为数值，错误值转换为NaN
+# 是我需求描述不清，所以price是带符号的，大部分是会变成NaN的
+df['price'] = pd.to_numeric(df['price'], errors='coerce')
+# 转换并尝试向下转换以节省内存
+df['quantity'] = pd.to_numeric(df['quantity'], downcast='integer')
+# 转换为特定数值类型
+df['age'] = df['age'].astype('int32')
+df['weight'] = df['weight'].astype('float32')
+print(df)
+print_star()
+
+# 3.3.2 字符串类型处理
+# Pandas 的字符串方法提供了强大的文本处理能力:
 # Series.str.strip(to_strip=None)  # 去除首尾空格或指定字符<reference type="end" id=185>
 # Series.str.replace(pat, repl, n=-1, case=None, flags=0, regex=False)  # 替换字符串<reference type="end" id=184>
 # Series.str.contains(pat, case=True, flags=0, na=False)  # 检查是否包含子串
 # Series.str.extract(pat, flags=0, expand=True)  # 提取匹配的子串
-# # 去除字符串首尾空格
-# df['name'] = df['name'].str.strip()
-# # 替换特定字符
-# df['phone'] = df['phone'].str.replace('-', '')
-# # 删除所有非数字字符
-# df['phone'] = df['phone'].str.replace(r'D', '', regex=True)
-# # 转换为大写
-# df['category'] = df['category'].str.upper()
-# # 提取邮箱域名
-# df['email_domain'] = df['email'].str.extract('@([^@]+)$')
-# 3.3
-# .3
+# 去除字符串首尾空格
+df['name'] = df['name'].str.strip()
+# 替换特定字符
+df['phone'] = df['phone'].str.replace('-', '')
+# 删除所有非数字字符
+df['phone'] = df['phone'].str.replace(r'D', '', regex=True)
+# 转换为大写
+df['category'] = df['category'].str.upper()
+# 提取邮箱域名
+df['email_domain'] = df['email'].str.extract('@([^@]+)$')
+print(df)
+print_star()
+
+# 3.3.3
 # 日期时间标准化
 # 日期时间标准化是处理时间数据的关键:
 # pd.to_datetime(arg, errors='raise', format=None, infer_datetime_format=False, ...)
-# # 转换日期字符串，错误值转换为NaT
-# df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce')
-# # 指定日期格式
-# df['birth_date'] = pd.to_datetime(df['birth_date'], format='%Y-%m-%d')
-# # 从多个列创建日期时间
-# df['datetime'] = pd.to_datetime(df[['year', 'month', 'day']])
-# # 转换时间戳（单位:秒）
-# df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
-# # 仅转换特定列
-# df = df.convert_dtypes()
-# 3.4
-# 数据筛选与过滤
+# 转换日期字符串，错误值转换为NaT
+df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce')
+# 指定日期格式
+df['birth_date'] = pd.to_datetime(df['birth_date'], format='mixed')
+# 从多个列创建日期时间
+df['datetime'] = pd.to_datetime(df[['year', 'month', 'day']])
+
+# 转换时间戳（单位:秒）
+# 你的数据是字符串日期 + 带时间 + 有无效值 → 绝对不能加 unit，必须加 errors='coerce'
+# 会出现一个警告
+# 因为数据格式很乱：1978/3/27、2015/8/30 19:16、invalid
+# pandas 自动识别时会发出一个友好提醒，不是错误
+# 加上 format='mixed' 就会关闭这个警告
+df['timestamp'] = pd.to_datetime(df['timestamp'], format='mixed', errors='coerce')
+
+# 仅转换特定列
+df = df.convert_dtypes()
+print(df)
+print_star()
+
+# 3.4 数据筛选与过滤
 # 数据筛选是根据条件提取所需数据的过程:
-# 1.
-# 布尔索引:使用布尔表达式筛选数据
-# 2.
-# query方法:使用字符串表达式进行查询
-# 3.
-# loc方法:基于标签筛选
-# 4.
-# iloc方法:基于位置筛选
-# # 布尔索引示例
-# # 筛选年龄在25-40岁之间的数据
-# df_filtered = df[(df['age'] >= 25) & (df['age'] <= 40)]
-# # 筛选收入大于10000或职业为工程师的记录
-# df_filtered = df[(df['income'] > 10000) | (df['job'] == '工程师')]
-# # 筛选非空值记录
-# df_filtered = df[df['email'].notna()]
-# # query方法示例
-# df_filtered = df.query('age >= 25 and age <= 40 and city == "北京"')
-# # loc方法示例（基于标签）
-# # 筛选id为1001到1005的记录，包含name和age列
-# df_filtered = df.loc[1001:1005, ['name', 'age']]
-# # iloc方法示例（基于位置）
-# # 筛选前10行，第2到第4列
-# df_filtered = df.iloc[:10, 1:4]
+# 1. 布尔索引:使用布尔表达式筛选数据
+# 2. query方法:使用字符串表达式进行查询
+# 3. loc方法:基于标签筛选
+# 4. iloc方法:基于位置筛选
+# 布尔索引示例
+# 筛选年龄在25-40岁之间的数据
+df_filtered = df[(df['age'] >= 25) & (df['age'] <= 40)]
+print(df_filtered)
+print_dot()
+# 筛选收入大于10000或...
+df_filtered = df[(df['income'] > 10000) | (df['category'] == '技术部')]
+print(df_filtered)
+print_dot()
+# 筛选非空值记录
+df_filtered = df[df['email'].notna()]
+print(df_filtered)
+print_dot()
+# query方法示例
+df_filtered = df.query('age >= 25 and age <= 40 and city == "北京"')
+print(df_filtered)
+print_dot()
+# loc方法示例（基于标签）
+# 筛选id为100到150的记录，包含name和age列
+df_filtered = df.loc[100:150, ['name', 'age']]
+print(df_filtered)
+print_dot()
+# iloc方法示例（基于位置）
+# 筛选前10行，第2到第4列
+df_filtered = df.iloc[:10, 1:4]
+print(df_filtered)
+print_star()
+
 # 四、高级清洗技术
-# 4.1
-# 分组清洗
+# 4.1 分组清洗
 # 分组清洗是指按类别对数据进行分组，然后对每个组内的数据进行清洗。这种方法特别适用于需要按类别处理缺失值或异常值的场景。
-# # 按部门分组，用各组的均值填充缺失的工资
-# df['salary'] = df.groupby('department')['salary'].transform(lambda x: x.fillna(x.mean()))
-# # 按产品类别分组，用各组的中位数填充缺失值
-# df['sales'] = df.groupby('product_category')['sales'].transform(lambda x: x.fillna(x.median()))
-# # 按地区分组，统计每组的缺失值数量
-# missing_by_group = df.groupby('region')['value'].apply(lambda x: x.isna().sum())
-# print("各地区缺失值数量:")
-# print(missing_by_group)
-# # 按日期分组，删除每组中的重复记录
-# df_cleaned = df.groupby('date').apply(lambda x: x.drop_duplicates())
+
+df2 = pd.read_csv("File_Generation/data_clean_demo.csv")
+print("原数据: ")
+print(df2)
+print_dot()
+
+# 按部门分组，用各组的均值填充缺失的工资
+df2['salary'] = df2.groupby('department')['salary'].transform(lambda x: x.fillna(x.mean()))
+# 按产品类别分组，用各组的中位数填充缺失值
+df2['sales'] = df2.groupby('product_category')['sales'].transform(lambda x: x.fillna(x.median()))
+# 按地区分组，统计每组的缺失值数量
+missing_by_group = df2.groupby('region')['value'].apply(lambda x: x.isna().sum())
+print("清洗后: ")
+print(df2)
+print_dot()
+
+print("各地区缺失值数量:")
+print(missing_by_group)
+# 按日期分组，删除每组中的重复记录
+df_cleaned = df2.groupby('date').apply(lambda x: x.drop_duplicates())
+print_star()
+
 # 4.2
 # 条件清洗
 # 条件清洗是根据特定条件对数据进行选择性清洗:
-# # 条件清洗示例
-# # 1. 将工资低于0的值设为0（处理负值）
-# df['salary'] = df['salary'].where(df['salary'] > 0, 0)
-# # 2. 将年龄超过100岁的值设为100（封顶处理）
-# df['age'] = df['age'].where(df['age'] <= 100, 100)
-# # 3. 根据条件填充缺失值
-# # 如果收入缺失且职业是教师，用教师的平均收入填充
-# df['income'] = df['income'].fillna(
-#     df.groupby('job')['income'].transform('mean')
+# 条件清洗示例
+# 1. 将工资低于0的值设为0（处理负值）
+df2['salary'] = df2['salary'].where(df2['salary'] > 0, 0)
+# 2. 将年龄超过100岁的值设为100（封顶处理）
+df2['age'] = df2['age'].where(df2['age'] <= 100, 100)
+# 3. 根据条件填充缺失值
+# 如果收入缺失且职业是教师，用教师的平均收入填充,数据里面没有
+# df2['income'] = df2['income'].fillna(
+#     df2.groupby('job')['income'].transform('mean')
 # )
-# # 4. 批量条件替换
-# conditions = [
-#     (df['score'] >= 90),
-#     (df['score'] >= 80),
-#     (df['score'] >= 70),
-#     (df['score'] >= 60)
-# ]
-# choices = ['A', 'B', 'C', 'D']
-# df['grade'] = np.select(conditions, choices, default='E')
-# # 5. 复杂条件清洗（使用apply）
-# def clean_data(row):
-#     """复杂的单行数据清洗函数"""
-#     # 清洗姓名
-#     row['name'] = row['name'].strip().title()
-#     # 清洗邮箱（只保留有效的邮箱）
-#     if '@' not in row['email']:
-#         row['email'] = None
-#     # 清洗年龄（限制在18-100岁）
-#     if row['age'] < 18 or row['age'] > 100:
-#         row['age'] = None
-#     return row
-# df_cleaned = df.apply(clean_data, axis=1)
+# 4. 批量条件替换
+conditions = [
+    (df2['score'] >= 90),
+    (df2['score'] >= 80),
+    (df2['score'] >= 70),
+    (df2['score'] >= 60)
+]
+choices = ['A', 'B', 'C', 'D']
+df2['grade'] = np.select(conditions, choices, default='E')
+print(df2)
+print_star()
+
+
+# 5. 复杂条件清洗（使用apply）
+def clean_data(row):
+    """复杂的单行数据清洗函数"""
+    # 清洗姓名
+    row['name'] = row['name'].strip().title()
+
+    # 清洗邮箱
+    email = row['email']
+    if not isinstance(email, str) or '@' not in email:
+        row['email'] = None
+        return False  # 示例
+    return True
+
+    # 清洗年龄（限制在18-100岁）
+    if row['age'] < 18 or row['age'] > 100:
+        row['age'] = None
+    return row
+
+
+df_cleaned = df2.apply(clean_data, axis=1)
+print_star()
+
+
 # 4.3
 # 数据标准化与归一化
 # 数据标准化与归一化是将数据转换为统一尺度的过程，常用于机器学习预处理:
-# 4.3
-# .1
-# Min - Max
-# 归一化
-# 将数据缩放到[0, 1]
-# 区间:
-# def min_max_normalization(x):
-#     """Min-Max归一化"""
-#     return (x - x.min()) / (x.max() - x.min())
-# # 对数值列进行Min-Max归一化
-# numeric_cols = df.select_dtypes(include=['int', 'float']).columns
-# df_normalized = df[numeric_cols].apply(min_max_normalization)
-# # 缩放到指定区间（如0-100）
-# def scaled_min_max(x, min_val=0, max_val=100):
-#     return min_val + (x - x.min()) * (max_val - min_val) / (x.max() - x.min())
-# df['scaled_score'] = scaled_min_max(df['score'], 0, 100)
+# 4.3.1
+# Min - Max 归一化
+# 将数据缩放到[0, 1]区间:
+def min_max_normalization(x):
+    """Min-Max归一化"""
+    return (x - x.min()) / (x.max() - x.min())
+
+
+print("原数据")
+print(df2)
+# 对数值列进行Min-Max归一化
+numeric_cols = df2.select_dtypes(include=['int', 'float']).columns
+df2_normalized = df2[numeric_cols].apply(min_max_normalization)
+
+
+# 缩放到指定区间（如0-100）
+def scaled_min_max(x, min_val=0, max_val=100):
+    return min_val + (x - x.min()) * (max_val - min_val) / (x.max() - x.min())
+
+
+df2['scaled_score'] = scaled_min_max(df2['score'], 0, 100)
+print(df2)
+print_star()
+
+
 # 4.3
 # .2
 # Z - Score
