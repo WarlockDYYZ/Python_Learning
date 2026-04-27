@@ -301,79 +301,136 @@ print(df1)
 print(df2)
 print(df3)
 
-
 # 二、数据质量检查
-# 2.1
-# 缺失值识别
-# 缺失值是数据清洗中最常见的问题之一。Pandas
-# 提供了多种方法来识别缺失值:
+# 2.1 缺失值识别
+# 缺失值是数据清洗中最常见的问题之一
+# Pandas 提供了多种方法来识别缺失值:
 # - isna() / isnull():检测缺失值，返回布尔型对象(94)
 # - notna() / notnull():检测非缺失值，返回布尔型对象(94)
 # - isna().sum():统计每列缺失值数量
 # - isna().sum() / len(df) * 100:计算缺失值百分比
-# # 检测缺失值
-# print("缺失值检测:")
-# print(df.isna())
-# # 统计各列缺失值数量
-# missing_values = df.isna().sum()
-# print("各列缺失值数量:")
-# print(missing_values)
-# # 计算缺失值百分比
-# missing_percentage = (df.isna().sum() / len(df)) * 100
-# print("缺失值百分比:")
-# print(missing_percentage)
-# 2.2
-# 重复值识别
-# 重复值会影响分析结果的准确性。Pandas
-# 的duplicated方法可以标记重复行:
+# 检测缺失值
+df = pd.read_csv("Data_File/pandas_data_cleaning_advanced.csv")
+print("缺失值检测:")
+print(df.isna())
+# 统计各列缺失值数量
+missing_values = df.isna().sum()
+print_dot()
+print("各列缺失值数量:")
+print(missing_values)
+print_dot()
+# 计算缺失值百分比
+
+# len(df) 在 Pandas 中返回 DataFrame 的行数（记录数），等价于 df.shape[0]
+# df.isna().sum() 用于统计 DataFrame 每列的缺失值数量
+# 返回一个 pandas.Series 类型。
+# 索引：原 DataFrame 的列名
+# 值：每列缺失值的数量（int64）
+# dtype：int64
+# 如果指定 axis=1，即 df.isna().sum(axis=1)，则返回每行缺失值数量的 Series，索引为原行索引
+
+# 补充
+# 遍历 DataFrame 时优先用 df.iterrows() 或 df.itertuples()，而非 range(len(df))，后者效率较低
+# df.iterrows() 和 df.itertuples() 都是 Pandas 中逐行遍历 DataFrame 的方法，但性能和返回格式有显著差异
+
+# 1. df.iterrows() — 逐行返回 (索引, Series)
+# for index, row in df.iterrows():
+#     print(index, row['姓名'], row['年龄'])
+# 特点	    说明
+# 返回	    (索引, Series) 元组
+# 数据类型	数值列会被转为 float64（因为 Series 需要统一类型），可能丢失原始类型
+# 速度	    慢，每次迭代都创建 Series 对象
+# 适用	    需要按列名访问、数据量较小（<1万行）
+# ⚠️ 注意：修改 row 不会反映到原 DataFrame，需用 df.loc[index, '列名'] = 值
+
+# 2. df.itertuples() — 逐行返回命名元组
+# for row in df.itertuples():
+#     print(row.姓名, row.年龄)
+#     # 或 print(row[1], row[2])  # 按位置访问
+# 特点	    说明
+# 返回	    Pandas(Index=..., 列1=..., 列2=...) 命名元组
+# 数据类型	保留原始数据类型，不会强制转换
+# 速度	    快，比 iterrows() 快约 10~100 倍
+# 适用	    大数据量遍历、只读操作、性能敏感场景
+# 列名含空格或特殊字符时，可用 getattr(row, '列 名') 或 row._1（按位置）
+# 1. getattr(row, '列名') — 用字符串指定属性名
+# '员工 姓名': ['张三', '李四']
+# name = getattr(row, '员工 姓名')
+# 2. row._1、row._2 — 按位置索引访问
+# itertuples() 自动给每个字段分配位置编号：
+# row.Index 或 row._0 → 行索引
+# row._1 → 第 1 列
+# for row in df.itertuples():
+#     print(row._0)   # 行索引，等价于 row.Index
+#     print(row._1)   # 第1列：员工 姓名
+#     print(row._2)   # 第2列：基本工资(元)
+#     print(row._3)   # 第3列：绩效评分
+# ⚠️ 注意：_1 对应的是 DataFrame 的第 1 列（从 1 开始计数），不是 Python 常规的 0 开始索引。_0 固定留给行索引
+
+missing_percentage = (df.isna().sum() / len(df)) * 100
+print("缺失值百分比:")
+print(missing_percentage)
+print_star()
+
+# 2.2 重复值识别
+# 重复值会影响分析结果的准确性
+# Pandas 的 duplicated方法可以标记重复行:
 # DataFrame.duplicated(subset=None, keep='first', inplace=False)
 # 其中subset指定要检查的列，keep参数指定保留策略:
 # - 'first':保留第一个出现的行（默认）
 # - 'last':保留最后一个出现的行
 # - False:标记所有重复行(104)
-# # 检测所有列的重复值
-# print("检测所有列的重复值:")
-# duplicates = df.duplicated()
-# print(duplicates)
-# # 检测特定列的重复值
-# print("检测ID列的重复值:")
-# id_duplicates = df.duplicated(subset=['id'])
-# print(id_duplicates)
-# # 统计重复行数
-# print(f"重复行数量:{id_duplicates.sum()}")
-# 2.3
-# 异常值检测
-# 异常值是指明显偏离正常范围的数据点。常用的检测方法包括:
-# 1.
-# 描述性统计法:使用describe()
-# 方法查看数据的基本统计信息，识别异常值(124)
-# 2.
-# 四分位距（IQR）法:
+# 检测所有列的重复值
+print("检测所有行的重复值:")
+print(df)
+# df.duplicated() 用于检测 DataFrame 中的重复行，返回一个布尔型 Series
+duplicates = df.duplicated()
+print(duplicates)
+# 检测特定列的重复值
+print("检测ID列的重复值:")
+# 不算 id 本身
+id_duplicates = df.duplicated(subset=['id'])
+print(id_duplicates)
+# 统计重复行数
+print(f"重复行数量:{id_duplicates.sum()}")
+print_star()
+
+
+# 2.3 异常值检测
+# 异常值是指明显偏离正常范围的数据点
+# 常用的检测方法包括:
+# 1. 描述性统计法:使用describe()
+# 方法查看数据的基本统计信息，识别异常值
+# 2. 四分位距（IQR）法
 # - 计算第一四分位数（Q1）和第三四分位数（Q3）
 # - 计算四分位距:IQR = Q3 - Q1
-# - 定义异常值范围:小于
-# Q1 - 1.5
-# IQR
-# 或大于
-# Q3 + 1.5
-# IQR(117)
-# def detect_outliers_iqr(series):
-#     """使用IQR方法检测异常值"""
-#     q1 = series.quantile(0.25)
-#     q3 = series.quantile(0.75)
-#     iqr = q3 - q1
-#     lower_bound = q1 - 1.5 * iqr
-#     upper_bound = q3 + 1.5 * iqr
-#     return series[(series < lower_bound) | (series > upper_bound)]
-# # 检测销售额列的异常值
-# outliers = detect_outliers_iqr(df['sales_amount'])
-# print(f"检测到{len(outliers)}个异常值:")
-# print(outliers)
-# 1.
-# Z - Score
-# 法:计算数据点与均值的标准差倍数，通常绝对值大于
-# 3
-# 的被视为异常值。
+# - 定义异常值范围:小于 Q1 - 1.5 * IQR 或大于 Q3 + 1.5 * IQR
+def detect_outliers_iqr(series):
+    """使用IQR方法检测异常值"""
+    q1 = series.quantile(0.25)
+    q3 = series.quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    return series[(series < lower_bound) | (series > upper_bound)]
+
+
+print_dot()
+
+# 检测销售额列的异常值
+# 这个函数返回的是一个 Series 子集，其索引（标签）完全继承自原始 series
+# 特性	说明
+# 类型	pandas.Series
+# 索引	原 Series 的索引（行标签），保持不变
+# 值	被判定为异常值的具体数值
+# 长度	异常值的个数
+outliers = detect_outliers_iqr(df['sales_amount'])
+print(f"检测到{len(outliers)}个异常值:")
+print(outliers)
+# 3. Z-Score 法:计算数据点与均值的标准差倍数，通常绝对值大于 3 的被视为异常值
+print_star()
+
+
 # 2.4
 # 数据类型检查
 # 数据类型错误会导致计算错误或内存浪费。使用以下方法检查数据类型:
