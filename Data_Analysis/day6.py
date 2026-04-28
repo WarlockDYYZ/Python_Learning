@@ -19,11 +19,11 @@ except:
 
 # 数据输入输出
 def print_dot():
-    print(50 * ".")
+    print(100 * ".")
 
 
 def print_star():
-    print(50 * "*")
+    print(100 * "*")
 
 
 # 4.1 CSV 文件的读取与写入
@@ -837,7 +837,6 @@ def clean_data(row):
     if not isinstance(email, str) or '@' not in email:
         row['email'] = None
         return False  # 示例
-    return True
 
     # 清洗年龄（限制在18-100岁）
     if row['age'] < 18 or row['age'] > 100:
@@ -921,87 +920,88 @@ print_star()
 # 3. 词干提取与词形还原:将词汇转换为基本形式
 # 4. 特殊字符处理:处理标点符号、表情符号等
 # 5. 语言检测与转换:检测文本语言并进行转换
-nltk.download('stopwords')
-nltk.download('wordnet')
-nltk.download('omw-1.4')
+# nltk.download('stopwords')
+# nltk.download('wordnet')
+# nltk.download('omw-1.4')
 
 # # 初始化工具
-stop_words = set(stopwords.words('english'))  # 英文停用词（the/a/is/and...无意义词）
-stemmer = PorterStemmer()  # 词干提取器（running → run）
-lemmatizer = WordNetLemmatizer()  # 词形还原器（better → good）
-nltk.download('stopwords')
-nltk.download('wordnet')
-nltk.download('omw-1.4')
-
-
-def clean_text(text):
-    """完整的文本清洗函数"""
-    # 处理缺失值，避免报错
-    if pd.isna(text):
-        return None
-
-    # 1. 转换为小写
-    text = text.lower()
-    # 2. 去除URL
-    # re.sub()：替换函数（regular expression substitute）
-    # 作用: 在字符串里查找符合规则的内容 → 替换成别的内容
-    # 规则: r'http\S+'
-    # http: 匹配以 http 开头的网址
-    # \S+: 匹配所有非空格字符（一直到空格为止）
-    text = re.sub(r'http\S+', '', text)
-    # 3. 去除特殊字符和数字
-    # 删除数字、标点、符号、表情，只留下字母和空格
-    # [^a-zA-Z\s]是反向匹配
-    #  a-z: 小写字母
-    #  A-Z: 大写字母
-    #  \s: 空格
-    #  ^: 除了…之外
-    #  把不是字母、不是空格的东西全部删掉, 只保留英文，删除乱七八糟的符号和数字
-    text = re.sub(r'[^a-zA-Zs]', '', text)
-    # 4. 去除多余空格
-    # \s+: 匹配1个或多个连续空格
-    # 替换成' ': 1个空格
-    # .strip(): 删除句子开头和结尾的空格
-    text = re.sub(r's+', ' ', text).strip()
-    # 5. 去除停用词
-    # 删除the/a/an/is/are/and/of等没用的词
-    # text.split()：把句子按空格切成单词列表
-    # if word not in stop_words：只保留不是停用词的单词
-    print("原数据: " + text)
-    words = text.split()
-    print("分割后: " + text)
-    words = [word for word in words if word not in stop_words]
-    # 6. 词干提取
-    # 把变化形式的单词，统一成最短词根
-    # 统一单词形态，减少词汇数量
-    words = [stemmer.stem(word) for word in words]
-    # 7. 词形还原
-    # 根据语法把单词还原成原始形态
-    # 比词干提取更准确：
-    # better → good
-    # drove → drive
-    # women → woman
-    # ate → eat
-    # 总结
-    # 让单词回归字典里的原型
-    words = [lemmatizer.lemmatize(word) for word in words]
-    return ' '.join(words)
-
-
-data = {
-    'raw_text': [
-        "I love running! It's 100% fun, check http://sport.com",
-        "The cats are playing in the garden!!!",
-        "This is a very good movie, I liked it a lot!!!",
-        "Hello WORLD!!! Today is 2025-01-01",
-        None,  # 空值测试
-        "Better late than never!!! 12345",
-        "I am learning Python and Data Science very happily",
-        "   Too   many   spaces   here   "
-    ]
-}
-
-df['cleaned_text'] = df['raw_text'].apply(clean_text)
+# stop_words = set(stopwords.words('english'))  # 英文停用词（the/a/is/and...无意义词）
+# stemmer = PorterStemmer()  # 词干提取器（running → run）
+# lemmatizer = WordNetLemmatizer()  # 词形还原器（better → good）
+# nltk.download('stopwords')
+# nltk.download('wordnet')
+# nltk.download('omw-1.4')
+#
+#
+# def clean_text(text):
+#     """完整的文本清洗函数"""
+#     # 处理缺失值，避免报错
+#     if pd.isna(text):
+#         return None
+#
+#     # 1. 转换为小写
+#     text = text.lower()
+#     # 2. 去除URL
+#     # re.sub()：替换函数（regular expression substitute）
+#     # 作用: 在字符串里查找符合规则的内容 → 替换成别的内容
+#     # 规则: r'http\S+'
+#     # http: 匹配以 http 开头的网址
+#     # \S+: 匹配所有非空格字符（一直到空格为止）
+#     text = re.sub(r'http\S+', '', text)
+#     # 3. 去除特殊字符和数字
+#     # 删除数字、标点、符号、表情，只留下字母和空格
+#     # [^a-zA-Z\s]是反向匹配
+#     #  a-z: 小写字母
+#     #  A-Z: 大写字母
+#     #  \s: 空格
+#     #  ^: 除了…之外
+#     #  把不是字母、不是空格的东西全部删掉, 只保留英文，删除乱七八糟的符号和数字
+#     text = re.sub(r'[^a-zA-Zs]', '', text)
+#     # 4. 去除多余空格
+#     # \s+: 匹配1个或多个连续空格
+#     # 替换成' ': 1个空格
+#     # .strip(): 删除句子开头和结尾的空格
+#     text = re.sub(r's+', ' ', text).strip()
+#     # 5. 去除停用词
+#     # 删除the/a/an/is/are/and/of等没用的词
+#     # text.split()：把句子按空格切成单词列表
+#     # if word not in stop_words：只保留不是停用词的单词
+#     print("原数据: " + text)
+#     words = text.split()
+#     print("分割后: " + text)
+#     words = [word for word in words if word not in stop_words]
+#     # 6. 词干提取
+#     # 把变化形式的单词，统一成最短词根
+#     # 统一单词形态，减少词汇数量
+#     words = [stemmer.stem(word) for word in words]
+#     # 7. 词形还原
+#     # 根据语法把单词还原成原始形态
+#     # 比词干提取更准确：
+#     # better → good
+#     # drove → drive
+#     # women → woman
+#     # ate → eat
+#     # 总结
+#     # 让单词回归字典里的原型
+#     words = [lemmatizer.lemmatize(word) for word in words]
+#     return ' '.join(words)
+#
+#
+# data = {
+#     'raw_text': [
+#         "I love running! It's 100% fun, check http://sport.com",
+#         "The cats are playing in the garden!!!",
+#         "This is a very good movie, I liked it a lot!!!",
+#         "Hello WORLD!!! Today is 2025-01-01",
+#         None,  # 空值测试
+#         "Better late than never!!! 12345",
+#         "I am learning Python and Data Science very happily",
+#         "   Too   many   spaces   here   "
+#     ]
+# }
+#
+# df = pd.DataFrame(data)
+# df['cleaned_text'] = df['raw_text'].apply(clean_text)
 
 # \s = 1 个空格
 # + = 至少 1 个，越多越好
@@ -1014,388 +1014,700 @@ df['cleaned_text'] = df['raw_text'].apply(clean_text)
 # stemmer.stem() → 粗暴词根化
 # lemmatizer.lemmatize() → 智能还原单词
 
-print(df)
+# print(df)
 
 # 对文本列应用清洗函数
 # df['cleaned_text'] = df['raw_text'].apply(clean_text)
 # print()
-# 五、实践练习
-# 5.1
+##################################################################################
+
+
+# 五、实践练习 5.1
 # 单表清洗练习
-# 5.1
-# .1
+# 5.1.1
 # 练习一:电商订单数据清洗
 # 数据描述:
 # - 数据来源:某电商平台订单数据
 # - 文件格式:CSV
-# - 包含字段:订单
-# ID、用户
-# ID、商品名称、价格、数量、下单时间、支付状态、收货地址
+# - 包含字段:订单ID、用户ID、商品名称、价格、数量、下单时间、支付状态、收货地址
 # - 数据问题:包含缺失值、重复订单、价格异常、日期格式不一致
 # 清洗要求:
-# 1.
-# 读取数据并检查数据质量
-# 2.
-# 处理缺失值（订单
-# ID、用户
-# ID
-# 不得缺失）
-# 3.
-# 删除重复订单
-# 4.
-# 修复价格异常（负值、超大值）
-# 5.
-# 标准化日期格式
-# 6.
-# 清洗收货地址（只保留城市信息）
+# 1. 读取数据并检查数据质量
+# 2. 处理缺失值（订单ID、用户ID不得缺失）
+# 3. 删除重复订单
+# 4. 修复价格异常（负值、超大值）
+# 5 标准化日期格式
+# 6.清洗收货地址（只保留城市信息）
+
 # 练习代码框架:
-# # 1. 读取数据
-# import pandas as pd
-# import numpy as np
-# # 读取CSV文件（假设文件名为orders.csv）
-# df_orders = pd.read_csv('orders.csv', encoding='utf-8')
+# 1. 读取数据
+# 读取CSV文件（假设文件名为orders.csv）
+df_orders = pd.read_csv('Data_File/orders.csv', encoding='utf-8')
+
 # # 2. 数据质量检查
-# print("=== 订单数据质量检查 ===")
-# print("1. 数据基本信息:")
-# print(f"数据形状:{df_orders.shape}")
-# print(df_orders.info())
-# print("2. 缺失值检查:")
-# missing_values = df_orders.isna().sum()
-# print(missing_values)
-# print("3. 重复值检查:")
-# print(f"重复订单数量:{df_orders.duplicated(subset=['order_id']).sum()}")
-# print("4. 价格范围检查:")
-# print(f"价格最小值:{df_orders['price'].min():.2f}")
-# print(f"价格最大值:{df_orders['price'].max():.2f}")
-# # 3. 数据清洗
-# print("=== 开始数据清洗 ===")
-# # 处理缺失值
-# print("1. 处理缺失值:")
-# # 删除订单ID或用户ID缺失的记录
-# df_orders_clean = df_orders.dropna(subset=['order_id', 'user_id'])
-# print(f"删除缺失值后剩余记录数:{len(df_orders_clean)}")
-# # 用0填充数量缺失值（假设缺失表示0个）
-# df_orders_clean['quantity'] = df_orders_clean['quantity'].fillna(0)
-# # 用均值填充价格缺失值（不推荐，仅示例）
-# df_orders_clean['price'] = df_orders_clean['price'].fillna(df_orders_clean['price'].mean())
-# # 处理重复订单
-# print("2. 处理重复订单:")
-# # 保留最新的订单（假设order_id唯一，但可能有重复）
-# df_orders_clean = df_orders_clean.drop_duplicates(subset=['order_id'], keep='last')
-# print(f"删除重复订单后剩余记录数:{len(df_orders_clean)}")
-# # 处理价格异常
-# print("3. 处理价格异常:")
-# # 找出价格小于0的记录
-# negative_price = df_orders_clean[df_orders_clean['price'] < 0]
-# print(f"发现{len(negative_price)}条负价格记录")
-# # 找出价格超过10000的记录（假设正常价格不超过10000）
-# high_price = df_orders_clean[df_orders_clean['price'] > 10000]
-# print(f"发现{len(high_price)}条超高价格记录")
-# # 将异常价格设为NaN（后续处理）
-# df_orders_clean['price'] = df_orders_clean['price'].where(
-#     (df_orders_clean['price'] >= 0) & (df_orders_clean['price'] <= 10000),
-#     np.nan
-# )
-# # 用中位数填充异常价格
-# df_orders_clean['price'] = df_orders_clean['price'].fillna(df_orders_clean['price'].median())
-# # 标准化日期格式
-# print("4. 标准化日期格式:")
-# print("原始日期格式示例:", df_orders_clean['order_time'].iloc[0])
-# # 转换为datetime类型
-# df_orders_clean['order_time'] = pd.to_datetime(df_orders_clean['order_time'], errors='coerce')
-# # 只保留日期部分
-# df_orders_clean['order_date'] = df_orders_clean['order_time'].dt.date
-# # 清洗收货地址
-# print("5. 清洗收货地址:")
-# # 从地址中提取城市信息（简化版）
-# def extract_city(address):
-#     """从地址中提取城市信息"""
-#     if pd.isna(address):
-#         return None
-#     # 简单规则:取省/市/区中的第一个词
-#     parts = address.split('省')
-#     if len(parts) > 1:
-#         return parts[0] + '省'
-#     parts = address.split('市')
-#     if len(parts) > 1:
-#         return parts[0] + '市'
-#     return address
-# df_orders_clean['city'] = df_orders_clean['address'].apply(extract_city)
-# # 4. 清洗后数据检查
-# print("=== 清洗后数据检查 ===")
-# print("1. 数据质量检查:")
-# print(f"最终数据形状:{df_orders_clean.shape}")
-# print("缺失值检查:")
-# print(df_orders_clean.isna().sum())
-# print("2. 价格统计:")
-# print(f"价格均值:{df_orders_clean['price'].mean():.2f}")
-# print(f"价格中位数:{df_orders_clean['price'].median():.2f}")
-# print(f"价格标准差:{df_orders_clean['price'].std():.2f}")
-# # 5. 保存清洗后的数据
-# print("=== 保存清洗后的数据 ===")
-# df_orders_clean.to_csv('cleaned_orders.csv', index=False, encoding='utf-8')
-# print("已保存清洗后的数据到 cleaned_orders.csv")
-# 5.1
-# .2
-# 练习二:员工信息数据清洗
+print("=== 订单数据质量检查 ===")
+print("1. 数据基本信息:")
+# 想知道表有多大，就用 .shape，先看行后看列 (11, 8) 11行8列，返回一个元组
+print(f"数据形状:{df_orders.shape}")
+
+# df_orders.info() 是 Pandas 中用于快速查看 DataFrame 内存摘要和数据质量的核心方法。
+# 如果说 .shape 是看数据的“体型”，那么 .info() 就是给数据做一次全面的“体检”
+# 在拿到任何一份新数据时，“标准起手式”通常是：
+# df.head()：看前几行长什么样
+# df.shape：看有多少行多少列
+# df.info()：看有没有缺失值、看数据类型对不对
+print(df_orders.info())
+
+print("2. 缺失值检查:")
+# 这行代码是 Pandas 里用来精准统计缺失值的“黄金组合”。它能把数据里隐藏的空值一个个揪出来，告诉你每一列到底缺了多少数据
+# df_orders.isna()
+# 1.作用：检查数据中的每一个单元格。
+# 结果：返回一个和原表一样大的表格，但里面只有 True 和 False。
+# 含义：True 代表这里是空的（缺失值），False 代表这里有数据。
+# 2..sum()
+# 作用：对上述的 True/False 表格进行求和。
+# 原理：在 Python/Pandas 中，True 当作 1，False 当作 0。
+# 默认行为：如果不指定轴，它默认是按列求和（axis=0）。
+# 3.最终结果
+# 返回一个 Series 对象。
+# 索引是列名，值是该列缺失值的总数量
+missing_values = df_orders.isna().sum()
+print(missing_values)
+
+print("3. 重复值检查:")
+# 1.df_orders.duplicated(subset=['order_id'])
+# 作用：检查 order_id 列的值是否重复。
+# 参数 subset=['order_id']：告诉 Pandas 只关注 order_id 这一列。只要订单号一样，就算重复，不管其他列（如价格、时间）是否一样。
+# 返回值：返回一个布尔序列（True/False）。
+# False：表示这是该订单号第一次出现（保留项）。
+# True：表示这个订单号之前已经出现过了（重复项）。
+# 2..sum()
+# 作用：对布尔值求和。
+# 原理：在计算中，True 视为 1，False 视为 0。
+# 结果：算出总共有多少个被标记为 True 的行。
+print(f"重复订单数量:{df_orders.duplicated(subset=['order_id']).sum()}")
+
+print("4. 价格范围检查:")
+# 这个我自己能看懂，还是查了一下
+# 先拿到列，再求最值
+# 索引方式	代码示例	    返回类型	    形象理解
+# 单括号	    df['Age']	Series	    把这一列抽出来，变成一维数组
+# 双括号	    df[['Age']]	DataFrame	把这一列框选住，它还是个表格（只是只有一列）
+# :.2f 是格式化字符串的语法
+print(f"价格最小值:{df_orders['price'].min():.2f}")
+print(f"价格最大值:{df_orders['price'].max():.2f}")
+
+# 3. 数据清洗
+print("=== 开始数据清洗 ===")
+# 处理缺失值
+print("1. 处理缺失值:")
+# 删除订单ID或用户ID缺失的记录
+print(f"原记录数:{len(df_orders)}")
+# 数据中user_id有一行为空
+df_orders_clean = df_orders.dropna(subset=['order_id', 'user_id'])
+print(f"删除缺失值后剩余记录数:{len(df_orders_clean)}")
+# 用0填充数量缺失值（假设缺失表示0个）
+df_orders_clean.loc[:, 'quantity'] = df_orders_clean['quantity'].fillna(0)
+# 用均值填充价格缺失值（不推荐，仅示例）
+df_orders_clean.loc[:, 'price'] = df_orders_clean['price'].fillna(df_orders_clean['price'].mean())
+# 处理重复订单
+print("2. 处理重复订单:")
+# 保留最新的订单（假设order_id唯一，但可能有重复）
+# order_id一条重复
+
+'''
+df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=False)
+是 Pandas 中用于数据去重的核心函数。简单来说，它的作用就是帮你在 DataFrame 中找出重复的行，并根据你的要求保留或剔除它们，确保数据的唯一性
+1. subset：按哪一列（或哪些列）去重？
+默认值：None。
+含义：
+      None：检查所有列。只有当一行数据的所有内容都与另一行完全一样时，才算重复。
+      ['列名']：只检查指定的列。只要这一列的值相同，不管其他列是什么，都算重复。
+场景：比如你想根据“用户ID”去重，就设置 subset=['用户ID']。
+2. keep：保留哪一个？
+这是控制去重策略的关键参数，有三个选项：
+      'first' (默认)：“喜新厌旧”的反义词。保留第一次出现的行，删除后面重复的行。
+      'last'：“喜新厌旧”。保留最后一次出现的行，删除前面重复的行。常用于保留最新状态的订单。
+      False：“六亲不认”。不保留任何重复项，把所有重复的行（包括第一次和最后一次）统统删除。只留下那些在表中独一无二的行。
+3. inplace：是否修改原数据？
+      False (默认)：不修改原 DataFrame，而是返回一个新的去重后的 DataFrame。
+      True：直接在原 DataFrame 上修改，不返回新对象。
+4. ignore_index：是否重置索引？
+      False (默认)：保留原来的行号（索引）。去重后索引可能会断断续续（如 0, 2, 5...）。
+      True：去重后，将索引重置为连续的 0, 1, 2...。
+'''
+
+df_orders_clean = df_orders_clean.drop_duplicates(subset=['order_id'], keep='last')
+print(f"删除重复订单后剩余记录数:{len(df_orders_clean)}")
+# 处理价格异常
+print("3. 处理价格异常:")
+
+# 找出价格小于0的记录
+negative_price = df_orders_clean[df_orders_clean['price'] < 0]
+'''
+1.df_orders_clean['price'] < 0
+这行代码本身会返回一个 Series，里面的数据全是 True 或者 False
+Pandas 会逐行检查 price 列
+2.df_orders_clean[...]
+这是布尔索引
+Pandas 拿着上面那串 True/False 序列去套在原表上
+只保留对应位置是 True 的行，丢弃 False 的行
+
+其实我是知道一些的，理解也之前，下面的表述要更正式
+方括号 [] 中放入一个 布尔类型的 Series（即由 True/False 组成的序列）时，Pandas 会将其视为一个掩码（Mask）或筛选器，对原 DataFrame 进行行过滤
+输入：df_orders_clean['price'] < 0 生成了一个布尔 Series。
+这个 Series 的长度与原表行数一致。
+每个 True 代表“保留这一行”，每个 False 代表“丢弃这一行”。
+执行：df_orders_clean[...] 接收这个 Series。
+Pandas 会逐行比对，只把对应位置为 True 的行提取出来。
+输出：结果依然是一个 DataFrame。
+结构不变：列名、列的数据类型都保持不变。
+行数减少：只包含满足条件的行。
+索引保持：默认情况下，保留原表的行索引（除非你后续重置它）。
+
+为什么是 DataFrame？
+因为筛选操作只是减少了行的数量，并没有改变数据的二维表格结构
+你得到的仍然是一个包含多列数据（订单ID、商品、价格等）的集合，所以它必须是 DataFrame
+'''
+
+print(f"发现{len(negative_price)}条负价格记录")
+
+# 找出价格超过10000的记录（假设正常价格不超过10000）
+high_price = df_orders_clean[df_orders_clean['price'] > 10000]
+print(f"发现{len(high_price)}条超高价格记录")
+'''
+将异常价格设为NaN（后续处理）
+.where(..., np.nan)（执行替换）
+语法：df.where(条件, 替换值)
+含义：
+    如果条件是 True（价格正常）：保留原来的价格数字。
+    如果条件是 False（价格异常）：将该位置的值替换为 np.nan（空值）
+这里再修改以后写回数据，数据改变
+'''
+df_orders_clean['price'] = df_orders_clean['price'].where(
+    (df_orders_clean['price'] >= 0) & (df_orders_clean['price'] <= 10000),
+    np.nan
+)
+
+# 用中位数填充异常价格
+df_orders_clean['price'] = df_orders_clean['price'].fillna(df_orders_clean['price'].median())
+
+# 标准化日期格式
+print("4. 标准化日期格式:")
+# 第一行负责“标准化”（把杂乱的文本变成标准时间）
+# 第二行负责“截取”（只要日期，不要具体几点几分）
+print("原始日期格式示例:", df_orders_clean['order_time'].iloc[0])
+# 转换为datetime类型
+df_orders_clean['order_time'] = pd.to_datetime(df_orders_clean['order_time'], errors='coerce')
+"""
+作用：将 order_time 列从“文本字符串”转换为 Pandas 的“标准时间戳”格式。
+pd.to_datetime(...)：
+这是 Pandas 的强力转换器。它能识别各种格式的字符串（如 "2023/1/1 12:00"、"2023-01-01" 等），并将它们统一转换成 datetime64 类型。
+转换后，这列数据就不再是普通的文字，而是计算机能理解的时间，可以进行计算（比如算时间差）。
+errors='coerce'（关键点）：
+这是一个“容错机制”。
+如果不加这个参数，一旦数据里混进一个无法识别的格式（比如 "未知时间" 或 "2023-13-40"），整个程序就会报错崩溃。
+加上 errors='coerce' 后，如果遇到无法转换的“脏数据”，Pandas 会把它变成 NaT，相当于时间领域的 NaN（空值）
+这样程序能继续运行，你可以后续再处理这些空值。
+
+只保留日期部分
+作用：从标准时间中把“年月日”单独提取出来，存入新的一列 order_date。
+.dt：
+这是 Pandas 的“时间访问器”。只有当一列数据是标准时间格式时，才能使用 .dt。
+.date：
+这是一个属性，它的作用是“扔掉”时分秒，只保留日期部分。
+注意：使用 .dt.date 提取后，该列的数据类型会变成 Python 原生的 datetime.date 对象（在 Pandas 中显示为 object 类型）。
+"""
+df_orders_clean['order_date'] = df_orders_clean['order_time'].dt.date
+# 清洗收货地址
+print("5. 清洗收货地址:")
+
+
+# 从地址中提取城市信息（简化版）
+def extract_city(address):
+    """从地址中提取城市信息"""
+    if pd.isna(address):
+        return None
+    # 简单规则:取省/市/区中的第一个词
+    parts = address.split('省')
+    if len(parts) > 1:
+        return parts[0] + '省'
+    parts = address.split('市')
+    if len(parts) > 1:
+        return parts[0] + '市'
+    return address
+
+
+'''
+.apply() 的核心逻辑就是：“遍历 Series 中的每一个元素，把它们一个一个地扔进你定义的函数里处理，最后把结果收回来。”
+.apply() 的返回类型遵循一个核心原则：“看人下菜碟”。它会根据你传入的函数返回值的结构，自动推断最终的结果类型
+默认情况：返回 Series
+特殊情况：如果你显式要求展开（expand）或返回了 Series 对象，则返回 DataFrame
+'''
+
+df_orders_clean['city'] = df_orders_clean['address'].apply(extract_city)
+print(df_orders_clean)
+
+# 4. 清洗后数据检查
+print("=== 清洗后数据检查 ===")
+print("1. 数据质量检查:")
+print(f"最终数据形状:{df_orders_clean.shape}")
+print("缺失值检查:")
+print(df_orders_clean.isna().sum())
+print("2. 价格统计:")
+print(f"价格均值:{df_orders_clean['price'].mean():.2f}")
+print(f"价格中位数:{df_orders_clean['price'].median():.2f}")
+print(f"价格标准差:{df_orders_clean['price'].std():.2f}")
+# 5. 保存清洗后的数据
+print("=== 保存清洗后的数据 ===")
+df_orders_clean.to_csv('cleaned_orders.csv', index=False, encoding='utf-8')
+print("已保存清洗后的数据到 cleaned_orders.csv")
+'''
+    原本(11, 8) 'user_id'一行缺失，'order_id'一行重复，sheng'xian, 删除后变成(9, 8)
+    提取日期添加一列'order_date',提取地址添加一列'city', 变为(9, 10)
+'''
+print_star()
+
+
+# 5.1.2 练习二:员工信息数据清洗
 # 数据描述:
 # - 数据来源:公司员工信息表
 # - 文件格式:Excel（包含多个工作表）
-# - 包含字段:员工
-# ID、姓名、性别、年龄、入职日期、部门、职位、薪资、邮箱
+# - 包含字段:员工ID、姓名、性别、年龄、入职日期、部门、职位、薪资、邮箱
 # - 数据问题:包含缺失值、重复记录、数据类型错误、邮箱格式不一致
 # 清洗要求:
-# 1.
-# 读取所有工作表数据并合并
-# 2.
-# 检查并处理重复员工
-# ID
-# 3.
-# 标准化性别和职位信息
-# 4.
-# 转换日期格式并计算工龄
-# 5.
-# 验证邮箱格式并提取域名
-# 6.
+# 1.读取所有工作表数据并合并
+# 2.检查并处理重复员工ID
+# 3.标准化性别和职位信息
+# 4.转换日期格式并计算工龄
+# 5.验证邮箱格式并提取域名
+# 6.处理薪资异常值
+
+# 练习代码框架:
+# 1. 读取Excel数据
+# 读取所有工作表
+excel_data = pd.read_excel('Data_File/employee_data.xlsx', sheet_name=None)
+print("发现的工作表:", list(excel_data.keys()))
+
+"""
+当你使用 sheet_name=None 时，Pandas 会读取 Excel 中的所有工作表，并返回一个字典，而不是一个 DataFrame。
+字典的键：是工作表的名字（如 'Sheet1', 'Sheet2'）。
+字典的值：才是具体的 DataFrame。
+所以，当你运行 excel_data['hire_date'] 时，Python 会试图在字典里找一个叫 'hire_date' 的键
+（也就是找一个叫 'hire_date' 的 Sheet），当然找不到，所以报了 KeyError。
+
+这样用时可以的
+print(excel_data["员工信息_1"]) 
+"""
+
+# 合并所有工作表
+df_employees = pd.concat(excel_data.values(), ignore_index=True)
+# 2. 数据质量检查
+print("=== 员工数据质量检查 ===")
+print(f"原始数据记录数:{len(df_employees)}")
+print(df_employees.info())
+# 3. 数据清洗
+print("=== 开始数据清洗 ===")
+# 处理重复员工ID
+print("1. 处理重复员工ID:")
+duplicate_ids = df_employees[df_employees.duplicated(subset=['employee_id'], keep=False)]
+print(f"发现{len(duplicate_ids)}条重复ID记录")
+# 保留最新的记录（假设入职日期越近越准确）
+
+# 生成的数据我还要再洗一遍，洗了，人工清洗果然很麻烦(还洗不完)
+# 处理 ISO 标准格式 (2011-03-07)
+"""
+Pandas 在进行筛选 df[mask] 时，必须明确知道这一行是“要”还是“不要”（True 或 False）
+如果你给它一个 NaN，它会困惑：“我不知道这一行该不该选”，于是报错
+只需要在 .str.match() 后面加上 na=False 参数即可
+
+下面也是一样
+如果 hire_date 这一列里有空值（NaN），.str.contains() 默认会返回 NaN（表示“不知道里面有没有年”），而不是 False
+同样只需要在 .str.contains() 里加上 na=False 参数
+"""
+mask_iso = df_employees['hire_date'].str.match(r'^\d{4}-\d{2}-\d{2}$', na=False)
+df_employees.loc[mask_iso, 'hire_date'] = pd.to_datetime(df_employees.loc[mask_iso, 'hire_date'])
+# 处理中文格式 (2010年03月07日)
+# 技巧：先把 "年" 替换为 "-"，"日" 替换为 ""，变成标准格式再转
+mask_cn = df_employees['hire_date'].str.contains('年', na=False)
+df_employees.loc[mask_cn, 'hire_date'] = pd.to_datetime(
+    df_employees.loc[mask_cn, 'hire_date'].str.replace('年', '-').str.replace('月', '-').str.replace('日', '')
+)
+# 处理 欧式斜杠格式 (27/05/2018)
+# 注意：必须指定 dayfirst=True，否则 27 会被误判
+mask_slash = df_employees['hire_date'].str.match(r'^\d{2}/\d{2}/\d{4}$', na=False)
+df_employees.loc[mask_slash, 'hire_date'] = pd.to_datetime(
+    df_employees.loc[mask_slash, 'hire_date'],
+    format='mixed'  # 明确指定：日/月/年
+)
+"""
+Mixed 模式（format='mixed'）
+逻辑：Pandas 会逐行扫描。
+看到 2021-01-01 -> 识别为 ISO 格式 -> 解析。
+看到 27/05/2018 -> 识别为 欧/英 格式 -> 解析。
+看到 2010年03月07日 -> 识别为 中文 格式 -> 解析。
+后果：无论你的 Excel 表里混了多少种日期写法，它都能自动识别并统一转换成标准时间。
+
+优点：
+极其省心：不需要写正则表达式，不需要分步筛选。
+兼容性强：完美支持中英文混排、各种分隔符混排。
+缺点：
+速度稍慢：因为要逐行去“猜”格式，处理几百万行数据时，速度会比指定单一格式（如 format='%Y-%m-%d'）慢一些。但在几十万行数据量下，体感差异不大。
+结论：对于现在处理这种清洗任务，format='mixed' 是目前的最优解。
+"""
+
+# 强制转换：无法识别的格式（包括那个 int）都会变成 NaT (Not a Time)
+df_employees['hire_date'] = pd.to_datetime(
+    df_employees['hire_date'],
+    errors='coerce',  # 关键参数：遇到无法转换的（如那个 int），直接转为空值，不再报错
+    dayfirst=True  # 辅助判断 日/月/年
+)
+
+"""
+有些日期在 Excel 里虽然显示为 2021/5/20，但底层存储可能是数字 44336。
+或者有的单元格是纯数字 20210520，Pandas 读取时把它当成了整数，而不是字符串。
+使用 errors='coerce' 可以把这些乱七八糟的格式统统“打回原形”（转为时间或空值），是清洗数据的终极手段。
+"""
+
+df_employees_clean = df_employees.sort_values('hire_date', ascending=False)
+df_employees_clean = df_employees_clean.drop_duplicates(subset=['employee_id'], keep='first')
+print(f"处理后剩余记录数:{len(df_employees_clean)}")
+# 标准化性别（转换为'男'或'女'）
+print("2. 标准化性别:")
+gender_mapping = {
+    '男': '男', '男性': '男', 'M': '男', 'm': '男',
+    '女': '女', '女性': '女', 'F': '女', 'f': '女',
+    '未知': None, '未填写': None
+}
+df_employees_clean['gender'] = df_employees_clean['gender'].map(gender_mapping)
+# 标准化职位（简化处理）
+print("3. 标准化职位:")
+position_mapping = {
+    '工程师': '工程师', '开发工程师': '工程师', '软件工程师': '工程师',
+    '产品经理': '产品经理', '产品': '产品经理',
+    '销售': '销售', '客户经理': '销售',
+    '运营': '运营', '数据运营': '运营'
+}
+
+
+def standardize_position(pos):
+    """标准化职位名称"""
+    if pd.isna(pos):
+        return None
+    for key in position_mapping:
+        if key in pos:
+            return position_mapping[key]
+    return '其他'
+
+
+df_employees_clean['position'] = df_employees_clean['position'].apply(standardize_position)
+# 日期处理和工龄计算
+print("4. 日期处理和工龄计算:")
+# 转换入职日期
+df_employees_clean['hire_date'] = pd.to_datetime(df_employees_clean['hire_date'], errors='coerce')
+# 计算工龄（年）
+current_date = datetime.datetime(2026, 4, 28)  # 假设当前日期
+df_employees_clean['work_years'] = (current_date - df_employees_clean['hire_date']).dt.days / 365
+# 验证邮箱格式
+print("5. 验证邮箱格式:")
+
+
+def validate_email(email):
+    """验证邮箱格式并提取域名"""
+    if pd.isna(email):
+        return None, None
+    pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+.[a-zA-Z0-9-.]+$'
+    if re.match(pattern, email):
+        domain = email.split('@')[1]
+        return email, domain
+    return None, None
+
+
+# 提取邮箱和域名
+emails, domains = zip(*df_employees_clean['email'].apply(validate_email))
+df_employees_clean['valid_email'] = list(emails)
+df_employees_clean['email_domain'] = list(domains)
 # 处理薪资异常值
+
+# 1. 强制转换 salary 列为数字
+# errors='coerce' 的意思是：如果遇到 "面议" 或 "10k" 这种转不成数字的，直接变成空值 (NaN)
+df_employees_clean['salary'] = pd.to_numeric(df_employees_clean['salary'], errors='coerce')
+
+print("6. 处理薪资异常值:")
+print("薪资统计:")
+print(f"薪资范围:{df_employees_clean['salary'].min():.0f} - {df_employees_clean['salary'].max():.0f}")
+print(f"薪资均值:{df_employees_clean['salary'].mean():.0f}")
+print(f"薪资中位数:{df_employees_clean['salary'].median():.0f}")
+# 使用IQR方法检测异常值
+q1 = df_employees_clean['salary'].quantile(0.25)
+q3 = df_employees_clean['salary'].quantile(0.75)
+iqr = q3 - q1
+lower_bound = q1 - 1.5 * iqr
+upper_bound = q3 + 1.5 * iqr
+outliers = df_employees_clean[(df_employees_clean['salary'] < lower_bound) |
+                              (df_employees_clean['salary'] > upper_bound)]
+print(f"检测到{len(outliers)}个薪资异常值")
+# 将异常值设为中位数（保守处理）
+df_employees_clean['salary'] = df_employees_clean['salary'].where(
+    (df_employees_clean['salary'] >= lower_bound) & (df_employees_clean['salary'] <= upper_bound),
+    df_employees_clean['salary'].median()
+)
+# 4. 数据质量复查
+print("=== 清洗后数据质量复查 ===")
+print(f"最终数据记录数:{len(df_employees_clean)}")
+print("主要指标统计:")
+print(f"平均年龄:{df_employees_clean['age'].mean():.1f}岁")
+print(f"平均工龄:{df_employees_clean['work_years'].mean():.1f}年")
+print(f"员工分布（按部门）:")
+print(df_employees_clean['department'].value_counts())
+print(f"员工分布（按职位）:")
+print(df_employees_clean['position'].value_counts())
+# 5. 保存结果
+df_employees_clean.to_excel('cleaned_employees.xlsx', index=False, sheet_name='清洗后员工数据')
+print("已保存清洗后的数据到 cleaned_employees.xlsx")
+print_star()
+"""
+验证邮箱的代码看起来是对的，实际也算是对的，因为我生成数据的时候没有表述清楚，所以大部分是没有数据的
+"""
+
+
+# 5.2 多表合并清洗练习
+# 5.2.1 练习三:销售数据整合
+"""
+数据描述:
+- 数据来源:三个 CSV 文件（销售订单、产品信息、客户信息）
+    - 文件1:sales_orders.csv - 销售订单（订单ID、客户ID、产品ID、数量、日期）
+    - 文件2:products.csv - 产品信息（产品ID、产品名称、类别、单价）
+    - 文件3:customers.csv - 客户信息（客户ID、客户名称、城市、国家）
+- 数据问题:订单中存在无效的产品ID和客户ID、数量异常、日期格式不一致
+清洗要求:
+    1.读取并清洗三个数据表
+    2.验证订单中的外键（产品ID和客户ID）
+    3.计算订单金额
+    4.按产品类别和客户国家进行销售统计
+    5.找出异常订单（数量为负或超过100）
+"""
 # 练习代码框架:
-# # 1. 读取Excel数据
-# import pandas as pd
-# import numpy as np
-# from datetime import datetime
-# # 读取所有工作表
-# excel_data = pd.read_excel('employee_data.xlsx', sheet_name=None)
-# print("发现的工作表:", list(excel_data.keys()))
-# # 合并所有工作表
-# df_employees = pd.concat(excel_data.values(), ignore_index=True)
-# # 2. 数据质量检查
-# print("=== 员工数据质量检查 ===")
-# print(f"原始数据记录数:{len(df_employees)}")
-# print(df_employees.info())
-# # 3. 数据清洗
-# print("=== 开始数据清洗 ===")
-# # 处理重复员工ID
-# print("1. 处理重复员工ID:")
-# duplicate_ids = df_employees[df_employees.duplicated(subset=['employee_id'], keep=False)]
-# print(f"发现{len(duplicate_ids)}条重复ID记录")
-# # 保留最新的记录（假设入职日期越近越准确）
-# df_employees_clean = df_employees.sort_values('hire_date', ascending=False)
-# df_employees_clean = df_employees_clean.drop_duplicates(subset=['employee_id'], keep='first')
-# print(f"处理后剩余记录数:{len(df_employees_clean)}")
-# # 标准化性别（转换为'男'或'女'）
-# print("2. 标准化性别:")
-# gender_mapping = {
-#     '男': '男', '男性': '男', 'M': '男', 'm': '男',
-#     '女': '女', '女性': '女', 'F': '女', 'f': '女',
-#     '未知': None, '未填写': None
-# }
-# df_employees_clean['gender'] = df_employees_clean['gender'].map(gender_mapping)
-# # 标准化职位（简化处理）
-# print("3. 标准化职位:")
-# position_mapping = {
-#     '工程师': '工程师', '开发工程师': '工程师', '软件工程师': '工程师',
-#     '产品经理': '产品经理', '产品': '产品经理',
-#     '销售': '销售', '客户经理': '销售',
-#     '运营': '运营', '数据运营': '运营'
-# }
-# def standardize_position(pos):
-#     """标准化职位名称"""
-#     if pd.isna(pos):
-#         return None
-#     for key in position_mapping:
-#         if key in pos:
-#             return position_mapping[key]
-#     return '其他'
-# df_employees_clean['position'] = df_employees_clean['position'].apply(standardize_position)
-# # 日期处理和工龄计算
-# print("4. 日期处理和工龄计算:")
-# # 转换入职日期
-# df_employees_clean['hire_date'] = pd.to_datetime(df_employees_clean['hire_date'], errors='coerce')
-# # 计算工龄（年）
-# current_date = datetime(2025, 4, 1)  # 假设当前日期
-# df_employees_clean['work_years'] = (current_date - df_employees_clean['hire_date']).dt.days / 365
-# # 验证邮箱格式
-# print("5. 验证邮箱格式:")
-# import re
-# def validate_email(email):
-#     """验证邮箱格式并提取域名"""
-#     if pd.isna(email):
-#         return None, None
-#     pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+.[a-zA-Z0-9-.]+$'
-#     if re.match(pattern, email):
-#         domain = email.split('@')[1]
-#         return email, domain
-#     return None, None
-# # 提取邮箱和域名
-# emails, domains = zip(*df_employees_clean['email'].apply(validate_email))
-# df_employees_clean['valid_email'] = list(emails)
-# df_employees_clean['email_domain'] = list(domains)
-# # 处理薪资异常值
-# print("6. 处理薪资异常值:")
-# print("薪资统计:")
-# print(f"薪资范围:{df_employees_clean['salary'].min():.0f} - {df_employees_clean['salary'].max():.0f}")
-# print(f"薪资均值:{df_employees_clean['salary'].mean():.0f}")
-# print(f"薪资中位数:{df_employees_clean['salary'].median():.0f}")
-# # 使用IQR方法检测异常值
-# q1 = df_employees_clean['salary'].quantile(0.25)
-# q3 = df_employees_clean['salary'].quantile(0.75)
-# iqr = q3 - q1
-# lower_bound = q1 - 1.5 * iqr
-# upper_bound = q3 + 1.5 * iqr
-# outliers = df_employees_clean[(df_employees_clean['salary'] < lower_bound) |
-#                               (df_employees_clean['salary'] > upper_bound)]
-# print(f"检测到{len(outliers)}个薪资异常值")
-# # 将异常值设为中位数（保守处理）
-# df_employees_clean['salary'] = df_employees_clean['salary'].where(
-#     (df_employees_clean['salary'] >= lower_bound) & (df_employees_clean['salary'] <= upper_bound),
-#     df_employees_clean['salary'].median()
-# )
-# # 4. 数据质量复查
-# print("=== 清洗后数据质量复查 ===")
-# print(f"最终数据记录数:{len(df_employees_clean)}")
-# print("主要指标统计:")
-# print(f"平均年龄:{df_employees_clean['age'].mean():.1f}岁")
-# print(f"平均工龄:{df_employees_clean['work_years'].mean():.1f}年")
-# print(f"员工分布（按部门）:")
-# print(df_employees_clean['department'].value_counts())
-# print(f"员工分布（按职位）:")
-# print(df_employees_clean['position'].value_counts())
-# # 5. 保存结果
-# df_employees_clean.to_excel('cleaned_employees.xlsx', index=False, sheet_name='清洗后员工数据')
-# print("已保存清洗后的数据到 cleaned_employees.xlsx")
-# 5.2
-# 多表合并清洗练习
-# 5.2
-# .1
-# 练习三:销售数据整合
-# 数据描述:
-# - 数据来源:三个
-# CSV
-# 文件（销售订单、产品信息、客户信息）
-# - 文件
-# 1:sales_orders.csv - 销售订单（订单
-# ID、客户
-# ID、产品
-# ID、数量、日期）
-# - 文件
-# 2:products.csv - 产品信息（产品
-# ID、产品名称、类别、单价）
-# - 文件
-# 3:customers.csv - 客户信息（客户
-# ID、客户名称、城市、国家）
-# - 数据问题:订单中存在无效的产品
-# ID
-# 和客户
-# ID、数量异常、日期格式不一致
-# 清洗要求:
-# 1.
-# 读取并清洗三个数据表
-# 2.
-# 验证订单中的外键（产品
-# ID
-# 和客户
-# ID）
-# 3.
-# 计算订单金额
-# 4.
-# 按产品类别和客户国家进行销售统计
-# 5.
-# 找出异常订单（数量为负或超过
-# 100）
-# 练习代码框架:
-# # 1. 读取并清洗三个数据表
-# import pandas as pd
-# import numpy as np
-# print("=== 销售数据整合与清洗 ===")
-# # 读取订单数据
-# print("1. 读取并清洗订单数据:")
-# df_orders = pd.read_csv('sales_orders.csv', encoding='utf-8')
-# print(f"订单数据形状:{df_orders.shape}")
-# # 清洗订单数据
-# # 转换日期格式
-# df_orders['order_date'] = pd.to_datetime(df_orders['order_date'], errors='coerce')
-# # 处理异常数量（数量不能为负，且不超过100）
-# df_orders['quantity'] = df_orders['quantity'].where(
-#     (df_orders['quantity'] > 0) & (df_orders['quantity'] <= 100),
-#     1  # 将异常数量设为1
-# )
-# # 读取产品数据
-# print("2. 读取并清洗产品数据:")
-# df_products = pd.read_csv('products.csv', encoding='utf-8')
-# print(f"产品数据形状:{df_products.shape}")
-# # 清洗产品数据（去除重复产品ID）
-# df_products_clean = df_products.drop_duplicates(subset=['product_id'])
-# # 读取客户数据
-# print("3. 读取并清洗客户数据:")
-# df_customers = pd.read_csv('customers.csv', encoding='utf-8')
-# print(f"客户数据形状:{df_customers.shape}")
-# # 清洗客户数据（去除重复客户ID）
-# df_customers_clean = df_customers.drop_duplicates(subset=['customer_id'])
-# # 2. 数据验证和合并
-# print("=== 数据验证与合并 ===")
-# # 验证订单中的产品ID
-# valid_product_ids = set(df_products_clean['product_id'])
-# invalid_orders = df_orders[~df_orders['product_id'].isin(valid_product_ids)]
-# print(f"发现{len(invalid_orders)}条包含无效产品ID的订单")
-# # 验证订单中的客户ID
-# valid_customer_ids = set(df_customers_clean['customer_id'])
-# invalid_orders = df_orders[~df_orders['customer_id'].isin(valid_customer_ids)]
-# print(f"发现{len(invalid_orders)}条包含无效客户ID的订单")
-# # 合并数据
-# print("4. 合并订单、产品和客户数据:")
-# # 先合并订单和产品
-# df_orders_products = pd.merge(
-#     df_orders,
-#     df_products_clean[['product_id', 'product_name', 'category', 'unit_price']],
-#     on='product_id',
-#     how='inner'  # 只保留有效的产品ID
-# )
-# # 再合并客户信息
-# df_full_data = pd.merge(
-#     df_orders_products,
-#     df_customers_clean[['customer_id', 'customer_name', 'city', 'country']],
-#     on='customer_id',
-#     how='inner'  # 只保留有效的客户ID
-# )
-# print(f"合并后的数据形状:{df_full_data.shape}")
-# # 3. 计算订单金额
-# print("5. 计算订单金额:")
-# df_full_data['order_amount'] = df_full_data['quantity'] * df_full_data['unit_price']
-# # 4. 销售统计
-# print("6. 销售统计分析:")
-# # 按产品类别统计销售
-# category_sales = df_full_data.groupby('category').agg({
-#     'order_amount': 'sum',
-#     'quantity': 'sum',
-#     'order_id': 'count'
-# }).rename(columns={'order_id': 'order_count'})
-# print("按产品类别销售统计:")
-# print(category_sales)
-# # 按国家统计销售
-# country_sales = df_full_data.groupby('country').agg({
-#     'order_amount': 'sum',
-#     'customer_id': 'nunique'
-# }).rename(columns={'customer_id': 'customer_count'})
-# print("按国家销售统计:")
-# print(country_sales)
-# # 5. 找出异常订单
-# print("7. 异常订单检测:")
-# # 找出金额超过10000的订单
-# high_value_orders = df_full_data[df_full_data['order_amount'] > 10000]
-# print(f"高价值订单（>10000）:{len(high_value_orders)}条")
-# # 找出单价异常的订单（单价超过1000）
-# high_price_orders = df_full_data[df_full_data['unit_price'] > 1000]
-# print(f"高单价订单（单价>1000）:{len(high_price_orders)}条")
-# # 6. 保存结果
-# print("=== 保存整合后的数据 ===")
-# df_full_data.to_csv('integrated_sales_data.csv', index=False, encoding='utf-8')
-# print("已保存整合后的数据到 integrated_sales_data.csv")
-# # 保存统计报表
-# with pd.ExcelWriter('sales_report.xlsx') as writer:
-#     df_full_data.to_excel(writer, sheet_name='完整销售数据', index=False)
-#     category_sales.to_excel(writer, sheet_name='按类别统计', index=True)
-#     country_sales.to_excel(writer, sheet_name='按国家统计', index=True)
-# print("已生成销售统计报表 sales_report.xlsx")
+# 1. 读取并清洗三个数据表
+print("=== 销售数据整合与清洗 ===")
+# 读取订单数据
+print("1. 读取并清洗订单数据:")
+'''
+    pandas加载csv文件的常用格式
+    pd.read_csv('...csv', encoding='utf-8')
+    encoding= 就是指定 CSV 文件的编码格式！
+    
+    encoding='utf-8-sig'
+    它 = 带「签名」的 UTF-8 编码
+    作用：专门解决 Excel 保存的 CSV 中文乱码问题
+    它是 pandas 读取中文 CSV 最稳、最推荐的编码！
+    
+    编码	        说明	                适用场景
+    utf-8	    普通 UTF-8，不带签名	代码生成的文件、Linux/Mac 生成的文件
+    utf-8-sig	带签名的 UTF-8	    Excel 保存的 CSV、Windows 导出的中文文件
+    
+    Excel 保存 CSV 时，会偷偷在文件开头加一个「看不见的标记」—— 叫 BOM
+    如果你用 utf-8 读取：
+    会把这个标记当成乱码
+    结果就是：第一列表头出现 ï»¿ 奇怪符号
+    用 utf-8-sig：
+    会自动识别并忽略这个 BOM 标记
+    中文完美显示，不乱码 ✅
+    
+    sig = BOM Signature(BOM 签名)
+'''
+df_orders = pd.read_csv('Data_File/sales_orders.csv', encoding='utf-8-sig')
+print(f"订单数据形状:{df_orders.shape}")
+# 清洗订单数据
+# 转换日期格式
+df_orders['order_date'] = pd.to_datetime(df_orders['order_date'], errors='coerce')
+'''
+    df_orders['order_date'] = pd.to_datetime(df_orders['order_date'], errors='coerce')
+    把混乱的日期文本，统一变成标准日期格式
+    遇到无法识别的错误日期，直接转成空值（NaT）
+    
+    1. pd.to_datetime(...)
+    功能：把字符串 / 数字 → 转换成 pandas 能识别的 日期时间类型
+    比如：
+        "2025-01-01" → 标准日期
+        "01/02/2025" → 标准日期
+        "2025.01.03" → 标准日期
+    2. errors='coerce' （最关键）
+    意思：遇到无法识别的错误日期，不强转，不报错，而是转成空值 NaT
+    例子：
+        "今天" → NaT
+        "abc123" → NaT
+        "2025/13/32" → NaT
+    作用：让你的代码不会因为脏日期崩溃！
+    3. 赋值给 df_orders['order_date']
+    把原来混乱的日期列，覆盖成干净、标准、可计算的日期格式
+'''
+
+# 处理异常数量（数量不能为负，且不超过100）, 和前面的例子类似
+df_orders['quantity'] = df_orders['quantity'].where(
+    (df_orders['quantity'] > 0) & (df_orders['quantity'] <= 100),
+    1  # 将异常数量设为1
+)
+# 读取产品数据
+print("2. 读取并清洗产品数据:")
+df_products = pd.read_csv('Data_File/products.csv', encoding='utf-8')
+print(f"产品数据形状:{df_products.shape}")
+# 清洗产品数据（去除重复产品ID）
+df_products_clean = df_products.drop_duplicates(subset=['product_id'])
+'''
+    drop_duplicates()
+    Pandas 去重方法，默认：
+        整行所有字段完全相同，才判定为重复；
+    subset=['product_id']
+        限定去重依据：
+        只看 product_id 这一列只要 product_id 重复 → 判定为重复行，直接删除
+    保留规则
+        默认参数：keep='first'
+        重复的产品 ID → 保留第一行，删除后面所有重复行
+'''
+
+# 读取客户数据
+print("3. 读取并清洗客户数据:")
+df_customers = pd.read_csv('Data_File/customers.csv', encoding='utf-8')
+print(f"客户数据形状:{df_customers.shape}")
+# 清洗客户数据（去除重复客户ID）
+df_customers_clean = df_customers.drop_duplicates(subset=['customer_id'])
+
+# 2. 数据验证和合并
+print("=== 数据验证与合并 ===")
+# 验证订单中的产品ID
+valid_product_ids = set(df_products_clean['product_id'])
+invalid_orders = df_orders[~df_orders['product_id'].isin(valid_product_ids)]
+'''
+    valid_product_ids = 合法产品 ID 清单
+    invalid_orders = 订单里的无效数据（用了不存在的产品）
+    ~ = 不是、取反
+    .isin() = 是否在列表里
+    
+    Series 是可迭代对象
+    set() 可以接收任何可迭代对象（列表、Series、数组…）
+    
+    ✅ 布尔 Series 完全可以像 bool 列表一样筛选 DataFrame！
+'''
+
+print(f"发现{len(invalid_orders)}条包含无效产品ID的订单")
+
+# 验证订单中的客户ID
+valid_customer_ids = set(df_customers_clean['customer_id'])
+invalid_orders = df_orders[~df_orders['customer_id'].isin(valid_customer_ids)]
+print(f"发现{len(invalid_orders)}条包含无效客户ID的订单")
+
+# 合并数据
+print("4. 合并订单、产品和客户数据:")
+# 先合并订单和产品
+df_orders_products = pd.merge(
+    df_orders,                # 左表：订单
+    df_products_clean[['product_id', 'product_name', 'category', 'unit_price']],  # 右表：产品（只取需要的列）
+    on='product_id',          # 按产品ID合并（共同列）
+    how='inner'               # 内连接：只保留两边都有的数据
+)
+# 再合并客户信息
+df_full_data = pd.merge(
+    df_orders_products,     # 左表：订单+产品
+    df_customers_clean[['customer_id', 'customer_name', 'city', 'country']],  # 右表：客户
+    on='customer_id',      # 按客户ID合并
+    how='inner'            # 内连接：只保留有效客户
+)
+'''
+    上面是多表关联数据分析最核心、最标准的写法！
+    
+    pd.merge() = 多表拼接（SQL 里的 join）
+    on='字段' = 按哪个共同字段拼接
+    how='inner' = 只保留两边都能匹配上的数据（有效数据）
+    代码 = 订单 + 产品 + 客户 → 拼接成一张完整干净的大表
+'''
+print(f"合并后的数据形状:{df_full_data.shape}")
+
+# 3. 计算订单金额
+print("5. 计算订单金额:")
+# 原来应该没有这一列, 应该是向量化计算, 添加新列
+df_full_data['order_amount'] = df_full_data['quantity'] * df_full_data['unit_price']
+
+# 4. 销售统计
+print("6. 销售统计分析:")
+# 按产品类别统计销售
+category_sales = df_full_data.groupby('category').agg({
+    'order_amount': 'sum',
+    'quantity': 'sum',
+    'order_id': 'count'
+}).rename(columns={'order_id': 'order_count'})
+'''
+    1. groupby('category')
+        按「产品类别」分组, 每组单独统计
+    2. .agg({ ... }) 聚合统计
+        agg = aggregate 聚合可以一次性对不同列做不同计算
+        'order_amount': 'sum'    → 金额【求和】
+        'quantity': 'sum'        → 数量【求和】
+        'order_id': 'count'      → 订单【计数】（算有多少笔订单）
+    3. .rename(columns={'order_id': 'order_count'})
+        把默认列名 order_id → 改成 order_count（订单数）
+        让结果表更清晰、更专业
+        
+    返回值类型是 → DataFrame
+    行索引(index) ← 由 groupby(字段) 指定
+    列名(columns) ← 由 agg({字典}) 指定
+'''
+print("按产品类别销售统计:")
+print(category_sales)
+
+# 按国家统计销售
+country_sales = df_full_data.groupby('country').agg({
+    'order_amount': 'sum',
+    'customer_id': 'nunique'
+}).rename(columns={'customer_id': 'customer_count'})
+'''
+    nunique = Number of unique→ 不重复的个数 / 去重后的数量
+'''
+print("按国家销售统计:")
+print(country_sales)
+
+# 5. 找出异常订单
+print("7. 异常订单检测:")
+# 找出金额超过10000的订单
+high_value_orders = df_full_data[df_full_data['order_amount'] > 10000]
+print(f"高价值订单（>10000）:{len(high_value_orders)}条")
+# 找出单价异常的订单（单价超过1000）
+high_price_orders = df_full_data[df_full_data['unit_price'] > 1000]
+print(f"高单价订单（单价>1000）:{len(high_price_orders)}条")
+
+# 6. 保存结果
+print("=== 保存整合后的数据 ===")
+df_full_data.to_csv('integrated_sales_data.csv', index=False, encoding='utf-8')
+print("已保存整合后的数据到 integrated_sales_data.csv")
+
+# 保存统计报表
+# 数据验证
+print("category_sales 形状：", category_sales.shape)
+print("country_sales 形状：", country_sales.shape)
+print("df_full_data 形状：", df_full_data.shape)
+
+with pd.ExcelWriter('sales_report2.xlsx') as writer:
+    '''
+        pd.ExcelWriter：pandas 的 Excel 写入器
+        with ... as writer: 自动打开 / 关闭文件，安全不报错
+    '''
+    df_full_data.to_excel(writer, sheet_name='完整销售数据', index=False)
+    '''
+        把完整清洗后的大表写入
+        sheet_name：工作表名字
+        index=False：不导出 pandas 行号（干净整洁）
+    '''
+    category_sales.to_excel(writer, sheet_name='按类别统计', index=True)
+    country_sales.to_excel(writer, sheet_name='按国家统计', index=True)
+    '''
+        把分组统计结果写入
+        index=True：导出行索引（类别 / 国家）
+        因为 groupby 后，索引是类别 / 国家，必须导出才完整！
+    '''
+print("已生成销售统计报表 sales_report2.xlsx")
+print_star()
+
+
 # 5.2
 # .2
 # 练习四:多源数据合并
@@ -1566,323 +1878,166 @@ print(df)
 #     income_dist.to_frame().to_excel(writer, sheet_name='收入分布', index=True)
 # print("已生成数据分析报告 data_analysis_report.xlsx")
 
-# 六、总结与扩展
-# 
-# 6.1
-# 数据清洗流程总结
-# 
-# 经过本教程的学习，你已经掌握了使用
-# Pandas
-# 进行数据清洗的核心技能。一个完整的数据清洗流程通常包括以下步骤:
-# 
-# 
-# 
-# 1.
-# 数据读取与初步检查（5 - 10
-# 分钟）
-# 
-# - 读取数据文件
-# - 检查数据形状、基本信息
-# - 初步了解数据结构和内容
-# 
-# 1.
-# 数据质量全面评估（15 - 20
-# 分钟）
-# 
-# - 缺失值检测与统计
-# - 重复值检测
-# - 异常值检测
-# - 数据类型检查
-# - 逻辑一致性检查
-# 
-# 1.
-# 制定清洗策略（5 - 10
-# 分钟）
-# 
-# - 根据数据质量评估结果制定计划
-# - 确定处理优先级（如必须保留的关键列）
-# - 选择合适的清洗方法
-# 
-# 1.
-# 执行数据清洗（30 - 60
-# 分钟）
-# 
-# - 处理缺失值（删除或填充）
-# - 处理重复值
-# - 数据类型转换
-# - 字符串清洗
-# - 日期标准化
-# - 异常值处理
-# 
-# 1.
-# 高级清洗技术应用（20 - 30
-# 分钟）
-# 
-# - 分组清洗
-# - 条件清洗
-# - 数据标准化 / 归一化
-# - 文本数据特殊处理
-# 
-# 1.
-# 清洗结果验证（10 - 15
-# 分钟）
-# 
-# - 再次检查数据质量
-# - 验证关键指标
-# - 确保数据完整性
-# 
-# 1.
-# 数据保存与报告（5 - 10
-# 分钟）
-# 
-# - 保存清洗后的数据
-# - 生成清洗报告
-# - 记录清洗过程和决策
 
-# 6.2
-# 常见问题与解决方案
-# 
-# 在数据清洗过程中，经常遇到以下问题:
-# 
-# 1.
-# 中文编码问题
-# 
-# - 问题:读取中文
-# CSV
-# 文件时出现乱码
-# - 解决方案:使用encoding = 'gbk'
-# 或encoding = 'utf-8-sig'
-# 参数
-# 
-# 2.
-# 混合类型列
-# 
-# - 问题:同一列中包含多种数据类型
-# - 解决方案:
-# 
-# - 使用dtype参数显式指定类型
-# - 使用to_numeric配合errors = 'coerce'
-# - 分离为多个列
-# 
-# 3.
-# 大文件处理
-# 
-# - 问题:文件过大无法一次性加载到内存
-# - 解决方案:
-# 
-# - 使用chunksize参数分块读取
-# - 使用usecols只读取需要的列
-# - 逐步处理数据
-# 
-# 4.
-# 日期格式不统一
-# 
-# - 问题:日期格式多样（如
-# "2025/04/01"、"2025-04-01"、"01-04-2025"）
-# - 解决方案:
-# 
-# - 使用to_datetime配合format参数
-# - 先统一为字符串格式，再转换
-# - 处理不同地区的日期格式
-# 
-# 5.
-# 数据冲突
-# 
-# - 问题:多个数据源提供了不同的值
-# - 解决方案:
-# 
-# - 确定数据优先级
-# - 记录冲突并人工审核
-# - 使用统计方法（如取均值）
-# 
-# 6.
-# 性能问题
-# 
-# - 问题:处理大数据集时速度慢
-# - 解决方案:
-# 
-# - 使用向量化操作代替循环
-# - 选择合适的数据类型（如使用
-# category
-# 类型）
-# - 使用更高效的算法
+"""
+六、总结与扩展
+6.1 数据清洗流程总结
+经过本教程的学习，你已经掌握了使用 Pandas 进行数据清洗的核心技能一个完整的数据清洗流程通常包括以下步骤:
+1.数据读取与初步检查（5-10分钟）
+- 读取数据文件
+- 检查数据形状、基本信息
+- 初步了解数据结构和内容
 
-# 6.3
-# 进阶学习建议
-#
-# 为了进一步提升数据清洗技能，建议:
-#
-#
-#
-# 1.
-# 学习更多
-# Pandas
-# 高级功能
-#
-# - 深入了解groupby和apply的高级用法
-# - 学习使用pivot_table进行数据透视
-# - 掌握时间序列数据处理方法
-#
-# 1.
-# 扩展数据格式处理能力
-#
-# - 学习处理
-# JSON
-# Lines
-# 格式
-# - 掌握处理嵌套
-# JSON
-# 的方法
-# - 学习处理
-# Parquet、ORC
-# 等列式存储格式
-# - 了解如何处理数据库数据
-#
-# 1.
-# 提升文本处理技能
-#
-# - 深入学习正则表达式
-# - 了解自然语言处理（NLP）技术
-# - 学习使用
-# spaCy、NLTK
-# 等库
-#
-# 1.
-# 掌握更多清洗技术
-#
-# - 学习处理地理空间数据
-# - 了解数据验证规则引擎
-# - 学习使用
-# dask
-# 进行并行处理
-#
-# 1.
-# 实践真实项目
-#
-# - 参与
-# Kaggle
-# 数据竞赛
-# - 尝试清洗真实业务数据
-# - 学习数据质量评估标准
-#
-# 1.
-# 了解数据治理
-#
-# - 学习数据质量管理体系
-# - 了解数据合规要求
-# - 学习数据版本控制
-#
-# 记住，数据清洗是一个不断迭代的过程，需要根据具体数据和业务需求灵活调整策略。通过不断实践和总结经验，你将成为数据清洗的专家。
-#
-# 6.4
-# 练习答案与提示
-#
-# 为帮助你完成练习，以下提供部分练习的答案要点:
-#
-# 练习一答案要点:
-#
-#
-#
-# 1.
-# 缺失值处理后剩余记录数:995
-# 条（假设原始有
-# 1000
-# 条，5
-# 条因关键列缺失被删除）
-# 2.
-# 重复订单处理:删除
-# 5
-# 条重复订单
-# 3.
-# 异常价格处理:将负价格和超高价格设为中位数
-# 4.
-# 日期格式转换:成功转换为
-# datetime
-# 格式
-# 5.
-# 城市提取:从地址中提取出城市名
-#
-# 练习二答案要点:
-#
-#
-#
-# 1.
-# 合并后数据:约
-# 500
-# 条记录（假设三个工作表分别有
-# 200、180、120
-# 条）
-# 2.
-# 重复
-# ID
-# 处理:删除约
-# 20
-# 条重复记录
-# 3.
-# 性别标准化:统一为
-# ' 男'
-# 或
-# ' 女'，约
-# 5
-# 条
-# ' 未知'
-# 4.
-# 工龄计算:平均工龄约
-# 5.3
-# 年
-# 5.
-# 邮箱验证:约
-# 95 % 的邮箱格式正确
-#
-# 练习三答案要点:
-#
-#
-#
-# 1.
-# 订单验证:约
-# 20
-# 条无效产品
-# ID，15
-# 条无效客户
-# ID
-# 2.
-# 合并后数据:约
-# 965
-# 条有效订单
-# 3.
-# 按类别销售:电子产品占比最高（约
-# 40 %）
-# 4.
-# 按国家销售:中国占比最高（约
-# 60 %）
-# 5.
-# 异常订单:10
-# 条高价值订单（ > 10000）
-#
-# 练习四答案要点:
-#
-#
-#
-# 1.
-# ID
-# 统一:成功将不同格式的
-# ID
-# 转换为统一格式
-# 2.
-# 数据合并:合并后约
-# 380
-# 条记录（原始三个数据集分别有
-# 150、140、130
-# 条）
-# 3.
-# 冲突处理:处理了约
-# 15
-# 条收入冲突，20
-# 条职业冲突
-# 4.
-# 缺失值填充:年龄用均值（32.5
-# 岁），性别用众数（' 男 '）
-# 5.
-# 统计分析:男性平均收入略高于女性，技术类职业收入最高
-#
-# 记住，实际答案可能因数据不同而有所差异。重点是掌握数据清洗的方法和思路，而不是具体的数值结果。
+2.数据质量全面评估（15-20分钟）
+- 缺失值检测与统计
+- 重复值检测
+- 异常值检测
+- 数据类型检查
+- 逻辑一致性检查
+
+3.制定清洗策略（5-10分钟）
+- 根据数据质量评估结果制定计划
+- 确定处理优先级（如必须保留的关键列）
+- 选择合适的清洗方法
+
+4.执行数据清洗（30-60分钟）
+- 处理缺失值（删除或填充）
+- 处理重复值
+- 数据类型转换
+- 字符串清洗
+- 日期标准化
+- 异常值处理
+
+5.高级清洗技术应用（20-30分钟）
+- 分组清洗
+- 条件清洗
+- 数据标准化 / 归一化
+- 文本数据特殊处理
+
+6.清洗结果验证（10-15分钟）
+- 再次检查数据质量
+- 验证关键指标
+- 确保数据完整性
+
+7.数据保存与报告（5-10分钟）
+- 保存清洗后的数据
+- 生成清洗报告
+- 记录清洗过程和决策
+"""
+
+"""
+6.2
+常见问题与解决方案
+在数据清洗过程中，经常遇到以下问题:
+1.中文编码问题
+- 问题:读取中文CSV文件时出现乱码
+    - 解决方案:使用encoding = 'gbk'或encoding = 'utf-8-sig'参数
+
+2.混合类型列
+- 问题:同一列中包含多种数据类型
+    - 解决方案:
+    - 使用dtype参数显式指定类型
+    - 使用to_numeric配合errors = 'coerce'
+    - 分离为多个列
+
+3.大文件处理
+- 问题:文件过大无法一次性加载到内存
+    - 解决方案:
+    - 使用chunksize参数分块读取
+    - 使用usecols只读取需要的列
+    - 逐步处理数据
+
+4.日期格式不统一
+- 问题:日期格式多样（如"2025/04/01"、"2025-04-01"、"01-04-2025"）
+    - 解决方案:
+    - 使用to_datetime配合format参数
+    - 先统一为字符串格式，再转换
+    - 处理不同地区的日期格式
+
+5.数据冲突
+- 问题:多个数据源提供了不同的值
+    - 解决方案:
+    - 确定数据优先级
+    - 记录冲突并人工审核
+    - 使用统计方法（如取均值）
+
+6.性能问题
+- 问题:处理大数据集时速度慢
+    - 解决方案:
+    - 使用向量化操作代替循环
+    - 选择合适的数据类型（如使用category类型）
+    - 使用更高效的算法
+"""
+
+"""
+6.3进阶学习建议
+为了进一步提升数据清洗技能，建议:
+1.学习更多Pandas高级功能
+    - 深入了解groupby和apply的高级用法
+    - 学习使用pivot_table进行数据透视
+    - 掌握时间序列数据处理方法
+
+2.扩展数据格式处理能力
+    - 学习处理JSONLines格式
+    - 掌握处理嵌套JSON的方法
+    - 学习处理Parquet、ORC等列式存储格式
+    - 了解如何处理数据库数据
+
+3.提升文本处理技能
+    - 深入学习正则表达式
+    - 了解自然语言处理（NLP）技术
+    - 学习使用spaCy、NLTK等库
+
+4.掌握更多清洗技术
+    - 学习处理地理空间数据
+    - 了解数据验证规则引擎
+    - 学习使用dask进行并行处理
+
+5.实践真实项目
+    - 参与Kaggle数据竞赛
+    - 尝试清洗真实业务数据
+    - 学习数据质量评估标准
+
+6.了解数据治理
+    - 学习数据质量管理体系
+    - 了解数据合规要求
+    - 学习数据版本控制
+
+记住，数据清洗是一个不断迭代的过程，需要根据具体数据和业务需求灵活调整策略。不断实践和总结经验。
+"""
+
+"""
+6.4
+练习答案与提示
+为帮助你完成练习，以下提供部分练习的答案要点:
+
+练习一答案要点:
+1.缺失值处理后剩余记录数:995
+条（假设原始有1000条，5条因关键列缺失被删除）
+2.重复订单处理:删除5条重复订单
+3.异常价格处理:将负价格和超高价格设为中位数
+4.日期格式转换:成功转换为datetime格式
+5.城市提取:从地址中提取出城市名
+
+练习二答案要点:
+1.合并后数据:约500条记录（假设三个工作表分别有200、180、120条）
+2.重复ID处理:删除约20条重复记录
+3.性别标准化:统一为' 男'或' 女'，约5条' 未知'
+4.工龄计算:平均工龄约5.3年
+5.邮箱验证:约95 % 的邮箱格式正确
+
+练习三答案要点:
+1.订单验证:约20条无效产品ID，15条无效客户ID
+2.合并后数据:约965条有效订单
+3.按类别销售:电子产品占比最高（约40 %）
+4.按国家销售:中国占比最高（约60 %）
+5.异常订单:10条高价值订单（ > 10000）
+
+练习四答案要点:
+1.ID统一:成功将不同格式的ID转换为统一格式
+2.数据合并:合并后约380条记录（原始三个数据集分别有150、140、130条）
+3.冲突处理:处理了约15条收入冲突，20条职业冲突
+4.缺失值填充:年龄用均值（32.5岁），性别用众数（' 男 '）
+5.统计分析:男性平均收入略高于女性，技术类职业收入最高
+记住，实际答案可能因数据不同而有所差异。重点是掌握数据清洗的方法和思路，而不是具体的数值结果
+"""
