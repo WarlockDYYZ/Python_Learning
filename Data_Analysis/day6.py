@@ -1,6 +1,20 @@
+import nltk
 import pandas as pd
 import numpy as np
 import datetime
+import re
+import string
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer, WordNetLemmatizer
+
+import nltk
+
+try:
+    from nltk.corpus import stopwords
+except:
+    nltk.download('stopwords')
+    nltk.download('wordnet')
+    nltk.download('omw-1.4')
 
 
 # 数据输入输出
@@ -863,72 +877,148 @@ print(df2)
 print_star()
 
 
-# 4.3
-# .2
-# Z - Score
-# 标准化
-# 将数据转换为均值为
-# 0，标准差为
-# 1
+# 4.3.2 Z-Score 标准化
+# 将数据转换成 均值为0，标准差为1
 # 的标准正态分布:
-# def z_score_standardization(x):
-#     """Z-Score标准化"""
-#     return (x - x.mean()) / x.std()
-# # 对数值列进行Z-Score标准化
-# df_standardized = df[numeric_cols].apply(z_score_standardization)
-# # 处理包含异常值的情况（使用稳健统计量）
-# def robust_standardization(x):
-#     """使用中位数和四分位距进行稳健标准化"""
-#     q1 = x.quantile(0.25)
-#     q3 = x.quantile(0.75)
-#     iqr = q3 - q1
-#     return (x - x.median()) / iqr
-# df_robust = df[numeric_cols].apply(robust_standardization)
-# 4.4
-# 文本数据特殊清洗
+def z_score_standardization(x):
+    """Z-Score标准化"""
+    return (x - x.mean()) / x.std()
+
+
+# 加载数据
+# df = pd.read_csv("File_Generation/numeric.csv")
+# 对数值列进行Z-Score标准化
+df_standardized = df2[numeric_cols].apply(z_score_standardization)
+
+
+# .apply()
+# 作用 对 Series / DataFrame 的行或列，批量执行自定义函数
+# 语法
+# # Series
+# series.apply(func)
+# # DataFrame
+# df.apply(func, axis=0)  # axis=0：默认 按列
+# df.apply(func, axis=1)  # axis=1：按行
+
+
+# 处理包含异常值的情况（使用稳健统计量）
+def robust_standardization(x):
+    """使用中位数和四分位距进行稳健标准化"""
+    q1 = x.quantile(0.25)
+    q3 = x.quantile(0.75)
+    iqr = q3 - q1
+    return (x - x.median()) / iqr
+
+
+df_robust = df2[numeric_cols].apply(robust_standardization)
+print(df_robust)
+print_star()
+
+# 4.4 文本数据特殊清洗
 # 文本数据清洗是数据清洗中最复杂的部分之一，需要处理各种不规则的文本格式:
-# 1.
-# 文本标准化:统一文本格式（如统一为小写、去除多余空格）
-# 2.
-# 停用词处理:去除无意义的词汇（如
-# "的"、"了"
-# 等）
-# 3.
-# 词干提取与词形还原:将词汇转换为基本形式
-# 4.
-# 特殊字符处理:处理标点符号、表情符号等
-# 5.
-# 语言检测与转换:检测文本语言并进行转换
-# import re
-# import string
-# from nltk.corpus import stopwords
-# from nltk.stem import PorterStemmer, WordNetLemmatizer
+# 1. 文本标准化:统一文本格式（如统一为小写、去除多余空格）
+# 2. 停用词处理:去除无意义的词汇（如"的"、"了"等）
+# 3. 词干提取与词形还原:将词汇转换为基本形式
+# 4. 特殊字符处理:处理标点符号、表情符号等
+# 5. 语言检测与转换:检测文本语言并进行转换
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+
 # # 初始化工具
-# stop_words = set(stopwords.words('english'))
-# stemmer = PorterStemmer()
-# lemmatizer = WordNetLemmatizer()
-# def clean_text(text):
-#     """完整的文本清洗函数"""
-#     if pd.isna(text):
-#         return None
-#     # 1. 转换为小写
-#     text = text.lower()
-#     # 2. 去除URL
-#     text = re.sub(r'httpS+', '', text)
-#     # 3. 去除特殊字符和数字
-#     text = re.sub(r'[^a-zA-Zs]', '', text)
-#     # 4. 去除多余空格
-#     text = re.sub(r's+', ' ', text).strip()
-#     # 5. 去除停用词
-#     words = text.split()
-#     words = [word for word in words if word not in stop_words]
-#     # 6. 词干提取
-#     # words = [stemmer.stem(word) for word in words]
-#     # 7. 词形还原
-#     words = [lemmatizer.lemmatize(word) for word in words]
-#     return ' '.join(words)
-# # 对文本列应用清洗函数
+stop_words = set(stopwords.words('english'))  # 英文停用词（the/a/is/and...无意义词）
+stemmer = PorterStemmer()  # 词干提取器（running → run）
+lemmatizer = WordNetLemmatizer()  # 词形还原器（better → good）
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+
+
+def clean_text(text):
+    """完整的文本清洗函数"""
+    # 处理缺失值，避免报错
+    if pd.isna(text):
+        return None
+
+    # 1. 转换为小写
+    text = text.lower()
+    # 2. 去除URL
+    # re.sub()：替换函数（regular expression substitute）
+    # 作用: 在字符串里查找符合规则的内容 → 替换成别的内容
+    # 规则: r'http\S+'
+    # http: 匹配以 http 开头的网址
+    # \S+: 匹配所有非空格字符（一直到空格为止）
+    text = re.sub(r'http\S+', '', text)
+    # 3. 去除特殊字符和数字
+    # 删除数字、标点、符号、表情，只留下字母和空格
+    # [^a-zA-Z\s]是反向匹配
+    #  a-z: 小写字母
+    #  A-Z: 大写字母
+    #  \s: 空格
+    #  ^: 除了…之外
+    #  把不是字母、不是空格的东西全部删掉, 只保留英文，删除乱七八糟的符号和数字
+    text = re.sub(r'[^a-zA-Zs]', '', text)
+    # 4. 去除多余空格
+    # \s+: 匹配1个或多个连续空格
+    # 替换成' ': 1个空格
+    # .strip(): 删除句子开头和结尾的空格
+    text = re.sub(r's+', ' ', text).strip()
+    # 5. 去除停用词
+    # 删除the/a/an/is/are/and/of等没用的词
+    # text.split()：把句子按空格切成单词列表
+    # if word not in stop_words：只保留不是停用词的单词
+    print("原数据: " + text)
+    words = text.split()
+    print("分割后: " + text)
+    words = [word for word in words if word not in stop_words]
+    # 6. 词干提取
+    # 把变化形式的单词，统一成最短词根
+    # 统一单词形态，减少词汇数量
+    words = [stemmer.stem(word) for word in words]
+    # 7. 词形还原
+    # 根据语法把单词还原成原始形态
+    # 比词干提取更准确：
+    # better → good
+    # drove → drive
+    # women → woman
+    # ate → eat
+    # 总结
+    # 让单词回归字典里的原型
+    words = [lemmatizer.lemmatize(word) for word in words]
+    return ' '.join(words)
+
+
+data = {
+    'raw_text': [
+        "I love running! It's 100% fun, check http://sport.com",
+        "The cats are playing in the garden!!!",
+        "This is a very good movie, I liked it a lot!!!",
+        "Hello WORLD!!! Today is 2025-01-01",
+        None,  # 空值测试
+        "Better late than never!!! 12345",
+        "I am learning Python and Data Science very happily",
+        "   Too   many   spaces   here   "
+    ]
+}
+
+df['cleaned_text'] = df['raw_text'].apply(clean_text)
+
+# \s = 1 个空格
+# + = 至少 1 个，越多越好
+# \s+ = 一段连续空格（不管多少个）
+
+# re.sub(r'http\S+', '', text) → 删网址
+# re.sub(r'[^a-zA-Z\s]', '', text) → 只留英文
+# re.sub(r'\s+', ' ', text).strip() → 清理空格
+# if word not in stop_words → 删无用虚词
+# stemmer.stem() → 粗暴词根化
+# lemmatizer.lemmatize() → 智能还原单词
+
+print(df)
+
+# 对文本列应用清洗函数
 # df['cleaned_text'] = df['raw_text'].apply(clean_text)
+# print()
 # 五、实践练习
 # 5.1
 # 单表清洗练习
