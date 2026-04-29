@@ -1268,7 +1268,6 @@ print("已保存清洗后的数据到 cleaned_orders.csv")
 '''
 print_star()
 
-
 # 5.1.2 练习二:员工信息数据清洗
 # 数据描述:
 # - 数据来源:公司员工信息表
@@ -1470,7 +1469,6 @@ print_star()
 验证邮箱的代码看起来是对的，实际也算是对的，因为我生成数据的时候没有表述清楚，所以大部分是没有数据的
 """
 
-
 # 5.2 多表合并清洗练习
 # 5.2.1 练习三:销售数据整合
 """
@@ -1601,17 +1599,17 @@ print(f"发现{len(invalid_orders)}条包含无效客户ID的订单")
 print("4. 合并订单、产品和客户数据:")
 # 先合并订单和产品
 df_orders_products = pd.merge(
-    df_orders,                # 左表：订单
+    df_orders,  # 左表：订单
     df_products_clean[['product_id', 'product_name', 'category', 'unit_price']],  # 右表：产品（只取需要的列）
-    on='product_id',          # 按产品ID合并（共同列）
-    how='inner'               # 内连接：只保留两边都有的数据
+    on='product_id',  # 按产品ID合并（共同列）
+    how='inner'  # 内连接：只保留两边都有的数据
 )
 # 再合并客户信息
 df_full_data = pd.merge(
-    df_orders_products,     # 左表：订单+产品
+    df_orders_products,  # 左表：订单+产品
     df_customers_clean[['customer_id', 'customer_name', 'city', 'country']],  # 右表：客户
-    on='customer_id',      # 按客户ID合并
-    how='inner'            # 内连接：只保留有效客户
+    on='customer_id',  # 按客户ID合并
+    how='inner'  # 内连接：只保留有效客户
 )
 '''
     上面是多表关联数据分析最核心、最标准的写法！
@@ -1707,177 +1705,196 @@ with pd.ExcelWriter('sales_report2.xlsx') as writer:
 print("已生成销售统计报表 sales_report2.xlsx")
 print_star()
 
+# 5.2.2 练习四:多源数据合并
+'''
+数据描述:
+- 数据来源:
+- 主数据表:main_data.csv - 包含ID、姓名、年龄、性别
+- 补充数据表1:supplement1.csv - 包含ID、收入、职业
+- 补充数据表2:supplement2.csv - 包含ID、教育背景、联系方式
+- 数据问题:ID格式不一致、有缺失数据、重复记录
+清洗要求:
+1.读取所有数据并统一ID格式
+2.合并三个数据集
+3.处理冲突数据（如不同来源的收入数据）
+4.填充缺失值
+5.进行基本统计分析
+'''
 
-# 5.2
-# .2
-# 练习四:多源数据合并
-# 数据描述:
-# - 数据来源:
-# - 主数据表:main_data.csv - 包含
-# ID、姓名、年龄、性别
-# - 补充数据表
-# 1:supplement1.csv - 包含
-# ID、收入、职业
-# - 补充数据表
-# 2:supplement2.csv - 包含
-# ID、教育背景、联系方式
-# - 数据问题:ID
-# 格式不一致、有缺失数据、重复记录
-# 清洗要求:
-# 1.
-# 读取所有数据并统一
-# ID
-# 格式
-# 2.
-# 合并三个数据集
-# 3.
-# 处理冲突数据（如不同来源的收入数据）
-# 4.
-# 填充缺失值
-# 5.
-# 进行基本统计分析
+
 # 练习代码框架:
-# # 1. 读取并清洗数据
-# import pandas as pd
-# import numpy as np
-# print("=== 多源数据合并清洗 ===")
-# # 读取主数据
-# print("1. 读取主数据:")
-# df_main = pd.read_csv('main_data.csv', encoding='utf-8')
-# print(f"主数据形状:{df_main.shape}")
-# print("主数据示例:")
-# print(df_main.head())
-# # 读取补充数据1
-# print("2. 读取补充数据1:")
-# df_supp1 = pd.read_csv('supplement1.csv', encoding='utf-8')
-# print(f"补充数据1形状:{df_supp1.shape}")
-# # 读取补充数据2
-# print("3. 读取补充数据2:")
-# df_supp2 = pd.read_csv('supplement2.csv', encoding='utf-8')
-# print(f"补充数据2形状:{df_supp2.shape}")
-# # 2. 统一ID格式
-# print("=== 统一ID格式 ===")
-# # 观察ID格式
-# print("主数据ID格式示例:", df_main['ID'].iloc[0])
-# print("补充数据1 ID格式示例:", df_supp1['id'].iloc[0])
-# print("补充数据2 ID格式示例:", df_supp2['user_id'].iloc[0])
-# # 假设需要将所有ID转换为统一格式（如去掉前缀）
-# def clean_id(id_str):
-#     """清洗ID格式"""
-#     if pd.isna(id_str):
-#         return None
-#     # 去掉非数字字符
-#     cleaned = ''.join([c for c in str(id_str) if c.isdigit()])
-#     return cleaned
-# # 清洗所有ID列
-# df_main['clean_id'] = df_main['ID'].apply(clean_id)
-# df_supp1['clean_id'] = df_supp1['id'].apply(clean_id)
-# df_supp2['clean_id'] = df_supp2['user_id'].apply(clean_id)
-# # 3. 数据合并
-# print("=== 数据合并 ===")
-# # 先合并主数据和补充数据1
-# df_merged1 = pd.merge(
-#     df_main,
-#     df_supp1[['clean_id', 'income', 'occupation']],
-#     on='clean_id',
-#     how='outer',
-#     suffixes=('', '_supp1')
-# )
-# # 再合并补充数据2
-# df_merged = pd.merge(
-#     df_merged1,
-#     df_supp2[['clean_id', 'education', 'contact']],
-#     on='clean_id',
-#     how='outer',
-#     suffixes=('', '_supp2')
-# )
-# print(f"合并后数据形状:{df_merged.shape}")
-# # 4. 处理冲突数据
-# print("=== 处理数据冲突 ===")
-# # 检查是否有冲突的数据（如不同来源的收入数据）
-# print("检查收入数据冲突:")
-# conflict_income = df_merged[
-#     (~df_merged['income'].isna()) &
-#     (~df_merged['income_supp1'].isna()) &
-#     (df_merged['income'] != df_merged['income_supp1'])
-#     ]
-# print(f"发现{len(conflict_income)}条收入数据冲突")
-# # 处理冲突:优先使用补充数据1的收入（假设更可靠）
-# df_merged['final_income'] = df_merged['income_supp1'].fillna(df_merged['income'])
-# # 类似处理其他冲突数据
-# print("检查职业数据冲突:")
-# conflict_occupation = df_merged[
-#     (~df_merged['occupation'].isna()) &
-#     (~df_merged['occupation_supp1'].isna()) &
-#     (df_merged['occupation'] != df_merged['occupation_supp1'])
-#     ]
-# print(f"发现{len(conflict_occupation)}条职业数据冲突")
-# # 5. 填充缺失值
-# print("=== 填充缺失值 ===")
-# # 统计缺失值
-# missing_summary = df_merged.isna().sum()
-# print("缺失值统计:")
-# print(missing_summary)
-# # 填充策略:
-# # - 数值型:用均值或中位数
-# # - 字符串型:用最频繁的值或'未知'
-# # - 日期型:可能需要特殊处理
-# # 填充年龄（用均值）
-# df_merged['age'] = df_merged['age'].fillna(df_merged['age'].mean())
-# # 填充性别（用众数）
-# df_merged['gender'] = df_merged['gender'].fillna(df_merged['gender'].mode()[0])
-# # 填充教育背景（用'未知'）
-# df_merged['education'] = df_merged['education'].fillna('未知')
-# # 填充联系方式（用'未提供'）
-# df_merged['contact'] = df_merged['contact'].fillna('未提供')
-# # 6. 数据质量检查
-# print("=== 清洗后数据质量检查 ===")
-# print("最终数据形状:", df_merged.shape)
-# print("缺失值检查:")
-# print(df_merged.isna().sum())
-# # 7. 基本统计分析
-# print("=== 基本统计分析 ===")
-# # 按性别统计
-# gender_stats = df_merged.groupby('gender').agg({
-#     'age': 'mean',
-#     'final_income': 'mean',
-#     'occupation': 'nunique'
-# }).round(1)
-# print("按性别统计:")
-# print(gender_stats)
-# # 按职业统计
-# occupation_stats = df_merged.groupby('occupation').agg({
-#     'final_income': 'mean',
-#     'age': 'mean',
-#     'education': 'nunique'
-# }).round(1)
-# print("按职业统计:")
-# print(occupation_stats.head(10))
-# # 收入分布分析
-# print("收入分布分析:")
-# income_bins = [0, 5000, 10000, 20000, 30000, float('inf')]
-# income_labels = ['0-5K', '5-10K', '10-20K', '20-30K', '30K+']
-# df_merged['income_level'] = pd.cut(df_merged['final_income'], bins=income_bins, labels=income_labels)
-# income_dist = df_merged['income_level'].value_counts().sort_index()
-# print(income_dist)
-# # 8. 保存结果
-# print("=== 保存最终数据 ===")
-# # 选择需要保留的列
-# final_columns = [
-#     'clean_id', 'name', 'age', 'gender',
-#     'final_income', 'occupation', 'education', 'contact'
-# ]
-# df_final = df_merged[final_columns]
-# df_final.to_csv('cleaned_merged_data.csv', index=False, encoding='utf-8')
-# print("已保存清洗合并后的数据到 cleaned_merged_data.csv")
-# # 生成数据报告
-# with pd.ExcelWriter('data_analysis_report.xlsx') as writer:
-#     df_final.to_excel(writer, sheet_name='清洗后完整数据', index=False)
-#     gender_stats.to_excel(writer, sheet_name='性别统计', index=True)
-#     occupation_stats.to_excel(writer, sheet_name='职业统计', index=True)
-#     income_dist.to_frame().to_excel(writer, sheet_name='收入分布', index=True)
-# print("已生成数据分析报告 data_analysis_report.xlsx")
+# 1. 读取并清洗数据
 
+print("=== 多源数据合并清洗 ===")
+# 读取主数据
+print("1. 读取主数据:")
+df_main = pd.read_csv('Data_File/main_data.csv', encoding='utf-8')
+print(f"主数据形状:{df_main.shape}")
+print("主数据示例:")
+print(df_main.head())
+# 读取补充数据1
+print("2. 读取补充数据1:")
+df_supp1 = pd.read_csv('Data_File/supplement1.csv', encoding='utf-8')
+print(f"补充数据1形状:{df_supp1.shape}")
+# 读取补充数据2
+print("3. 读取补充数据2:")
+df_supp2 = pd.read_csv('Data_File/supplement2.csv', encoding='utf-8')
+print(f"补充数据2形状:{df_supp2.shape}")
+
+# 2. 统一ID格式
+print("=== 统一ID格式 ===")
+# 观察ID格式
+print("主数据ID格式示例:", df_main['ID'].iloc[0])
+print("补充数据1 ID格式示例:", df_supp1['id'].iloc[0])
+print("补充数据2 ID格式示例:", df_supp2['user_id'].iloc[0])
+
+
+# 假设需要将所有ID转换为统一格式（如去掉前缀）
+def clean_id(id_str):
+    """清洗ID格式"""
+    if pd.isna(id_str):
+        return None
+    # 仅保留数字字符
+    cleaned = ''.join([c for c in str(id_str) if c.isdigit()])
+    return cleaned
+
+
+# 清洗所有ID列
+df_main['clean_id'] = df_main['ID'].apply(clean_id)
+df_supp1['clean_id'] = df_supp1['id'].apply(clean_id)
+df_supp2['clean_id'] = df_supp2['user_id'].apply(clean_id)
+
+# 3. 数据合并
+print("=== 数据合并 ===")
+# 先合并主数据和补充数据1
+df_merged1 = pd.merge(
+    df_main,                # 主表
+    df_supp1[['clean_id', 'income', 'occupation']],  # 附表（只取需要的列）
+    on='clean_id',          # 关联键：按 clean_id 合并
+    how='outer',            # 外连接：保留两边所有数据
+    suffixes=('', '_supp1') # 重复列名自动加后缀区分
+)
+'''
+    how='outer' → 全量保留
+    suffixes → 自动区分重复列
+    只取需要列 → 干净整洁
+'''
+# 再合并补充数据2
+df_merged = pd.merge(
+    df_merged1,
+    df_supp2[['clean_id', 'education', 'contact']],
+    on='clean_id',
+    how='outer',
+    suffixes=('', '_supp2')
+)
+print(f"合并后数据形状:{df_merged.shape}")
+
+# 4. 处理冲突数据
+print("=== 处理数据冲突 ===")
+# 检查是否有冲突的数据（如不同来源的收入数据）
+print("检查收入数据冲突:")
+conflict_income = df_merged[
+    (~df_merged['income'].isna()) &
+    (~df_merged['income_supp1'].isna()) &
+    (df_merged['income'] != df_merged['income_supp1'])
+    ]
+'''
+    1. .isna() 的结果
+    单元格 有值（数字 / 文字） → False
+    单元格 空值（NaN/None） → True
+    2. 前面加个 ~ （取反）
+    ~ = NOT 非
+    把 True ↔ False 互换
+
+    主表中查找收入为空的，取反
+    辅助表中查找收入为空的，取反
+    主表收入不等于辅助表收入
+    
+    最终筛选结果：主表有值 + 附表有值 + 两个值不相等 → 数据冲突
+'''
+print(f"发现{len(conflict_income)}条收入数据冲突")
+
+# 处理冲突:优先使用补充数据1的收入（假设更可靠）
+df_merged['final_income'] = df_merged['income_supp1'].fillna(df_merged['income'])
+'''
+    合并后这是同一行的数据, 按【同一行】填充
+'''
+
+# 类似处理其他冲突数据
+print("检查职业数据冲突:")
+conflict_occupation = df_merged[
+    (~df_merged['occupation'].isna()) &
+    (~df_merged['occupation_supp1'].isna()) &
+    (df_merged['occupation'] != df_merged['occupation_supp1'])
+    ]
+print(f"发现{len(conflict_occupation)}条职业数据冲突")
+
+# 5. 填充缺失值
+print("=== 填充缺失值 ===")
+# 统计缺失值
+missing_summary = df_merged.isna().sum()
+print("缺失值统计:")
+print(missing_summary)
+# 填充策略:
+# - 数值型:用均值或中位数
+# - 字符串型:用最频繁的值或'未知'
+# - 日期型:可能需要特殊处理
+# 填充年龄（用均值）
+df_merged['age'] = df_merged['age'].fillna(df_merged['age'].mean())
+# 填充性别（用众数）
+df_merged['gender'] = df_merged['gender'].fillna(df_merged['gender'].mode()[0])
+# 填充教育背景（用'未知'）
+df_merged['education'] = df_merged['education'].fillna('未知')
+# 填充联系方式（用'未提供'）
+df_merged['contact'] = df_merged['contact'].fillna('未提供')
+# 6. 数据质量检查
+print("=== 清洗后数据质量检查 ===")
+print("最终数据形状:", df_merged.shape)
+print("缺失值检查:")
+print(df_merged.isna().sum())
+
+# 7. 基本统计分析
+print("=== 基本统计分析 ===")
+# 按性别统计
+gender_stats = df_merged.groupby('gender').agg({
+    'age': 'mean',
+    'final_income': 'mean',
+    'occupation': 'nunique'
+}).round(1)
+print("按性别统计:")
+print(gender_stats)
+# 按职业统计
+occupation_stats = df_merged.groupby('occupation').agg({
+    'final_income': 'mean',
+    'age': 'mean',
+    'education': 'nunique'
+}).round(1)
+print("按职业统计:")
+print(occupation_stats.head(10))
+# 收入分布分析
+print("收入分布分析:")
+income_bins = [0, 5000, 10000, 20000, 30000, float('inf')]
+income_labels = ['0-5K', '5-10K', '10-20K', '20-30K', '30K+']
+df_merged['income_level'] = pd.cut(df_merged['final_income'], bins=income_bins, labels=income_labels)
+income_dist = df_merged['income_level'].value_counts().sort_index()
+print(income_dist)
+# 8. 保存结果
+print("=== 保存最终数据 ===")
+# 选择需要保留的列
+final_columns = [
+    'clean_id', 'name', 'age', 'gender',
+    'final_income', 'occupation', 'education', 'contact'
+]
+df_final = df_merged[final_columns]
+df_final.to_csv('cleaned_merged_data.csv', index=False, encoding='utf-8')
+print("已保存清洗合并后的数据到 cleaned_merged_data.csv")
+# 生成数据报告
+with pd.ExcelWriter('data_analysis_report.xlsx') as writer:
+    df_final.to_excel(writer, sheet_name='清洗后完整数据', index=False)
+    gender_stats.to_excel(writer, sheet_name='性别统计', index=True)
+    occupation_stats.to_excel(writer, sheet_name='职业统计', index=True)
+    income_dist.to_frame().to_excel(writer, sheet_name='收入分布', index=True)
+print("已生成数据分析报告 data_analysis_report.xlsx")
 
 """
 六、总结与扩展
