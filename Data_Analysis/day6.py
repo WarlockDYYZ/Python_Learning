@@ -1721,7 +1721,6 @@ print_star()
 5.进行基本统计分析
 '''
 
-
 # 练习代码框架:
 # 1. 读取并清洗数据
 
@@ -1768,11 +1767,11 @@ df_supp2['clean_id'] = df_supp2['user_id'].apply(clean_id)
 print("=== 数据合并 ===")
 # 先合并主数据和补充数据1
 df_merged1 = pd.merge(
-    df_main,                # 主表
+    df_main,  # 主表
     df_supp1[['clean_id', 'income', 'occupation']],  # 附表（只取需要的列）
-    on='clean_id',          # 关联键：按 clean_id 合并
-    how='outer',            # 外连接：保留两边所有数据
-    suffixes=('', '_supp1') # 重复列名自动加后缀区分
+    on='clean_id',  # 关联键：按 clean_id 合并
+    how='outer',  # 外连接：保留两边所有数据
+    suffixes=('', '_supp1')  # 重复列名自动加后缀区分
 )
 '''
     how='outer' → 全量保留
@@ -1843,6 +1842,51 @@ print(missing_summary)
 df_merged['age'] = df_merged['age'].fillna(df_merged['age'].mean())
 # 填充性别（用众数）
 df_merged['gender'] = df_merged['gender'].fillna(df_merged['gender'].mode()[0])
+'''
+先算出 gender 列的众数（得到一个 Series），然后用 [0]（或更稳健的 .iloc[0]）取出排在第一位的那个最常见的性别，最后用 fillna 把它填充到缺失的地方。
+mode() 返回的是一个小表格（Series/DataFrame）而不是单个值
+
+mode()
+1. 核心作用与返回值
+是一个用于计算众数（即数据集中出现频率最高的值）的统计函数
+它既可以用于 Series（单列数据），也可以用于 DataFrame（整个表格）
+最大的特点是: 
+    返回值永远是一个 Series（即使只有一个众数）
+    如果有多个值并列出现次数最多，它会返回所有这些值
+    如果所有值出现的次数都一样，它会把所有值都当作众数返回
+
+2. 常用参数详解
+mode() 有几个非常实用的参数，能帮你应对各种复杂的数据情况:
+    dropna=True (默认值)：在计算时忽略缺失值（NaN）。
+    dropna=False：把缺失值（NaN）也当作一个正常的“值”参与计算。如果 NaN 出现的次数最多，众数就是 NaN。
+    numeric_only=False (默认值)：计算所有类型的数据（包括字符串、日期等）。
+    numeric_only=True：只计算纯数值类型的列（比如 int, float），会自动跳过字符串列。
+
+3. 实战中的两种典型场景
+场景一：单列数据（Series）求众数
+s = pd.Series(['男', '女', '男', '未知', '女', '男'])
+# 返回的是一个 Series
+print(s.mode()) 
+# 输出: 0    男
+# dtype: object
+# 提取具体的值，需要用 .iloc[0]
+most_frequent = s.mode().iloc[0]  # 得到 '男'
+场景二：整个表格（DataFrame）求众数
+默认情况下，df.mode() 会计算每一列的众数
+df = pd.DataFrame({
+    'A': [1, 2, 2, 3],
+    'B': ['x', 'x', 'y', 'y']
+})
+# 计算每列的众数
+print(df.mode())
+# 输出:
+#      A  B
+# 0  2.0  x
+# 1  NaN  y
+上面的输出：A列众数是2；B列中 'x' 和 'y' 都出现了2次，并列第一，所以它们都被返回了
+因为 B 列有两个众数，A 列只有一个，Pandas 会自动用 NaN 来填充空缺的位置，保证返回的 DataFrame 结构整齐。
+'''
+
 # 填充教育背景（用'未知'）
 df_merged['education'] = df_merged['education'].fillna('未知')
 # 填充联系方式（用'未提供'）
@@ -1861,8 +1905,31 @@ gender_stats = df_merged.groupby('gender').agg({
     'final_income': 'mean',
     'occupation': 'nunique'
 }).round(1)
+'''
+按性别分组，一次性算出不同性别在年龄、最终收入和职业数量上的统计特征，并保留一位小数。
+
+1. df_merged.groupby('gender')
+    这是第一步“拆分”。它会根据 gender（性别）列里的不同值（比如“男”、“女”），把整个表格拆分成若干个独立的小组。
+2. .agg({ ... })
+    这是第二步“应用”。agg 是 aggregate（聚合）的缩写。你通过一个字典，给不同的列指定了不同的统计任务：
+        'age': 'mean'：计算每个性别组的平均年龄。
+        'final_income': 'mean'：计算每个性别组的平均最终收入。
+        'occupation': 'nunique'：统计每个性别组里有多少种不重复的职业（nunique 即 number of unique 的缩写）。
+3. .round(1)
+    这是最后的美化步骤。把前面计算出来的所有平均值等结果，统一保留一位小数，让数据展示更整洁。
+4. gender_stats = ...
+    把最终生成的统计结果（通常是一个以性别为索引的新 DataFrame）赋值给 gender_stats 变量，方便你后续查看或画图。
+
+如果你想给输出的列起更直观的中文名字，或者对同一列做多种统计，agg 还支持更灵活的“元组写法”（Pandas 官方推荐）。比如：
+gender_stats = df_merged.groupby('gender').agg(
+    平均年龄=('age', 'mean'),
+    平均收入=('final_income', 'mean'),
+    职业种类数=('occupation', 'nunique')
+).round(1)
+'''
 print("按性别统计:")
 print(gender_stats)
+
 # 按职业统计
 occupation_stats = df_merged.groupby('occupation').agg({
     'final_income': 'mean',
@@ -1871,13 +1938,63 @@ occupation_stats = df_merged.groupby('occupation').agg({
 }).round(1)
 print("按职业统计:")
 print(occupation_stats.head(10))
+
 # 收入分布分析
 print("收入分布分析:")
 income_bins = [0, 5000, 10000, 20000, 30000, float('inf')]
 income_labels = ['0-5K', '5-10K', '10-20K', '20-30K', '30K+']
 df_merged['income_level'] = pd.cut(df_merged['final_income'], bins=income_bins, labels=income_labels)
+'''
+将连续的收入数据划分成不同的等级（分箱），然后统计每个等级的人数分布
+
+1. 定义区间和标签：
+income_bins = [0, 5000, 10000, 20000, 30000, float('inf')]
+    定义了收入的分界线，其中 float('inf') 代表正无穷，确保再高的收入也能被装进最后一个桶里。
+income_labels
+    给上面划分的每个区间起了直观的名字（如 '0-5K', '30K+'）。
+2. pd.cut 进行数据分箱：
+pd.cut(df_merged['final_income'], bins=..., labels=...)
+    这是核心步骤。它会把 final_income 里的每一个具体数字，根据设定的区间，映射成对应的标签（比如把 4500 变成 '0-5K'，把 28000 变成 '20-30K'
+    ，并将这些标签存入新列 income_level 中。
+3. value_counts().sort_index() 统计与排序：
+    value_counts()：统计每个收入标签（如 '0-5K'）出现了多少次，也就是每个区间有多少人。
+    sort_index()：结果会按照收入等级从低到高（即你定义 labels 的顺序）整齐排列，非常符合阅读习惯。
+
+定义 bins 和 labels，把原本参差不齐的具体薪资数字，转化成了整齐的 '0-5K', '5-10K' 等分类标签，
+这让后续做人数统计（value_counts）和可视化分析变得非常直观和方便！
+
+注意的“小细节”：区间的开与闭
+如果你希望区间是左闭右开 [a, b)（即 5000 算在 '5-10K' 里，5000 到 9999 算在 '5-10K' 里），可以在 pd.cut 中加入参数 right=False：（值属于右边）
+# 左闭右开写法
+df_merged['income_level'] = pd.cut(df_merged['final_income'], bins=income_bins, labels=income_labels, right=False)
+
+
+pd.cut() 是 Pandas 中一个非常实用的函数，它的核心作用就是数据分箱（也叫数据离散化）
+它能把一串连续的数字（比如具体的年龄、薪资、考试分数），按照你设定的规则划分到不同的“桶”（区间）里，并给它们打上对应的标签（比如“青年/中年/老年”、“高收入/低收入”）
+pd.cut(x, bins, right=True, labels=None, ...)
+1. x（要分箱的数据）：
+就是你想要处理的那一列连续数据，比如你代码中的 df_merged['final_income']。
+2. bins（分箱的规则）：
+这是最关键的参数，它有两种常见的指定方式：
+指定区间边界（你刚才的用法）：传入一个列表，如 [0, 5000, 10000]。Pandas 会严格按照你划定的边界来切分数据。
+指定箱子的数量：直接传入一个整数，比如 bins=5。Pandas 会自动计算这列数据的最大值和最小值，然后把它等宽地切成 5 份。
+3. labels（给箱子贴标签）：
+如果不填，分箱后的结果会显示具体的区间范围（如 (5000, 10000]）；如果填入一个列表（如 ['低', '中', '高']），结果就会直接显示这些好懂的标签。
+4. right（决定区间的开闭）：
+right=True（默认值）：代表区间是左开右闭 (a, b]。
+right=False：代表区间是左闭右开 [a, b)。
+这决定了当数据刚好等于边界值（比如刚好是 5000 块）时，它应该被分到左边还是右边的箱子里。
+
+💡 重点补充 cut() 与 qcut() 的区别
+1. pd.cut()（等宽分箱）：
+关注的是“区间宽度相等”。比如按分数划分等级：0-60分不及格，60-80分良好，80-100分优秀。每个区间的跨度是固定的，但每个箱子里装的人数可能相差很大。
+2. pd.qcut()（等频分箱）：
+关注的是“箱子里的人数相等”。它会根据数据的分布，自动调整区间的边界，确保每个箱子里包含的数据量大致相同（比如分成四组，每组各占总人数的 25%）。
+这在处理收入等贫富差距较大的倾斜数据时非常有用。
+'''
 income_dist = df_merged['income_level'].value_counts().sort_index()
 print(income_dist)
+
 # 8. 保存结果
 print("=== 保存最终数据 ===")
 # 选择需要保留的列
@@ -1895,6 +2012,7 @@ with pd.ExcelWriter('data_analysis_report.xlsx') as writer:
     occupation_stats.to_excel(writer, sheet_name='职业统计', index=True)
     income_dist.to_frame().to_excel(writer, sheet_name='收入分布', index=True)
 print("已生成数据分析报告 data_analysis_report.xlsx")
+
 
 """
 六、总结与扩展
