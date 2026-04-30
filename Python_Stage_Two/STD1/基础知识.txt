@@ -60,3 +60,201 @@ Python 模块与自定义包
         4. 上传到 PyPI：twine upload dist/*(33)
 
     推荐使用 API Token 而非密码进行认证，更加安全。可以使用 Poetry 等工具简化发布流程，支持一键构建和发布
+
+
+2.1 虚拟环境基础概念
+    虚拟环境是一个独立的 Python 环境，它允许你在同一个系统上为不同的项目安装不同的包和版本，而不会相互干扰。
+    每个虚拟环境都有自己的 Python 解释器、标准库和第三方库目录。虚拟环境的重要性体现在三个方面：
+        依赖隔离：确保不同项目间的第三方库不会相互干扰
+        项目可移植性：使环境配置能跨机器无缝迁移
+        协作稳定性：避免 “在我机器上能运行” 的经典问题
+
+    Python 3.3 及以上版本自带了venv模块，可以用来创建虚拟环境。创建虚拟环境的命令是：
+        python -m venv myenv
+
+    激活虚拟环境的方式因平台而异
+        Windows (PowerShell)：.\myenv\Scripts\activate.ps1
+
+2.2 虚拟环境管理最佳实践
+    推荐将虚拟环境目录置于项目根目录下（如project/.venv），而非全局集中存储。创建时通过--prompt参数设置环境前缀便于识别：
+        python -m venv --prompt PROJECT\_NAME --copies .venv
+    其中，--copies参数确保复制基础解释器而非使用符号链接，规避解释器升级导致的环境损坏
+    特别需避免--system-site-packages参数，该选项会引入全局包污染环境，破坏隔离性。
+
+    依赖管理的核心是使用requirements.txt文件。生成依赖文件的命令是：
+        pip freeze > requirements.txt
+    在新环境中安装依赖：
+        pip install -r requirements.txt
+    为了获得更好的依赖管理体验，推荐使用pip-tools生成锁定文件：
+        pip-compile requirements.in > requirements.lock
+
+    注意：pip-compile 是 Python 第三方工具包 pip-tools 里的一个命令。
+        当安装 pip-tools 后，它的可执行文件（pip-compile.exe）会被放在 Python 安装目录下的 Scripts 文件夹里。
+        如果这个文件夹没有被添加到系统的环境变量 Path 中，PowerShell 就无法直接识别并运行 pip-compile。
+        你可以通过以下两种方法来解决：
+            方法一：使用 python -m 直接调用（最推荐，无需配置）
+            这是最简单、最稳妥的方法，可以完全绕过环境变量的问题。你只需要在命令前面加上 python -m，让 Python 解释器去调用这个模块即可。
+            将你的命令修改为：
+                python -m piptools compile requirements.in > requirements.lock
+                注：pip-compile 对应的模块名是 piptools
+
+            方法二：配置系统环境变量（一劳永逸）
+            如果你希望以后能直接在终端里敲 pip-compile 就能运行，需要把 Python 的 Scripts 目录添加到系统的 Path 环境变量中。
+            1. 找到 Scripts 文件夹的路径
+            可以先在 PowerShell 中输入以下命令，查看 Python 的安装位置：
+
+                python -c "import sys; print(sys.executable)"
+
+            假设输出结果是 C:\Users\你的用户名\AppData\Local\Programs\Python\Python313\python.exe，那么你需要找的路径就是
+            把末尾的 \python.exe 替换成 \Scripts，即：
+            C:\Users\你的用户名\AppData\Local\Programs\Python\Python313\Scripts
+            2. 添加到环境变量
+            按键盘 Win + S 键，搜索 “编辑系统环境变量” 并打开。
+            点击右下角的 “环境变量” 按钮。
+            在“系统变量”或“用户变量”中找到名为 Path 的变量，双击它。
+            点击 “新建”，将上面找到的 Scripts 文件夹路径粘贴进去，然后一路点击“确定”保存。
+            3. 重启终端
+            配置完成后，必须关闭并重新打开你的 PowerShell 窗口，新的环境变量才会生效。此时再输入 pip-compile 就可以正常识别了。
+
+        如果在使用上述方法时提示找不到 piptools 模块，说明你还没有安装 pip-tools 工具包。你可以先用以下命令安装它：
+            python -m pip install pip-tools
+
+2.3 现代依赖管理工具对比
+    Python 生态中有多种依赖管理工具，各有特点：
+    工具	    特点	                                                            适用场景
+    pipenv	结合了 pip 和 virtualenv 的功能，使用 Pipfile 替代 requirements.txt	简单应用开发，Python 官方曾推荐
+    poetry	现代依赖管理与打包工具，通过 pyproject.toml 声明依赖，内置打包发布功能	    严肃项目开发，开源项目
+    pdm	    新兴工具，依赖解析速度快，采用 PubGrub 算法	                        性能敏感项目
+    conda	跨语言包管理器，在科学计算领域占主导地位	                            科学计算，数据科学项目
+
+    Poetry的优势在于：
+    单一配置文件：使用 pyproject.toml，避免多文件管理
+    声明式依赖管理：通过清晰的格式声明依赖范围和版本约束
+    内置打包发布功能：支持poetry build和poetry publish
+    更快的依赖解析：采用先进的依赖解析算法
+
+2.4 数据分析项目环境配置实战
+    对于一个数据分析项目，推荐的环境配置流程如下：
+    步骤 1：创建虚拟环境
+        python -m venv .venv
+    步骤 2：激活环境
+        source .venv/bin/activate  # Linux/macOS
+    步骤 3：安装基础依赖
+        pip install pandas numpy matplotlib scipy jupyter
+    步骤 4：生成 requirements.txt
+        pip freeze > requirements.txt
+    步骤 5：使用 Poetry 进行高级依赖管理
+    如果项目较为复杂，可以使用 Poetry：
+        poetry init  # 初始化项目
+        poetry add pandas@^1.5.0  # 添加依赖
+        poetry add numpy@^1.23.0 --dev  # 添加开发依赖
+        poetry install  # 安装所有依赖
+
+
+2.5 环境迁移与协作
+    在团队协作中，环境可重现性至关重要。推荐的最佳实践包括：
+    1. 将虚拟环境目录添加到.gitignore：
+        # .gitignore
+        .venv
+        __pycache__/
+        *.pyc
+    使用锁文件：
+        - Pipenv：Pipfile.lock
+        - Poetry：poetry.lock
+        - 传统方式：requirements.lock
+    CI/CD 环境配置：
+       在 GitHub Actions 等 CI/CD 系统中，可以缓存虚拟环境：
+        - name: Cache venv
+            uses: actions/cache@v3
+            with:
+                path: .venv
+                key: venv-${{ hashFiles('**/poetry.lock') }}
+
+    国内用户优化：
+        替换 PyPI 源以加速下载：
+            # ~/.pip/pip.conf
+            [global]
+            index-url = https://pypi.tuna.tsinghua.edu.cn/simple
+
+
+三、封装小工具
+3.1 命令行工具开发基础
+    Python 提供了多种命令行工具开发框架，其中argparse是标准库中的基础工具，无需额外安装。
+    使用 argparse 的基本流程是：创建解析器→添加参数→解析参数→执行逻辑。
+    一个简单的数据分析工具示例：data_analysis_tool.py
+        把你的 Python 程序，变成一个【能在终端用命令运行的工具】就像 pip、git 一样，直接输命令 + 参数就能用
+    知识补充：
+    1.入口
+        if __name__ == '__main__':
+            main()
+            这是 Python 程序的入口
+            当直接运行这个文件时，才会执行 main()
+            被别人导入时不运行（安全规范）
+    2.核心
+        parser = argparse.ArgumentParser(description='Data analysis tool')
+            创建一个命令行解析器
+            作用：接收在终端输入的命令和参数
+    3.输入
+        ① 必须传的参数：输入文件
+            parser.add_argument('input_file', help='Input CSV file')
+            必须传 比如：data.csv
+        ② 可选参数：输出文件（-o /--output）
+            parser.add_argument('-o', '--output', help='Output file path')
+            可写可不写，短写法 -o，长写法 --output
+        ③ 分析类型（固定 3 种选择）
+            parser.add_argument('--analysis-type',
+                choices=['summary', 'plot', 'stats'],
+                default='summary'
+            )
+            只能选 3 个：
+            summary 数据概要（默认）
+            plot 画图
+            stats 统计指标
+        ④ 日期列（画图时用）
+            parser.add_argument('--date-column', help='Name of date column')
+    4. 接收参数
+        args = parser.parse_args()
+        把终端输入的所有参数，放进 args 里，后面直接用。
+    5. 业务逻辑：根据参数做不同事情
+        df = pd.read_csv(args.input_file)
+        读取输入的 CSV 文件
+        ① 分析类型 = summary
+            print(df.describe())
+            输出数据的统计概要（均值、最大最小、数量等）
+        ② 分析类型 = plot
+            plt.plot(df[args.date_column], df['value'])
+            plt.savefig(args.output)
+            用日期列画折线图，保存成图片
+        ③ 分析类型 = stats
+            print(f"Mean: {df['value'].mean()}")
+            print(f"Median: {df['value'].median()}")
+            print(f"Standard deviation: {df['value'].std()}")
+            输出均值、中位数、标准差
+            超级重点：怎么在终端运行？（一看就会）
+
+    调用：
+        运行 1：输出数据概要（默认）
+            python 文件名.py data.csv
+        运行 2：画图
+            python 文件名.py data.csv --analysis-type plot --date-column date -o figure.png
+        运行 3：统计指标
+            python 文件名.py data.csv --analysis-type stats
+
+    打包好，别人就能直接：
+        my_tool data.csv --analysis-type plot -o out.png
+
+    补充：
+        help之类的参数是 argparse 命令行工具 的说明文字 + 规则限制，不是代码逻辑，只是给用户看的提示 + 规则！
+        1. description='Data analysis tool'
+            作用：给整个工具写一段介绍（标题 / 简介），查看方法
+                python 工具.py -h
+        2. help='Input CSV file'
+            作用：告诉用户这个参数是干嘛的（给用户看的提示文字）
+                parser.add_argument('input_file', help='Input CSV file')
+            用 -h 查看帮助时，会看到：
+                input_file    Input CSV file
+        3. choices=['summary', 'plot', 'stats']
+            作用：限定用户只能从这三个里面选（只能三选一，不能乱写）
+
+
+3.2 使用 Click 构建专业 CLI
