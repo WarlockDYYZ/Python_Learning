@@ -258,3 +258,113 @@ Python 模块与自定义包
 
 
 3.2 使用 Click 构建专业 CLI
+    对于复杂的命令行工具，推荐使用Click库。它使用装饰器方式简化了命令行参数定义，支持子命令、参数校验、颜色输出等高级功能。
+        使用 Click 重写数据分析工具：click_tool
+
+        做了一个命令行工具箱
+        可以在终端直接运行：
+            python 脚本.py --help → 查看帮助
+            python 脚本.py summary --help → 查看 summary 命令帮助
+
+            python 脚本.py summary data.csv → 输出数据统计
+            python 脚本.py summary data.csv -o out.txt -> 输出到文件
+            python 脚本.py plot data.csv --x date --y value -o out.png → 画图
+
+        1. 导入工具
+            import click
+            click：专门用来快速写命令行工具的库
+        2. 创建工具箱入口
+            @click.group()
+            def cli():
+                """Data analysis command line tool"""
+                pass
+            @click.group()：创建一个命令组
+            作用：可以放多个子命令（summary、plot...）
+            下面的 cli() 就是工具箱名字
+        3. 第一个命令：summary（统计）
+            - 读取 CSV
+            - 生成统计信息 df.describe()
+            - 如果给了 -o → 保存到文件
+            - 没给 → 直接打印在终端
+        4. 第二个命令：plot（画图）
+            - 读取 CSV
+            - 指定 --x 和 --y 列
+            - 画图并保存到 --output
+
+        Click 核心语法
+        写法	                意思
+        @click.group()	    创建命令工具箱
+        @cli.command()	    创建一个子命令
+        @click.argument()	必须传的参数
+        @click.option()	    可选参数（-o /--output）
+        click.echo()	    终端打印
+
+
+3.3 数据分析小工具实战案例
+    案例：数据清洗工具 data_cleaning_and_preprocessing.py
+
+    这是一个终端数据清洗工具，有 2 个功能：
+        1. clean → 清洗数据（删缺失值、填充值、转日期）
+        2. detect_outliers → 检测异常值（Z-score）
+        算 Z 分数 → 挑出超过阈值的异常 → 打印数量和内容
+    用户在终端输命令就能用：
+        python 文件名.py clean data.csv --convert-date date
+        python 文件名.py detect_outliers data.csv --column price
+
+    补充：
+        multiple=True：同一个参数可以传多次
+        nargs=2：一个参数后面必须跟 2 个值
+
+        dropna()：删除 有空值（NaN） 的行
+        subset=list(dropna)：只检查这些列有没有空值
+            比如用户传了 --dropna age --dropna name
+            → 只删除 age 或 name 列为空的行
+
+        fillna 是这种格式：
+            (("age", 0), ("score", 50), ("name", "未知"))
+
+
+3.4 构建数据分析流水线工具
+    更复杂的数据分析工具可以构建成流水线形式，包含数据读取、清洗、分析、可视化等步骤：
+    complete_data_analysis_pipeline.py
+    自动批量处理多个数据文件，依次执行：清洗 → 分析 → 画图
+    自己不干活，只负责调度其他脚本按顺序跑！
+
+    调用：
+    python tool.py process a.csv b.csv -o result
+        工具会自动执行：
+            clean a.csv → result/cleaned_a.csv
+            analyze cleaned_a.csv → result/analysis_a.csv
+            visualize analysis_a.csv → result/plot_a.png
+        然后对 b.csv 做同样操作！
+
+    python 工具.py report 数据.csv --output report.txt
+        输入一份数据 → 自动算统计指标 → 输出一份干净的文本报告
+
+    补充：
+        subprocess.run(...)
+        subprocess.run([
+            'python', '脚本.py', '参数1', '参数2'
+        ])
+        就等于在终端手动输入：
+            python 脚本.py 参数1 参数2
+
+        @data_pipeline.command()
+        把函数，变成一个【终端命令】
+        1. 定义了一个命令组（工具箱），名字叫 data_pipeline
+        @click.group()
+        def data_pipeline():
+            pass
+        2. 把 process 这个函数，注册成 data_pipeline 工具箱里的一个【子命令】
+        @data_pipeline.command()  # <-- 就是这行！
+        def process(...):
+            ...
+        最终在终端里就可以这样用：
+            python 文件名.py process
+        python 文件名.py → 运行工具箱（data_pipeline）
+        process → 运行定义的子命令（process 函数）
+
+        代码	                                终端命令
+        @click.group() → data_pipeline	    python tool.py
+        @data_pipeline.command() → process	python tool.py process
+        @data_pipeline.command() → report	python tool.py report
