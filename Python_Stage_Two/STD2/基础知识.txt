@@ -103,3 +103,106 @@ Python 多态与封装
     场景 3：Web 框架中间件系统
     Django 的中间件机制就是多态的典型应用。每个中间件只需实现__call__方法，就能拦截请求 / 响应进行处理：
         Web_Middleware.py
+        Django 中间件的核心原理 —— 责任链模式 + 装饰器模式
+        请求从外到内一层层过，响应从内到外一层层回
+        像洋葱一样：外层包内层，请求先进外层，再进内层；响应先出内层，再出外层
+
+        定义中间件必须有的结构：
+            预处理（请求进来）
+            调用下一层
+            后处理（响应回去）
+
+        构建中间件链（最关键！）（洋葱模型）
+            middleware_chain = AuthenticationMiddleware(
+                LoggingMiddleware(
+                    Middleware(get_response)
+                )
+            )
+            最外层：认证中间件
+               ↓
+            中间层：日志中间件
+               ↓
+            最内层：基础中间件
+               ↓
+            视图函数
+
+        中间件 = 请求的关卡 + 响应的关卡
+            请求必须一层层通过关卡才能到视图
+            响应必须一层层通过关卡才能返回给用户
+            这种结构叫 洋葱模型 / 责任链模式
+        这就是 Django / Flask 等所有 Web 框架的中间件底层原理
+
+        构造链条时，层层传入的都是「下一层组件」：
+            视图函数 → 基础中间件 → 日志中间件 → 认证中间件
+        构造时（从内往外包）：
+            get_response(函数)
+                → Middleware
+                → LoggingMiddleware
+                → AuthenticationMiddleware（最外层）
+
+        调用时（传参只在最后一步）：
+            AuthenticationMiddleware.__call__("请求字符串")
+        构造阶段：全部没有传字符串
+
+        只有执行调用那一步，才传请求字符串
+        每层 __init__ 接收的：函数 / 中间件实例，都是「下一层处理器」
+
+        补充：为什么能层层调用？
+        因为所有中间件都实现了 __call__只要一个对象有 __call__，它就可以像函数一样被调用：
+            obj(xxx)  → 触发 obj.__call__(xxx)
+        中间件实例 = 可调用对象
+        外层调内层，本质就是：
+            self.get_response(request) 调用下一层的 __call__
+
+
+        洋葱模型道理我理解了，现在处于朦朦胧胧的阶段，就是，让我复述一遍他的意思的话可能不太准确
+        洋葱模型・完整流向图
+        1）请求下行（由外到内）
+            【最外层】AuthenticationMiddleware
+                ↓ 打印：认证中间件：验证用户身份
+            【调用父类】super().__call__(request)
+                ↓ 打印：中间件预处理请求
+            【中间层】LoggingMiddleware
+                ↓ 打印：日志中间件：记录请求信息
+            【调用父类】super().__call__(request)
+                ↓ 打印：中间件预处理请求
+            【基础层】Middleware
+                ↓ 打印：中间件预处理请求
+            【核心】get_response 视图函数
+                ↓ 打印：视图函数处理请求
+        2）响应上行（由内到外）
+            【核心】视图执行完毕，拿到响应
+                ↓ 返回上一层
+            【基础层】Middleware，执行完毕，返回上一层
+                ↓ 打印：中间件后处理响应
+            【中间层】LoggingMiddleware，执行完毕，返回上一层
+                ↓ 打印：中间件后处理响应
+            【最外层】AuthenticationMiddleware，执行完毕，返回上一层
+                ↓ 打印：中间件后处理响应
+            最终返回响应
+        3 个中间件都继承了父类 Middleware，
+        每个都会执行父类的 call！
+        所以 3 次预处理、3 次后处理！
+
+        补充2：真正的中间件链不应该继承，应该互相包装！
+            Django_Web_Middleware.py
+
+        区别：
+            LoggingMiddleware、AuthenticationMiddleware不再继承Middleware
+            因为要层层调用下一层，所以每个中间件必须写：
+            1. __init__(self, get_response)
+               → 保存下一层是谁
+            2.__call__(self, request)
+               → 处理请求，并调用下一层
+
+            = 标准 责任链模式
+            = 真实 Web 框架中间件设计
+
+        形参 get_response：外层传进来的下一层对象 / 函数
+        self.get_response：绑定到实例，长期保存
+        后续 __call__ 里，靠这个变量，实现层层接力调用。
+
+        记住：
+        1. 没有 __init__ → 无法接收下一层，实例化报错
+        2. 没有 __call__ → 对象不能被调用，运行报错
+        3. 不执行 self.get_response(request) → 中间件链断裂
