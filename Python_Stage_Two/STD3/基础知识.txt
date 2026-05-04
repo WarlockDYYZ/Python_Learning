@@ -125,3 +125,68 @@
                 内部怎么算都行，外部只管像用变量一样用
 
         @property = 让方法看起来像属性，优雅、安全、简洁、只读。
+
+    2.3.2 带 Setter 的属性
+        通过 @属性名.setter 装饰器，可以为属性添加设置功能，实现完整的 getter 和 setter：
+            Temperature.py
+        属性封装 + 数据校验 结合「读 + 写 + 校验」
+        1. @property → 只读 getter：取值
+        2. @celsius.setter → 可写 setter：赋值、做校验
+
+        四大核心优势
+        1. 隐藏内部变量
+            外部不碰 _celsius，只操作 celsius，封装性强。
+        3. 读写分离
+            celsius：可读可写
+            fahrenheit：只读，防止篡改
+        4. 动态计算
+            华氏度不需要存，实时换算，数据一致。
+
+        property → 查（get）
+        @变量名.setter → 改（set）
+        真实数据存在 _私有变量
+        所有赋值走 setter，统一校验逻辑
+
+        @property → 读属性（getter）
+        @celsius.setter → 写属性（setter）
+        赋值自动进 setter
+        取值自动进 getter
+        真正数据存在 _私有变量
+        外部只能通过安全接口访问
+
+    2.3.3 属性删除器
+        通过 @属性名.deleter 装饰器，可以定义删除属性时的行为：
+            Config.py (配置)
+        区别：普通 del self._value 是彻底删掉变量；
+        本例是软删除：清空内容、保留字段。
+
+        知识点：
+            1. deleter 必须绑定在已有的 property 上
+                必须写 @value.deleter，不能乱写名字；
+            2. deleter 方法只有 self 一个参数；
+            3. 可以自由定制删除逻辑：
+                软删除（赋值为 None）
+                硬删除（del self._value），修改为硬删除仅需要将 self._value = None 改为 del self._value
+                加权限校验、抛异常禁止删除
+            4. 本例没有写 setter
+                所以：
+                ✅ 可读 config.value
+                ✅ 可删 del config.value
+                ❌ 不可改 config.value = 10 会报错
+
+        补充：
+            del 对象.属性 → 自动执行 @xxx.deleter
+            用来自定义删除行为，不是单纯删变量
+            真实数据存在 _xxx，deleter 操作内部私有变量
+            property/setter/deleter 组成完整属性控制体系
+
+    2.3.4 计算属性
+        @property 装饰器特别适合实现计算属性，这些属性的值是基于其他属性计算得出的：
+            Rectangle.py
+
+
+
+
+
+
+
