@@ -32,10 +32,12 @@ class BankAccount(ABC):
             "account_id": self.account_id,
             "account_holder": self.account_holder,
             "balance": self._balance,
+            # 自动获取当前对象所属的类的名字（字符串）
             "account_type": self.__class__.__name__
         }
 
-    def _record_transaction(self, transaction_type, amount, description=""):
+    # 再类外要调用，不应该被声明为 _record_transaction 内部受保护方法, 虽然可以运行但是会有警告
+    def record_transaction(self, transaction_type, amount, description=""):
         """记录交易历史"""
         transaction = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

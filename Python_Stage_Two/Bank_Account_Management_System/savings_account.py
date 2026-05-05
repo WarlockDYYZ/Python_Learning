@@ -12,7 +12,7 @@ class SavingsAccount(BankAccount):
         if amount < 0:
             raise NegativeAmountError(amount)
         self._balance += amount
-        self._record_transaction("deposit", amount, "储蓄账户存款")
+        self.record_transaction("deposit", amount, "储蓄账户存款")
         print(f"储蓄账户{self.account_id}存款${amount}成功，当前余额：${self._balance}")
 
     def withdraw(self, amount):
@@ -21,7 +21,7 @@ class SavingsAccount(BankAccount):
         if self._balance - amount < self.min_balance:
             raise InsufficientFundsError(self.account_id, self._balance, amount)
         self._balance -= amount
-        self._record_transaction("withdrawal", amount, "储蓄账户取款")
+        self.record_transaction("withdrawal", amount, "储蓄账户取款")
         print(f"储蓄账户{self.account_id}取款${amount}成功，当前余额：${self._balance}")
 
     def calculate_interest(self):
@@ -33,5 +33,5 @@ class SavingsAccount(BankAccount):
         """应用利息"""
         interest = self.calculate_interest()
         self.deposit(interest)
-        self._record_transaction("interest", interest, f"年利率{self.interest_rate * 100}%")
+        self.record_transaction("interest", interest, f"年利率{self.interest_rate * 100}%")
         print(f"储蓄账户{self.account_id}已应用利息${interest:.2f}")
