@@ -1,3 +1,6 @@
+from abc import ABC, abstractmethod
+
+
 def print_star():
     print(100 * "*")
 
@@ -140,7 +143,7 @@ account = BankAccount2("Alice", 1000)
 print(account.account_holder)  # 输出：Alice
 # ✅ 可以访问，但编辑器会警告（不推荐外部直接访问）
 # Access to a protected member _balance of a class
-print(account._balance)  # 输出：1000（能运行，但不规范）
+# print(account._balance)  # 输出：1000（能运行，但不规范）
 account.deposit(500)  # 输出：存款成功，当前余额：1500
 print_star()
 
@@ -177,6 +180,40 @@ class Animal:
     def __init__(self, name):
         self.name = name
 
+    @staticmethod
+    def speak():
+        print("动物发出声音")
+
+
+# 定义Dog类，继承自Animal
+class Dog(Animal):
+    def __init__(self, name, breed):
+        super().__init__(name)  # 调用父类的构造方法
+        self.breed = breed  # 子类特有的属性
+
+    def speak(self):  # 重写父类的speak方法
+        print("汪汪！")
+
+
+# 定义Cat类，继承自Animal
+class Cat(Animal):
+    def speak(self):  # 重写父类的speak方法
+        print("喵喵！")
+
+
+# 创建对象并测试
+dog = Dog("旺财", "中华田园犬")
+dog.speak()  # 输出：汪汪！
+print(dog.name)  # 输出：旺财
+cat = Cat("咪咪")
+cat.speak()  # 输出：喵喵！
+print_star()
+
+
+class Animal:
+    def __init__(self, name):
+        self.name = name
+
     def speak(self):
         print("动物发出声音")
 
@@ -206,10 +243,314 @@ cat.speak()  # 输出：喵喵！
 print_star()
 
 
+class Shape:
+    def area(self):
+        pass  # 抽象方法，没有具体实现
 
 
+class Circle(Shape):
+    def __init__(self, radius):
+        self.radius = radius
+
+    def area(self):  # 重写area方法
+        return 3.14 * self.radius ** 2
 
 
+class Rectangle(Shape):
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
 
+    def area(self):  # 重写area方法
+        return self.width * self.height
+
+
+# 多态调用
+shapes = [Circle(5), Rectangle(3, 4)]
+for shape in shapes:
+    print(f"面积：{shape.area()}")
+# 输出：
+# 面积：78.5
+# 面积：12
+print_star()
+
+
+class Duck:
+    @staticmethod
+    def quack():
+        print("嘎嘎！")
+
+
+class Goose:
+    @staticmethod
+    def quack():
+        print("咕咕！")
+
+
+class Robot:
+    @staticmethod
+    def quack():
+        print("滴滴！")
+
+
+# 统一的调用函数
+def make_quack(duck_like):
+    duck_like.quack()
+
+
+# 多态调用
+duck = Duck()
+goose = Goose()
+robot = Robot()
+make_quack(duck)  # 输出：嘎嘎！
+make_quack(goose)  # 输出：咕咕！
+make_quack(robot)  # 输出：滴滴！
+print_star()
+
+
+class Payment(ABC):
+    @abstractmethod
+    def process_payment(self, amount):
+        """处理支付"""
+        pass
+
+    @abstractmethod
+    def refund(self, transaction_id):
+        """退款操作"""
+        pass
+
+
+# 具体实现类
+class CreditCardPayment(Payment):
+    # 实现父类定义的抽象方法
+    def process_payment(self, amount):
+        print(f"信用卡支付 ${amount}")
+
+    def refund(self, transaction_id):
+        print(f"信用卡退款，交易ID：{transaction_id}")
+
+
+class PayPalPayment(Payment):
+    def process_payment(self, amount):
+        print(f"PayPal支付 ${amount}")
+
+    def refund(self, transaction_id):
+        print(f"PayPal退款，交易ID：{transaction_id}")
+
+
+# 测试
+cc_payment = CreditCardPayment()
+paypal_payment = PayPalPayment()
+cc_payment.process_payment(100)  # 输出：信用卡支付 $100
+paypal_payment.refund("TXN12345")  # 输出：PayPal退款，交易ID：TXN12345
+print_star()
+
+
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __str__(self):
+        return f"({self.x}, {self.y})"  # 用户友好的表示
+
+    def __repr__(self):
+        return f"Point({self.x}, {self.y})"  # 官方表示
+
+    def __add__(self, other):
+        """定义向量加法"""
+        return Point(self.x + other.x, self.y + other.y)
+
+    def __len__(self):
+        """返回坐标的数量"""
+        return 2
+
+
+# 创建点对象
+p1 = Point(2, 3)
+p2 = Point(4, 5)
+print(str(p1))  # 输出：(2, 3)
+print(repr(p1))  # 输出：Point(2, 3)
+print(len(p1))  # 输出：2
+# 向量加法
+p3 = p1 + p2
+print(p3)  # 输出：(6, 8)
+print_star()
+
+
+class Circle:
+    def __init__(self, radius):
+        self._radius = radius  # 使用保护属性
+
+    @property
+    def radius(self):
+        """获取半径"""
+        return self._radius
+
+    @property
+    def diameter(self):
+        """获取直径（只读属性）"""
+        return self._radius * 2
+
+    @property
+    def area(self):
+        """获取面积（只读属性）"""
+        return 3.14 * self._radius ** 2
+
+
+# 使用
+circle = Circle(5)
+print(circle.radius)  # 输出：5
+print(circle.diameter)  # 输出：10
+print(circle.area)  # 输出：78.5
+# 访问保护属性
+# print(circle._radius)  # 可以输出，警告：Access to a protected member _radius of a class
+# 尝试修改只读属性（会失败）
+# circle.diameter = 20  # 报错：AttributeError: can't set attribute
+print_star()
+
+
+class Temperature:
+    def __init__(self, celsius):
+        self.celsius = celsius  # 使用setter进行初始化
+
+    @property
+    def celsius(self):
+        """获取摄氏温度"""
+        return self._celsius
+
+    @celsius.setter
+    def celsius(self, value):
+        """设置摄氏温度（包含验证逻辑）"""
+        if value < -273.15:
+            raise ValueError("温度不能低于绝对零度（-273.15°C）")
+        self._celsius = value
+
+    @property
+    def fahrenheit(self):
+        """获取华氏温度（只读）"""
+        return self._celsius * 9 / 5 + 32
+
+
+# 使用
+temp = Temperature(25)
+print(f"摄氏温度：{temp.celsius}°C")  # 输出：25°C
+print(f"华氏温度：{temp.fahrenheit}°F")  # 输出：77°F
+temp.celsius = 30
+print(f"新的摄氏温度：{temp.celsius}°C")  # 输出：30°C
+print(f"新的华氏温度：{temp.fahrenheit}°F")  # 输出：86°F
+# 尝试设置无效温度
+# temp.celsius = -300  # 报错：ValueError: 温度不能低于绝对零度（-273.15°C）
+print_star()
+
+
+class Config:
+    def __init__(self, value):
+        self._value = value
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.deleter
+    def value(self):
+        print("正在删除配置值...")
+        self._value = None
+        print("配置值已删除")
+
+
+# 使用
+config = Config(42)
+print(config.value)  # 输出：42
+del config.value  # 输出：正在删除配置值... 配置值已删除
+print(config.value)  # 输出：None
+print_star()
+
+
+class Engine:
+    @staticmethod
+    def start():
+        print("引擎启动")
+
+    @staticmethod
+    def stop():
+        print("引擎停止")
+
+
+class Car:
+    def __init__(self):
+        self.engine = Engine()  # 组合Engine对象
+
+    def start(self):
+        print("汽车启动")
+        self.engine.start()  # 委托给引擎对象
+
+    def stop(self):
+        print("汽车停止")
+        self.engine.stop()  # 委托给引擎对象
+
+
+# 使用
+car = Car()
+car.start()  # 输出：汽车启动 引擎启动
+car.stop()  # 输出：汽车停止 引擎停止
+print_star()
+
+
+# 简单工厂示例
+class Animal:
+    def speak(self):
+        pass
+
+
+class Dog(Animal):
+    def speak(self):
+        return "汪汪！"
+
+
+class Cat(Animal):
+    def speak(self):
+        return "喵喵！"
+
+
+# 工厂函数
+def create_animal(animal_type):
+    if animal_type == "dog":
+        return Dog()
+    elif animal_type == "cat":
+        return Cat()
+    else:
+        raise ValueError("未知的动物类型")
+
+
+# 使用工厂
+dog = create_animal("dog")
+cat = create_animal("cat")
+print(dog.speak())  # 输出：汪汪！
+print(cat.speak())  # 输出：喵喵！
+
+
+# 使用字典改进的工厂模式
+# 这个用来工厂类，上面是工厂函数
+class AnimalFactory:
+    animals = {
+        "dog": Dog,  # 键是字符串，值是 【类本身】
+        "cat": Cat   # 不是对象！是类！
+    }
+
+    @staticmethod
+    def create(animal_type):
+        if animal_type in AnimalFactory.animals:
+            # 先取类 → 再加括号实例化
+            return AnimalFactory.animals[animal_type]()
+        else:
+            raise ValueError(f"未知的动物类型：{animal_type}")
+
+
+# 使用改进的工厂
+dog = AnimalFactory.create("dog")
+cat = AnimalFactory.create("cat")
+print(dog.speak())  # 输出：汪汪！
+print(cat.speak())  # 输出：喵喵！
 
 
