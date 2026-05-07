@@ -1,17 +1,13 @@
-class AnimalFactory:
-    animals = {
-        "dog": Dog,
-        "cat": Cat
-    }
-
-    @staticmethod
-    def create(animal_type):
-        if animal_type in AnimalFactory.animals:
-            return AnimalFactory.animals[animal_type]()
-        else:
-            raise ValueError(f"未知的动物类型：{animal_type}")
+class MyMeta(type):
+    def __new__(cls, name, bases, attrs):
+        # 在创建类时自动添加一个属性
+        attrs['created_by'] = "MyMeta"
+        return super().__new__(cls, name, bases, attrs)
 
 
-# 使用改进的工厂
-dog = AnimalFactory.create("dog")
-cat = AnimalFactory.create("cat")
+# 使用元类
+class MyClass(metaclass=MyMeta):
+    pass
+
+
+print(MyClass.created_by)  # 输出：MyMeta

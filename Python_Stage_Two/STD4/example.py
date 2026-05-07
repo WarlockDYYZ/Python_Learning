@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import threading
 
 
 def print_star():
@@ -535,7 +536,7 @@ print(cat.speak())  # 输出：喵喵！
 class AnimalFactory:
     animals = {
         "dog": Dog,  # 键是字符串，值是 【类本身】
-        "cat": Cat   # 不是对象！是类！
+        "cat": Cat  # 不是对象！是类！
     }
 
     @staticmethod
@@ -552,5 +553,133 @@ dog = AnimalFactory.create("dog")
 cat = AnimalFactory.create("cat")
 print(dog.speak())  # 输出：汪汪！
 print(cat.speak())  # 输出：喵喵！
+print_star()
 
 
+# 基本实现
+class Singleton:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+
+# 测试
+s1 = Singleton()
+s2 = Singleton()
+print(s1 is s2)  # 输出：True（两个变量指向同一个对象）
+
+
+# 使用装饰器实现的 Pythonic 方式
+def singleton(cls):
+    # 闭包变量，只会初始化一次，长期保存所有被装饰类的实例
+    instances = {}
+
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+
+    return get_instance
+
+
+# 更严谨的版本，加了锁，防止多线程产生影响
+def singleton(cls):
+    instances = {}
+    lock = threading.Lock()  # 加锁保证线程安全
+
+    def get_instance(*args, **kwargs):
+        key = (cls, args, tuple(sorted(kwargs.items())))
+        if key not in instances:
+            with lock:
+                # 双重检查，防止高并发重复创建
+                if key not in instances:
+                    instances[key] = cls(*args, **kwargs)
+        return instances[key]
+
+    return get_instance
+
+
+@singleton
+class DatabaseConnection:
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        print(f"连接到数据库：{host}:{port}")
+
+
+# 使用
+db1 = DatabaseConnection("localhost", 3306)
+db2 = DatabaseConnection("localhost", 3306)
+print(db1 is db2)  # 输出：True
+# 第一次调用：创建实例，打印连接信息。
+# 第二次调用：直接返回缓存的实例，不会执行 __init__。
+# db1 is db2 证明是同一个内存对象。
+print_star()
+
+
+class Subject:
+    def __init__(self):
+        self._observers = []
+
+    def attach(self, observer):
+        """添加观察者"""
+        self._observers.append(observer)
+
+    def detach(self, observer):
+        """移除观察者"""
+        self._observers.remove(observer)
+
+    def notify(self, message):
+        """通知所有观察者"""
+        for observer in self._observers:
+            observer.update(message)
+
+
+class Observer:
+    def update(self, message):
+        """接收通知的方法"""
+        pass
+
+
+class EmailObserver(Observer):
+    def update(self, message):
+        print(f"发送邮件：{message}")
+
+
+class SMSObserver(Observer):
+    def update(self, message):
+        print(f"发送短信：{message}")
+
+
+# 使用观察者模式
+subject = Subject()
+# 添加观察者
+email_observer = EmailObserver()
+sms_observer = SMSObserver()
+subject.attach(email_observer)
+subject.attach(sms_observer)
+# 主题发布消息
+subject.notify("服务器故障！")
+# 输出：
+# 发送邮件：服务器故障！
+# 发送短信：服务器故障！
+print_star()
+
+
+# 简单元类示例
+class MyMeta(type):
+    def __new__(cls, name, bases, attrs):
+        # 在创建类时自动添加一个属性
+        attrs['created_by'] = "MyMeta"
+        return super().__new__(cls, name, bases, attrs)
+
+
+# 使用元类
+class MyClass(metaclass=MyMeta):
+    pass
+
+
+print(MyClass.created_by)  # 输出：MyMeta

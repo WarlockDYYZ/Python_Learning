@@ -234,3 +234,43 @@
                         - Dog() 👉 才是创建对象
                         cls = Dog       # 拿到类
                         obj = Dog()     # 调用类，造实例
+
+            单例模式（Singleton Pattern）：
+                单例模式确保一个类在整个程序运行过程中只创建一个实例对象，无论调用多少次类的构造方法，返回的都是同一个实例。
+                    class Singleton
+
+                补充：
+                    使用装饰器
+                        @singleton
+                        class DatabaseConnection:
+                            ...
+                    等价于
+                        DatabaseConnection = singleton(DatabaseConnection)
+                        之后调用 DatabaseConnection() 实际调用的是装饰器里的 get_instance
+
+                    更严谨的加锁的版本中，字典的键为一个元组，因为元组是不可变的所以符合字典键的规定，
+                    元组的内容为，类名、位置参数和一个存放在元组中排序后的关键字参数的键值对
+                        - sorted()：保证 name="a", age=18 和 age=18, name="a" 被视为同一个 key
+                        - tuple()：把列表变成不可变类型，才能放进 key 里
+
+                    修改后的逻辑就是：【类 + 传进去的所有参数】完全一样，才返回同一个实例。
+
+            观察者模式（Observer Pattern）：
+                观察者模式定义了对象之间的一对多依赖关系，当一个对象（主题）的状态发生变化时，所有依赖于它的对象（观察者）都会得到通知并自动更新。
+                    class Subject
+
+        3.4 元类（Metaclasses）
+            元类（Metaclass）是创建类的类，它定义了类的创建过程。在 Python 中，所有的类都是type类的实例，而type本身就是一个元类。
+            使用元类可以：
+                - 自动注册类
+                - 强制类遵循特定的编码规范
+                - 创建领域特定语言（DSL）
+                - 在类创建时动态修改类
+
+                class MyMeta
+            MyMeta元类在创建MyClass时自动添加了created_by属性。
+            元类的__new__方法接收以下参数：
+                - cls：当前元类
+                - name：类名
+                - bases：基类元组
+                - attrs：类属性字典
