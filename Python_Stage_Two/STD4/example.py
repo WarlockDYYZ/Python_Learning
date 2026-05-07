@@ -678,6 +678,8 @@ class MyMeta(type):
 
 
 # 使用元类
+# 不要用默认的 type 创建 MyClass，用我自定义的 MyMeta 来创建
+# 执行这行代码时，会自动调用 MyMeta.__new__，不需要手动调用
 class MyClass(metaclass=MyMeta):
     pass
 
