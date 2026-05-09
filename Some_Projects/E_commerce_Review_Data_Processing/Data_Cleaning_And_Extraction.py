@@ -95,22 +95,27 @@ print("=" * 50)
 # 完整的数据处理流程
 def process_comment(raw_comment):
     """处理单条评论数据，返回结构化信息"""
+
     # 步骤1：清洗HTML标签
     clean_comment = re.sub(r"<[^>]+>", "", raw_comment)
+
     # 步骤2：提取关键信息
-    info_match = re.search(r"\s*用户(\d+)\s*商品(\d+)\s*([★☆]{5})\s*(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})\s*", clean_comment)
+    info_match = re.search(r"\s*用户(\d+)\s*商品(\d+)\s*([★☆]{5})\s*(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})\s*",
+                           clean_comment)
     if not info_match:
         return None
     user_id = info_match.group(1)
     product_id = info_match.group(2)
     score = info_match.group(3)
     timestamp = info_match.group(4)
+
     # 步骤3：提取评论内容
     content_match = re.search(r"宝贝收到了，([^。！]+)，([^。！]+)！([^。]+)。([^。]+)", clean_comment)
     quality = content_match.group(1) if content_match else "未提及"
     logistics = content_match.group(2) if content_match else "未提及"
     price = content_match.group(3) if content_match else "未提及"
     overall = content_match.group(4) if content_match else "未提及"
+
     # 步骤4：情感分析
     positive_count = sum(clean_comment.count(word) for word in positive_words)
     negative_count = sum(clean_comment.count(word) for word in negative_words)
@@ -120,6 +125,7 @@ def process_comment(raw_comment):
         sentiment = "负向"
     else:
         sentiment = "中性"
+
     # 返回结构化数据
     return {
         "user_id": user_id,
@@ -143,10 +149,39 @@ if processed_data:
     print("=" * 50)
 
 
-
-
-
-
-
-
-
+# 批量处理多条评论数据
+comments = [
+    """<div class="comment"><div class="user-info"><span class="user-id">用户12345</span><span class="product-id">商品67890
+    </span><span class="score">★★★★☆</span><span class="time">2024-05-20 14:30:45</span></div><div class="content"><p>宝贝收到了，质量很好，物流也很快！👍</p><p>价格有点贵，不过还是值得购买的。</p></div></div>""",
+    """<div class="comment"><div class="user-info"><span class="user-id">用户67890</span><span class="product-id">商品12345
+    </span><span class="score">★★★☆☆</span><span class="time">2024-05-21 09:15:23</span></div><div class="content"><p>质量一般，物流太慢了！</p><p>价格还可以，不会再买了。</p></div></div>""",
+    """<div class="comment"><div class="user-info"><span class="user-id">用户54321</span><span class="product-id">商品67890
+    </span><span class="score">★★★★★</span><span class="time">2024-05-20 16:45:12</span></div><div class="content"><p>非常满意！质量好，价格实惠，物流快！</p></div></div>"""
+]
+# 批量处理
+processed_comments = []
+for comment in comments:
+    data = process_comment(comment)
+    if data:
+        processed_comments.append(data)
+# 统计分析
+print("批量处理结果统计：")
+print(f"处理的评论总数：{len(processed_comments)}")
+# 按情感分类统计
+sentiment_stats = {}
+for comment in processed_comments:
+    sentiment = comment["sentiment"]
+    sentiment_stats[sentiment] = sentiment_stats.get(sentiment, 0) + 1
+print("\n情感分布：")
+for sentiment, count in sentiment_stats.items():
+    percentage = (count / len(processed_comments)) * 100
+    print(f"{sentiment}评论：{count}条（{percentage:.1f}%）")
+# 按评分统计
+score_stats = {}
+for comment in processed_comments:
+    score = comment["score"]
+    score_stats[score] = score_stats.get(score, 0) + 1
+print("\n评分分布：")
+for score, count in score_stats.items():
+    percentage = (count / len(processed_comments)) * 100
+    print(f"{score}：{count}条（{percentage:.1f}%）")
