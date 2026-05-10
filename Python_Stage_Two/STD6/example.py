@@ -102,3 +102,69 @@ for _ in range(5):
 for t in threads:
     t.join()
 print(f"最终计数: {counter.count}")  # 预期输出: 500000
+print_star()
+
+
+# RLock 可重入锁, Reentrant Lock
+# 同一个线程可以多次加锁，不会死锁
+lock = threading.RLock()
+
+
+def recursive_function(n):
+    with lock:
+        if n > 0:
+            print(f"递归深度: {n}")
+            recursive_function(n - 1)
+
+
+# 调用递归函数
+recursive_function(5)
+print_star()
+
+
+# Condition 条件变量
+# 缓冲区和条件变量
+buffer = []
+buffer_size = 5
+condition = threading.Condition()
+
+
+# 生产者线程
+def producer():
+    for i in range(10):
+        item = f"产品-{i}"
+        with condition:
+            # 等待缓冲区有空间
+            while len(buffer) >= buffer_size:
+                condition.wait()
+            buffer.append(item)
+            print(f"生产者生产了 {item} (队列大小: {len(buffer)})")
+            condition.notify()  # 通知消费者有新数据
+
+
+# 消费者线程
+def consumer():
+    while True:
+        with condition:
+            # 等待缓冲区有数据
+            while not buffer:
+                condition.wait()
+            item = buffer.pop(0)
+            print(f"消费者消费了 {item} (队列大小: {len(buffer)})")
+            condition.notify()  # 通知生产者有空间
+
+
+# 创建线程
+producer_thread = threading.Thread(target=producer)
+consumer_thread = threading.Thread(target=consumer, daemon=True)
+# 启动线程
+producer_thread.start()
+consumer_thread.start()
+# 等待生产者完成
+producer_thread.join()
+
+
+
+
+
+
