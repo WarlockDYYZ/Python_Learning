@@ -118,6 +118,8 @@ def process_comment(raw_comment):
 
     # 步骤4：情感分析
     positive_count = sum(clean_comment.count(word) for word in positive_words)
+    # 统计子串 sub 在字符串 s 中非重叠出现的次数
+    # 前面记过一次，就在上面，没整合成函数的单独功能
     negative_count = sum(clean_comment.count(word) for word in negative_words)
     if positive_count > negative_count:
         sentiment = "正向"
@@ -158,25 +160,33 @@ comments = [
     """<div class="comment"><div class="user-info"><span class="user-id">用户54321</span><span class="product-id">商品67890
     </span><span class="score">★★★★★</span><span class="time">2024-05-20 16:45:12</span></div><div class="content"><p>非常满意！质量好，价格实惠，物流快！</p></div></div>"""
 ]
+
 # 批量处理
 processed_comments = []
 for comment in comments:
     data = process_comment(comment)
     if data:
         processed_comments.append(data)
+
 # 统计分析
 print("批量处理结果统计：")
 print(f"处理的评论总数：{len(processed_comments)}")
+
 # 按情感分类统计
 sentiment_stats = {}
 for comment in processed_comments:
     sentiment = comment["sentiment"]
+    # 如果字典里已有这个情感 → 取出当前数量，计数 + 1
+    # 如果还没有 → 默认给 0，计数 + 1
     sentiment_stats[sentiment] = sentiment_stats.get(sentiment, 0) + 1
 print("\n情感分布：")
+# sentiment_stats 字典中 键是情感倾向（正、负、中） 值是对应情感评论数量
 for sentiment, count in sentiment_stats.items():
     percentage = (count / len(processed_comments)) * 100
     print(f"{sentiment}评论：{count}条（{percentage:.1f}%）")
+
 # 按评分统计
+# 和上面其实是一样的
 score_stats = {}
 for comment in processed_comments:
     score = comment["score"]
