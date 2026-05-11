@@ -375,6 +375,12 @@ Python 多线程基础理论
                 - 发完通知，waiter 才继续往下跑
             这就是 Event 的核心作用：线程间的 “开关 / 信号灯”
 
+            示例代码中没有用到，但常用的函数 event.clear()
+                threading.Event 是一次性开关，set 后永久生效；想重复控制、重复启停，必须用 clear() 重置状态
+                - event.set()：事件置为True，所有 wait() 立刻放行
+                - event.clear()：事件重置为False，后续 wait() 重新阻塞
+                - event.wait()：False 就阻塞，True 直接通过
+
             1、 threading.Event 是什么
                 Event = 一个全局 “开关/信号灯”默认是 关闭状态（False）
                 它只有 3 个核心方法：
@@ -402,6 +408,52 @@ Python 多线程基础理论
                 - submit(fn, *args, **kwargs)：提交任务到线程池
                 - map(fn, *iterables)：类似内置map，但并发执行
                 - shutdown(wait=True)：关闭线程池
+
+            方法一、
+                1. executor.submit(任务, 参数)
+                    - 把任务丢进线程池
+                    - 马上返回一个 Future（未来结果）
+                    - 不阻塞，继续往下走
+                2. as_completed(futures)
+                    - 谁先完成，先返回谁
+                    - 所以输出顺序一定是：
+                        1秒完成
+                        2秒完成
+                        3秒完成
+            方法二、
+                1. executor.map(任务, 参数列表)
+                    - 简化写法，自动遍历参数提交任务
+                    - 结果顺序 = 提交顺序
+                    - 就算 3 秒 任务先跑完，也会等 1 秒、2 秒 跑完，按顺序显示
+                    输出顺序永远固定，一定是：
+                        任务完成于 2 秒后
+                        任务完成于 1 秒后
+                        任务完成于 3 秒后
+
+            as_completed vs map 对比
+            方法	            输出顺序	            适用场景
+            as_completed	完成顺序（谁快谁先出）	要最快拿到结果
+            map	            提交顺序（固定顺序）	要保持输入输出顺序一致
+
+        补充：
+            为什么要用 with？
+                with ThreadPoolExecutor() as executor:
+                    - 自动管理线程池
+                    - 代码块结束 自动关闭线程池
+                    - 自动等待所有任务完成
+                    - 不用手动 join()，超级安全
+
+            print_star() 什么时候输出？
+                一定在所有线程池任务全部执行完之后才输出！
+                    - with 代码块 会阻塞等待所有线程完成
+                    - 全部结束后，才会退出 with
+                    - 然后才执行 print_star()
+
+        总结：
+            - ThreadPoolExecutor：官方线程池，自动管理线程
+            - submit + as_completed：按完成顺序获取结果
+            - map：按提交顺序获取结果
+            - with：自动等待所有任务结束，安全简洁
 
         2.3.2 自定义线程池示例
             基于threading模块实现简单的线程池

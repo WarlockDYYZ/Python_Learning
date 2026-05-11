@@ -244,7 +244,7 @@ def delayed_task(seconds):
 # 使用with语句自动管理线程池
 with concurrent.futures.ThreadPoolExecutor() as executor:
     # 提交多个任务
-    delays = [1, 2, 3]
+    delays = [2, 1, 3]
     futures = [executor.submit(delayed_task, delay) for delay in delays]
     # 按完成顺序获取结果
     print("任务结果（按完成顺序）：")
@@ -263,13 +263,14 @@ print_star()
 # 自定义线程池
 class ThreadPool:
     def __init__(self, max_workers):
-        self.max_workers = max_workers
-        self.tasks = queue.Queue()
-        self.workers = []
+        self.max_workers = max_workers  # 最多几个线程
+        self.tasks = queue.Queue()      # 任务队列（所有任务放这里）
+        self.workers = []               # 保存工作线程
 
-        # 创建工作线程
+        # 创建工作线程，固定数量
         for i in range(max_workers):
             worker = threading.Thread(target=self.worker_loop, name=f"Worker-{i}")
+            # 设置为协程，随主线程结束而结束
             worker.daemon = True
             worker.start()
             self.workers.append(worker)
