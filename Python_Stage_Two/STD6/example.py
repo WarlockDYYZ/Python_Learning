@@ -264,31 +264,44 @@ print_star()
 class ThreadPool:
     def __init__(self, max_workers):
         self.max_workers = max_workers  # 最多几个线程
-        self.tasks = queue.Queue()      # 任务队列（所有任务放这里）
-        self.workers = []               # 保存工作线程
+        self.tasks = queue.Queue()      # 任务队列（所有任务放这里），一个线程安全的任务队列
+        self.workers = []               # 保存线程对象
 
         # 创建工作线程，固定数量
         for i in range(max_workers):
+            # target 指定：线程启动后，要去执行的函数；name 给线程起个名字，方便看日志，造一个工人线程
             worker = threading.Thread(target=self.worker_loop, name=f"Worker-{i}")
-            # 设置为协程，随主线程结束而结束
+            # 设置为守护线程，随主线程结束而结束
             worker.daemon = True
             worker.start()
             self.workers.append(worker)
 
     def worker_loop(self):
-        while True:
+        while True:  # ？。。。
+            # 从队列拿任务（.get() 没有任务就阻塞等待）
+            # .get() 取出来的是：
+            # ( process_data, ("数据-1",), {} )
+            # task = process_data  函数本身
+            # args = ("数据-1",)    位置参数元组
+            # kwargs = {}          关键字参数字典
             task, args, kwargs = self.tasks.get()
             try:
-                task(*args, **kwargs)
+                # task 是你传进来的函数：process_data
+                # *args 展开位置参数
+                # **kwargs 展开关键字参数
+                task(*args, **kwargs)  # 执行任务函数
             except Exception as e:
+                # 获取当前线程的名字(在构造时定义的名字)
                 print(f"线程 {threading.current_thread().name} 执行任务时出错: {e}")
             finally:
-                self.tasks.task_done()
+                self.tasks.task_done()  # 标记任务完成
 
     def submit(self, task, *args, **kwargs):
+        # 也就是把 (函数, 位置参数元组, 关键字参数字典) 放进队列，线程会自动取
         self.tasks.put((task, args, kwargs))
 
     def join(self):
+        # 主线程阻塞在这里，直到队列里所有任务都被执行完
         self.tasks.join()
 
 

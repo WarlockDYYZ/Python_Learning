@@ -458,7 +458,129 @@ Python 多线程基础理论
         2.3.2 自定义线程池示例
             基于threading模块实现简单的线程池
                 class ThreadPool
+                - 固定开 N 个线程（比如 3 个）
+                - 往队列里扔任务
+                - 线程自动从队列取任务执行
+                - 所有任务执行完主线程才继续走
+                - 任务出错不崩整个线程
 
+            一开始就创建好固定数量的线程，让它们待命
+
+            - while True → 线程永远活着，不断取任务
+            - self.tasks.get() → 队空就阻塞，不占 CPU
+            - task(*args, **kwargs) → 执行提交的函数
+            - task_done() → 告诉队列：这个任务做完了
+
+            特点：
+                - 永远只有 3 个线程在工作
+                - 10 个任务排队执行
+                - 线程复用，不会反复创建 / 销毁（这就是线程池的意义）
+
+            queue.Queue()
+                - 可以想象成排队取号机
+                - 所有要执行的任务都放这里
+                - 多个线程同时取任务不会乱，自带安全锁
+                - 没有任务时，线程会自动等着，不浪费 CPU
+                一句话：任务排队的地方
+
+            .task_done()
+                作用：告诉队列：这个任务做完了！
+                - 每执行完一个任务，必须调用它
+                - 不然队列不知道任务结束
+                - pool.join() 就是靠这个计数判断所有任务是否完成
+                一句话：标记任务完成。
+
+            总结（7 行核心口诀）
+                - queue.Queue() → 任务排队
+                - threading.Thread() → 创建工人
+                - daemon=True → 主线程退，工人也退
+                - tasks.get() → 工人取任务
+                - task(*args, **kwargs) → 执行任务
+                - task_done() → 报告完成
+                - current_thread().name → 看谁在干活
+
+
+            优化建议：
+                - 加 Future 机制：让 submit 返回结果。 前面的ThreadPoolExecutor 线程池
+                - 加 shutdown：安全关闭，不丢任务。
+                - 队列设 maxsize：防止内存溢出。
+                - 加任务超时：避免卡死线程。
+                - 加异常重试：提升稳定性。
+
+        补充：
+            1、finally 不是等循环结束才执行！
+                每取一个任务 → 执行完 → 立刻进入 finally！
+                第一步：线程卡在 get () 等待任务
+                    task, args, kwargs = self.tasks.get()  # 没任务 → 阻塞等待
+                第二步：队列来任务了，get () 返回
+                    task, args, kwargs = (process_data, ("数据-1",), {})
+                第三步：进入 try 执行任务
+                    task(*args, **kwargs)  # 执函数
+                第四步：任务函数执行完 / 抛异常 → 立刻离开 try，进入 finally！
+                    - 函数正常结束 → 离开 try → 进 finally
+                    - 函数报错抛异常 → 被 except 抓住 → 进 finally
+                第五步：执行 finally
+                    self.tasks.task_done()
+                第六步：finally 执行完 → 回到 while True 顶部，重新 get () 取下一个任务
+
+                其实：就是没仔细看，while 和 finally 不是一个缩进等级
+
+            2、 假设，最大三个线程，一个线程在get堵塞会卡住另外两个线程吗？
+                不会
+                设 max_workers=3，开了 3 个工作线程：
+                    - 线程 A 卡在 self.tasks.get() 阻塞等待任务
+                    - 线程 B、线程 C 照样各自独立运行、各自阻塞等待
+                三个线程谁也不堵谁，各自独立阻塞。
+
+                1. queue.Queue 是线程安全的内置队列
+                2.多个线程同时调用 queue.get()：
+                    - 队列为空时：所有调用 get () 的线程全部阻塞休眠
+                    - 队列放入一个任务：只会唤醒其中一个线程拿走任务
+                    - 剩下两个继续安静阻塞，不占用 CPU
+
+                - queue.Queue.get() 阻塞只阻塞当前调用的那条线程，不影响其他线程
+                - 三个线程各自跑自己的 while True、各自跑自己的 get()
+                - 队列内部有锁 + 条件变量，天然支持多线程同时等待
+
+                总结：一个线程在 get () 阻塞，只会卡住自己，另外两个该等待等待、该干活干活，完全不受影响。(收银员和顾客的关系)
+
+            3、 Python 内置的队列全家桶
+                1. queue.Queue () —— 先进先出队列 FIFO
+                    - 特点：先放进去的任务，先被拿走
+                    - 场景：普通任务排队
+                    - 方法：put() / get() / join() / task_done()
+                2. queue.LifoQueue () —— 后进先出队列（栈）
+                    - 最后放进去的，最先被拿走
+                    - 像叠盘子：最后放的最先拿
+                    - 场景：需要最新任务优先执行
+                3. queue.PriorityQueue () —— 优先级队列
+                    谁优先级高，谁先出队！
+                        - 放入：(优先级数字, 数据)
+                        - 数字越小优先级越高
+                        - 场景：紧急任务插队
+                    q = queue.PriorityQueue()
+                    q.put((1, "普通任务"))
+                    q.put((0, "紧急任务！"))  # 优先执行
+                4. queue.SimpleQueue () —— 简化版队列（3.7+）
+                    - 只保留核心：put() / get()
+                    - 没有 task_done() / join()
+                    - 更轻更快
+
+                不管哪种队列，都能用：
+                    ✅ q.put(item) 把数据放进队列
+                    ✅ q.get() 从队列取数据（空则阻塞）
+                    ✅ q.empty() 判断队列是否为空（不保证 100% 线程安全，仅参考）
+                    ✅ q.full() 判断队列是否满
+                    ✅ q.qsize() 返回队列大小
+                只有 Queue / LifoQueue / PriorityQueue 拥有
+                    ✅ q.task_done() 任务完成，告诉队列 “我做完了”
+                    ✅ q.join() 等待所有任务都被处理完
+
+                总结：
+                    - Queue() → 排队打饭（先来先吃）
+                    - LifoQueue() → 叠盘子（后来先拿）
+                    - PriorityQueue() → VIP 优先（重要先做）
+                    - SimpleQueue() → 极简队列（无 join）
 
     2.4 线程间通信
         2.4.1 使用 Queue 队列通信
