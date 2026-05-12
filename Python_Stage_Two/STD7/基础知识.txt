@@ -1,0 +1,228 @@
+一、Matplotlib 基础概念与环境配置
+
+
+    1.1 Matplotlib 简介与架构
+        Matplotlib 是 Python 中最强大的 2D 绘图库，能够创建静态、动态和交互式可视化图表。
+        它的设计理念是 “使简单的事情变得简单，困难的事情变得可能”，让你只需几行代码就能创建出版质量的图表。
+
+        Matplotlib 采用三层架构设计，理解这个架构对掌握 Matplotlib 至关重要：
+            Figure（画布）
+                - 整个图表的容器，相当于一张白纸
+                - 可以包含一个或多个 Axes
+                - 负责管理所有子元素
+            Axes（坐标系 / 子图）
+                - 真正绘制数据的区域
+                - 包含坐标轴、标题、图例等元素
+                - 一个 Figure 可以包含多个 Axes，但一个 Axes 只能属于一个 Figure
+            Axis（坐标轴）
+                - 控制数据范围的显示（X 轴和 Y 轴）
+                - 包含刻度和刻度标签
+                - 负责数据到视觉空间的映射
+            Artist（图形元素）
+                - Figure 上所有可见的元素都是 Artist
+                - 包括线条、文本、标记、图像等
+                - 提供了丰富的样式设置接口
+
+
+    1.2 安装与环境配置
+        使用pip安装（推荐）
+            pip install matplotlib
+        使用conda安装
+            conda install matplotlib
+        验证安装
+            import matplotlib
+            print(f"Matplotlib版本: {matplotlib.__version__}")
+
+
+    1.3 中文字体设置（关键技巧）
+        由于 Matplotlib 默认不支持中文字体，需要进行配置
+            - plt.rcParams['font.sans-serif'] = ['SimHei']：这是最关键的一行。
+                    SimHei 是“黑体”的英文名，也是 Windows 系统自带的字体。这行代码告诉 Matplotlib：“以后遇到文字，优先用黑体来显示。”
+            - plt.rcParams['axes.unicode_minus'] = False：Matplotlib 默认使用 Unicode 编码的减号（-），
+                    某些中文字体不支持这个特殊符号，会导致负号也变成方框。将其设为 False 后，它会改用普通的连字符（hyphen），从而完美显示负号。
+
+        通过字体文件的绝对路径（fname）加载一个特定的字体
+            - 这是一种“指哪打哪”的方法。它不改变全局设置，而是直接通过字体文件的绝对路径（fname）加载一个特定的字体。
+-           - 使用时，你需要在具体的绘图函数里单独指定，例如：plt.title("中文标题", fontproperties=font)。
+                    这种方法适合只想让某几个特定的文字使用特殊字体（比如艺术字或特定品牌的定制字体）的场景。
+
+        带“备选方案”的动态设置（最稳健）
+            - 它一次性更新了一组配置，并且为字体设置了“备选名单”。
+            - 执行逻辑：Matplotlib 会按顺序从左到右寻找字体。它会先找 SimHei（适合 Windows），
+                    如果你的电脑是 Mac 没有黑体，它就会自动跳过，去尝试找 Arial Unicode MS（适合 macOS），
+                    最后如果都没有，才退回到默认的 DejaVu Sans。
+            - 这种写法写出的代码跨平台兼容性极强，把你的代码发给用 Mac 或 Linux 的同事，他们直接运行也不会报错或出现乱码。
+
+        如果是在 Windows 电脑上日常做数据分析或画图，直接复制方法3的代码放在所有绘图脚本的最开头，基本就能一劳永逸地解决中文乱码和负号显示问题
+
+
+    1.4 基本使用流程
+        Matplotlib 提供两种使用风格：
+        面向对象风格（推荐）：
+            核心特征是：显式地创建并操作“对象”，通过调用这些对象自带的“方法”来完成绘图。
+            代码中具体体现在以下几个关键点：
+                1. 显式创建对象 (Explicit Object Creation)
+                    直接把绘图的核心元素——Figure（画布对象）和 Axes（坐标轴/子图对象）——显式地创建出来，并赋值给了变量 fig 和 ax
+                2. 通过对象调用方法 (Calling Methods on Objects)
+                    在拿到 ax 和 fig 这两个对象后，后续几乎所有的操作都是通过 对象.方法() 的形式来执行的：
+                        - 绘图：ax.plot(...) —— 明确告诉 ax 这个坐标轴对象：“请你画出这条线”。
+                        - 设置属性：ax.set_xlabel(...)、ax.set_title(...)、ax.legend()、ax.grid(...)
+                                —— 都是在直接指挥 ax 对象去修改它自己的标签、标题、图例和网格。
+                        - 保存文件：fig.savefig(...) —— 指挥最外层的 fig 画布对象把自己保存成一张图片。
+
+        pyplot 风格（快速交互）
+            “傻瓜相机”模式。在这种模式下，不需要关心画布（Figure）和坐标轴（Axes）这些具体的对象，只需要直接向 plt 下达指令
+            （比如 plt.plot(), plt.title()），Matplotlib 会在后台自动创建画布，并默默记住“当前正在操作的是哪张图、哪个坐标系”。
+            它最大的特点就是代码简短，全程使用 plt. 开头
+            写复杂项目时推崇面向对象（OO）风格，但过程式风格在以下几种场景中非常好用，甚至更高效：
+                1. 快速探索数据（如 Jupyter Notebook 中）
+                    当你在做数据分析的初期，只是想快速看一眼数据的分布或趋势，不需要精美的排版。
+                    用 plt 几行代码就能立刻出图，非常顺手。
+                2. 绘制极其简单的单张图表
+                    如果你只需要画一张图，且图上只有一个坐标系（没有复杂的子图拼接），过程式风格写起来最快，代码也最简洁。
+                3. 编程入门或教学演示
+                    对于刚接触 Matplotlib 的新手，面向对象中 fig 和 ax 的概念可能会增加理解门槛。
+                    过程式风格逻辑直观（像流水账一样），非常适合用来学习基础的绘图函数。
+
+        总结：
+            如果只是随便画个图看看，或者画非常简单的单图，直接用 plt 的过程式风格完全没问题，怎么快怎么来；
+            但如果你要写正式的分析脚本、做复杂的仪表盘或者批量出图，请务必切换回面向对象（fig, ax）风格。
+
+
+二、基础图表类型详解
+
+
+    2.1 折线图（Line Plot）
+        折线图是最基本的图表类型，用于显示数据随时间或有序类别变化的趋势。
+
+        基本语法：
+            plt.plot(x, y, format_string, **kwargs)
+
+        format_string 参数：
+            颜色：’b’（蓝色）、’g’（绿色）、’r’（红色）、’c’（青色）、’m’（品红）、’y’（黄色）、’k’（黑色）、’w’（白色）
+            线型：’-‘（实线）、’—‘（虚线）、’-.’（点划线）、’:’（点线）
+            标记：’.’（点）、’,’（像素点）、’o’（圆圈）、’v’（下三角）、’^’（上三角）、’s’（正方形）、’*‘（星号）
+
+        综合示例:
+            Line Plot
+
+        关键参数说明：
+            - linewidth：线条宽度（单位：点）
+            - markersize：标记大小（单位：点）
+            - markeredgecolor：标记边缘颜色
+            - markerfacecolor：标记填充颜色
+            - alpha：透明度（0-1）
+
+    补充：
+        fig, ax = plt.subplots()
+            fig 是整张画纸，ax 是画纸上的坐标轴（画板），画画都是在 ax 上画
+            plt.subplots() 这个函数本身就返回一个元组：(画布对象, 坐标轴对象)，用解包赋值，分别给到 fig 和 ax。
+
+                - fig → Figure 画布 / 画纸
+                    整张画布、整张图片容器
+                    管整体：尺寸、保存图片、整体布局
+                    不直接用来画线、画点
+                    专属操作：
+                        fig.savefig("xxx.png")  # 保存整张图
+                - ax → Axes 坐标系 / 绘图区
+                    - 就是带 X 轴、Y 轴 的那块绘图区域
+                    - 真正画图都用 ax
+                    - 所有绘图、设置都往 ax 上操作：
+                        ax.plot()         # 画曲线
+                        ax.set_xlabel()   # x轴标签
+                        ax.set_title()    # 标题
+                        ax.legend()       # 图例
+                        ax.grid()         # 网格
+
+            总结、
+                1. plt.subplots() 返回 (Figure, Axes) 两个对象
+                2. fig = 整张画布，只用来保存、管整体
+                3. ax = 坐标轴绘图区，所有画图、设标签、标题、网格都用它
+                4. 画图永远记住：在 ax 上画，用 fig 保存，用 plot 显示
+
+        一些方法的功能(虽然一些不查也能看明白，查一下更全面嘛)
+        1. plt.subplots(figsize=(10, 6))
+            作用：创建一张画布 + 一个坐标系
+                - fig = 整张图（画布）
+                - ax = 坐标系（画图区域）
+                - figsize=(10,6)：画布大小 10×6 英寸
+            返回两个东西：画布 + 坐标区
+        2. np.linspace(0, 10, 100)
+            生成等差数列
+                - 从 0 到 10
+                - 均匀生成 100 个点
+        3. np.sin(x)
+            计算正弦值输入 x，输出 sin (x)，得到 Y 轴数据。
+        4. ax.plot(x, y, 'b-', linewidth=2, label='sin(x)')
+            核心绘图函数：画折线图
+                - x, y：数据
+                - 'b-'：蓝色实线
+                    b = blue
+                    - = 实线
+                - linewidth=2：线条粗细
+                - label='sin(x)'：图例名称
+        5. ax.set_xlabel() / ax.set_ylabel()
+            设置 X 轴、Y 轴标签
+                - fontsize=12：字体大小
+        6. ax.set_title()
+            设置图表标题
+                - fontweight='bold'：加粗
+        7. ax.legend()
+            显示图例会自动使用 plot(..., label='xxx') 里的名字。
+        8. ax.grid()
+            显示网格线
+                - alpha=0.3：透明度（越接近 0 越淡）
+        9. plt.show()
+            弹出窗口显示图表必须写，否则图不出来。
+        10. fig.savefig()
+            保存图片到文件
+                - dpi=300：高清画质
+                - bbox_inches='tight'：裁剪白边
+        11. ax.set_xlim() 和 ax.set_ylim()
+            手动设置 X 轴 / Y 轴 的显示范围
+                - ax.set_xlim(最小值, 最大值)
+                - ax.set_ylim(最小值, 最大值)
+            作用
+                让图表留白更美观
+                控制显示区域，不让数据贴在边框上
+                突出重点区间
+        12. ax.axhline()
+            画一条横跨整个图表的水平参考线
+            参数解释
+                - y=0：在 Y=0 的位置画线
+                - color='gray'：颜色灰色
+                - linestyle='-'：实线
+                - linewidth=1：线宽
+            同类函数（拓展）
+                - ax.axhline() → 水平线
+                - ax.axvline() → 垂直线
+                - 常用于：0 轴线、基准线、阈值线、警戒线
+        13. plt.tight_layout()
+            自动调整图表内边距、子图间距，让标签、标题不重叠、不裁切
+            解决的问题：
+                - 防止标题、轴标签超出图片范围
+                - 防止多个子图互相挤压
+                - 让整个图更整洁、美观
+            自动排版，让图好看不挤！
+        14. loc='upper right' 参数
+            把图例（legend）放到坐标系的 右上角，单词原意
+            常用 9 个位置（直接背这几个够用）
+                - upper right / loc=1     右上角
+                - upper left  / loc=2     左上角
+                - lower right / loc=3     右下角
+                - lower left  / loc=4     左下角
+                - upper center    上居中
+                - lower center    下居中
+                - center left     左居中
+                - center right    右居中
+                - center          正中间
+            其实就是 upper/lower/center right/left/center 的排列组合
+            如果不想固定位置，想让 Matplotlib 自动找不遮挡曲线的地方：
+                ax.legend(loc='best')
+                它会自动选空隙最大的位置放图例
+
+
+
+
+
+
