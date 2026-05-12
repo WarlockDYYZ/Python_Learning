@@ -335,23 +335,19 @@ def producer():
         item = f"消息-{i}"
         q.put(item)
         print(f"生产者放入: {item}")
-    q.put(None)  # 放入结束标志
 
 
 # 消费者线程
 def consumer():
     while True:
         item = q.get()
-        if item is None:  # 遇到结束标志
-            q.put(None)  # 重新放入，让其他消费者也能收到
-            break
         print(f"消费者取出: {item}")
         q.task_done()  # 标记任务完成
 
 
 # 创建线程
 producer_thread = threading.Thread(target=producer)
-consumer_thread = threading.Thread(target=consumer)
+consumer_thread = threading.Thread(target=consumer, daemon=True)
 # 启动线程
 producer_thread.start()
 consumer_thread.start()
