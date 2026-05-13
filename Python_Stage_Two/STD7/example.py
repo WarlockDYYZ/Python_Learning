@@ -152,6 +152,7 @@ for bar in bars2:
 plt.tight_layout()
 plt.show()
 
+
 # 堆叠柱状图示例
 # 创建堆叠数据
 labels = ['A产品', 'B产品', 'C产品']
@@ -206,3 +207,89 @@ autolabel(bars1)
 autolabel(bars2, bottom_vals=men_means)
 plt.tight_layout()
 plt.show()
+
+
+# 饼图
+# 创建数据
+labels = ['Python', 'Java', 'C++', 'JavaScript', '其他']
+sizes = [35, 25, 20, 15, 5]
+explode = (0.1, 0, 0, 0, 0)  # 突出显示Python
+# 自定义颜色
+colors = ['#ff9999', '#66b3ff', '#99ff99', '#ffcc99', '#ff99cc']
+# 创建图表
+fig, ax = plt.subplots(figsize=(10, 8))
+# 绘制饼图
+
+# sizes & labels 饼图有几块，labels 就必须有几个！数量必须完全对应！
+wedges, texts, autotexts = ax.pie(sizes, explode=explode, labels=labels, colors=colors,
+                                        autopct='%1.1f%%', shadow=True, startangle=90)
+
+# 设置标题
+ax.set_title('编程语言使用占比', fontsize=16, fontweight='bold')
+# 美化文字
+for text in texts:
+    text.set_fontsize(12)
+for autotext in autotexts:
+    autotext.set_color('white')
+    autotext.set_fontsize(10)
+    autotext.set_weight('bold')
+plt.tight_layout()
+plt.show()
+
+
+# 直方图
+# 创建数据
+np.random.seed(42)
+# 生成正态分布数据
+data_normal = np.random.normal(0, 1, 1000)
+# 生成均匀分布数据
+data_uniform = np.random.uniform(-2, 2, 1000)
+# 创建图表
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+# 绘制正态分布直方图
+ax1.hist(data_normal, bins=30, alpha=0.7, color='skyblue',
+        edgecolor='black', label='正态分布')
+ax1.set_title('正态分布直方图', fontsize=14, fontweight='bold')
+ax1.set_xlabel('值', fontsize=12)
+ax1.set_ylabel('频率', fontsize=12)
+# 显示 ax1 的图列
+ax1.legend()
+# 绘制均匀分布直方图
+ax2.hist(data_uniform, bins=30, alpha=0.7, color='lightcoral',
+        edgecolor='black', label='均匀分布')
+ax2.set_title('均匀分布直方图', fontsize=14, fontweight='bold')
+ax2.set_xlabel('值', fontsize=12)
+ax2.set_ylabel('频率', fontsize=12)
+ax2.legend()
+plt.tight_layout()
+plt.show()
+
+# 双变量直方图示例
+# 创建二维直方图
+fig, ax = plt.subplots(figsize=(10, 8))
+# 生成二维正态分布数据
+x = np.random.normal(0, 1, 1000)
+y = np.random.normal(0, 1, 1000)
+# 绘制二维直方图
+hist = ax.hist2d(x, y, bins=30, cmap='Blues', density=True)
+# 设置标题和标签
+ax.set_title('二维直方图', fontsize=16, fontweight='bold')
+ax.set_xlabel('X值', fontsize=12)
+ax.set_ylabel('Y值', fontsize=12)
+# 添加颜色条
+cbar = plt.colorbar(hist[3], ax=ax)
+print(hist[0])
+cbar.set_label('密度', fontsize=10)
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
+
+
+
+

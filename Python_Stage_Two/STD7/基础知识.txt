@@ -229,7 +229,243 @@
             plt.bar(x, height, width=0.8, bottom=None, **kwargs)  # 垂直柱状图
             plt.barh(y, width, height=0.8, left=None, **kwargs)   # 水平柱状图
 
+    补充：
+        ax.bar(位置, 高度, 宽度, 标签, 颜色)
+        ax.bar(第一个参数) 传入的就是柱子中心点的 x 坐标
+        ax.set_xticks(x) 设置 x 轴下的小竖线，下的值
+        ax.set_xticklabels(categories) 把上面的值换成 categories 中的值
+
+        bars1 = ax.bar(x - width/2, sales_2023, width, label='2023年', color='#1f77b4')
+            - 返回值：BarContainer（柱子容器）
+            - 内部：包含 N 个 Rectangle 对象，N = 画的柱子数量
+            - 用法：像数组 / 列表一样使用
+
+        bottom 参数 作用
+            bottom 就是：每根柱子「底部从哪个高度开始往上画」
+            默认不写 bottom 时：
+                - 柱子底部默认在 y=0，从 0 往上长到你的数值高度。
+            给了 bottom 后：
+                - 柱子底部不再从 0 开始，从你指定的 bottom 位置往上长。
+
+        bar.get_x() + bar.get_width() / 2.
+            柱子左边缘位置 + 半根柱子宽度 = 柱子正中心 X 坐标
+            目的：让文字水平落在柱子正中间。
+        y_pos
+            就是把文字放在哪个高度。
+            常见两种玩法：
+                - 放柱子顶部上方：y_pos = height
+                - 放柱子垂直正中间：y_pos = height / 2
+        f'{int(height)}'
+            把柱子高度转成整数字符串，作为要画的文字
+        ha='center'
+            ha = horizontal alignment 水平对齐
+            以给的 X 坐标 为中心，文字水平居中对齐。
+            配合前面算的柱子中心 X，完美居中。
+            其他可选：
+                - ha='left' 文字左对齐
+                - ha='right' 文字右对齐
+        va='center'
+            va = vertical alignment 垂直对齐
+            以给的 Y 坐标 为中心，文字垂直居中。
+            其他可选：
+                - va='bottom' 文字底部贴在 Y 位置
+                - va='top' 文字顶部贴在 Y 位置
+
+        ax.text(
+            柱子中心X坐标,   # 水平位置：柱子正中间
+            指定的Y高度,    # 垂直位置
+            要显示的数字,
+            ha='center',    # 文字自身水平居中
+            va='center'     # 文字自身垂直居中
+        )
+
+        柱子顶部标数字(常用)
+        for bar in bars1:
+            height = bar.get_height()
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                height,        # y放在柱子顶端
+                f"{int(height)}",
+                ha="center",
+                va="bottom"    # 文字底部贴着柱子顶
+            )
+
+
+    2.3 饼图（Pie Chart）
+        饼图用于显示数据的比例分布。
+
+        基本语法：
+            plt.pie(x, explode=None, labels=None, colors=None, autopct=None, shadow=False, startangle=0, **kwargs)
+
+        高级饼图技巧：
+            - 使用autopct参数格式化百分比显示
+            - 使用explode参数突出显示特定部分
+            - 使用shadow参数添加阴影效果
+            - 使用startangle参数设置起始角度
+
+    补充：
+        plt.pie(
+            x,                   # 必须：饼图每一块的数值
+            explode=None,        # 可选：是否把某块“拉出来”
+            labels=None,         # 可选：每块的标签文字
+            colors=None,         # 可选：每块的颜色
+            autopct=None,        # 可选：显示百分比格式
+            shadow=False,        # 可选：是否显示阴影
+            startangle=0,        # 可选：饼图起始角度
+            **kwargs             # 其他高级参数
+        )
+        1. x（必须传）
+            - 作用：饼图每一块的大小数据
+            - 传入：列表 / 数组
+            - 注意：不用自己算百分比，matplotlib 自动算
+        2. explode（突出某一块）
+            - 作用：把某一块往外拉出来一点（强调用）
+            - 传入：列表，长度必须和 x 一样
+            - 0 = 不突出，数字越大突出越远
+        3. labels（每块的标签）
+            - 作用：给每块加名字
+            - 长度必须 = len(x)
+            - 否则报你刚才那个错：ValueError: 'label' must be of length 'x'
+        4. colors（颜色）
+            - 作用：自定义每块颜色
+            - 列表长度必须和 x 一样
+        5. autopct（显示百分比 ✨ 最常用）
+            - 作用：自动在饼图内部显示百分比
+            - 格式写法：
+                %.1f%% → 保留 1 位小数 + 百分号
+                %.2f%% → 保留 2 位小数
+                %d%% → 整数
+        6. shadow（阴影）
+            - True：有阴影（立体一点）
+            - False：无阴影（默认）
+        7. startangle（起始角度）
+            - 作用：旋转整个饼图
+            - 默认 0°：从 x 轴正方向开始画(逆时针)
+            - 常用 startangle=90：从顶部开始画（更好看）
+            - 想顺时针：加 counterclock=False
+
+        1、 wedges, texts, autotexts = ax.pie(...)
+            1. wedges → 饼图的「扇形块」
+                - 类型：饼图的每一块扇形（Patches）
+                - 作用：所有扇形的列表
+                - 你有几块饼，wedges 里就有几个对象
+                能用来干什么？
+                    - 改某块的颜色
+                        wedges[0].set_color('red')  # 把第一块改成红色
+                    - 改边框
+                    - 改透明度
+                    - 突出显示某一块
+            2. texts → 饼图旁边的「标签文字」
+                就是 labels=['A','B','C'] 显示在饼图外面的文字。
+                    - 类型：文本对象列表
+                    - 对应：每一个 label
+                    - 作用：控制外面标签的样式（字体、大小、颜色）
+            3. autotexts → 饼图内部的「百分比文字」
+                就是 autopct='%1.1f%%' 显示在扇形内部的数字。
+                    - 类型：文本对象列表
+                    - 对应：每块内部的百分比
+                    - 作用：修改内部百分比的样式
+
+
+    2.5 直方图（Histogram）
+        直方图用于显示数据的分布情况。
+
+        基本语法：
+            plt.hist(x, bins=10, range=None, density=False, alpha=0.7, \*\*kwargs)
+
+        二维直方图 hist2d
+            把 X-Y 平面分成很多小格子，统计每个格子里有多少个点，
+            用颜色深浅表示数量多少 → 这就是二维直方图！
+            X、Y：坐标点
+                - 颜色越深：点越多 / 密度越大
+                - 颜色越浅：点越少
+
+        类型	    统计维度	    表现形式
+        hist	1 维（x）	柱子高度
+        hist2d	2 维（x,y）	颜色深浅
         
+        可以：
+            - 改成热力图样式
+            - 加等高线
+            - 画离散数据分布
+
+    补充：
+        1. data
+            要统计的数据（列表、数组）
+        2. bins
+            柱子数量
+                - 越大 → 柱子越细
+                - 越小 → 柱子越粗
+        3. alpha
+            透明度（0~1）让图更好看，不刺眼
+        4. color & edgecolor
+            - color：柱子填充色
+            - edgecolor：柱子边框色（黑色最清晰）
+        5. label
+            图例文字，配合 ax.legend() 使用
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+            创建了 1 行 2 列的画布(宽度 14，高度 6)，一共 2 个独立的坐标系（坐标轴）
+
+        1、 hist2d 参数详解
+            1. x, y
+                必须传的两组数据，一一对应，代表平面上的点。
+            2.bins=30
+                X、Y 方向各分成 30 份→ 总格子数：30×30=900 个
+            3. cmap='Blues'颜色映射（配色方案）
+                - Blues：蓝色系
+                - Reds：红色系
+                - Greens：绿色系
+                - viridis：彩虹色（默认）
+            4. density=True
+                - True：显示概率密度（总和 = 1）
+                - False：显示每个格子里的点数量（默认）
+
+        2、 hist2d 的返回值（非常重要）
+            返回 4 个值（元组）：
+                (counts,  # 二维数组：每个格子的数量/密度
+                 xedges,  # X轴分箱边界
+                 yedges,  # Y轴分箱边界
+                 image    # 绘制出的图像对象 → 给colorbar用
+                )
+
+            hist [0] = counts
+                30 x 30，里的每一个数字 = 对应小格子的「概率密度」
+            hist [1] = xedges
+                X 轴上 31 个分界线坐标，把 X 轴切成 30 个小格子
+            hist [2] = yedges
+                Y 轴上 31 个分界线坐标，把 Y 轴切成 30 个小格子
+            hist [3] = image
+
+        3、 cbar = plt.colorbar(hist[3], ax=ax)
+            这行代码 = 给二维直方图添加右侧的「颜色条」，
+            hist [3] 是要显示颜色的图，ax=ax 是把颜色条挂在这个子图旁边。
+
+            1. plt.colorbar()
+                作用：创建一个颜色条（色标），用来告诉观察者：
+                    - 什么颜色代表什么数值
+                    - 在二维直方图里 = 颜色越深，密度 / 数量越大
+            2. hist [3] 是什么？（最关键）
+                - hist[0] = 统计数值（密度 / 数量）
+                - hist[1] = x 轴分箱
+                - hist[2] = y 轴分箱
+                - hist[3] = 真正画出来的图像对象（Image）
+                colorbar 必须绑定图像对象，所以必须传 hist[3]。
+            3. ax=ax 是什么？
+                把颜色条挂在当前这个子图 ax 的旁边，让它们对齐、排版整齐。
+                如果你有多个子图，必须指定挂在哪个图上。
+            给 hist2d 画出的图像添加一个颜色条，并把它放在 ax 子图旁边。
+
+
+
+
+
+
+
+
+
+
+
 
 
 
