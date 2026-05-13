@@ -222,6 +222,15 @@
                 它会自动选空隙最大的位置放图例
 
 
+    2.2 柱状图（Bar Chart）
+        柱状图用于比较不同类别之间的数据大小。
+
+        基本语法：
+            plt.bar(x, height, width=0.8, bottom=None, **kwargs)  # 垂直柱状图
+            plt.barh(y, width, height=0.8, left=None, **kwargs)   # 水平柱状图
+
+        
+
 
 
 
