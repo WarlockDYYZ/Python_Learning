@@ -458,6 +458,124 @@
 
 
 
+    2.4 散点图（Scatter Plot）
+        散点图用于显示两个变量之间的关系。
+
+        基本语法：
+            plt.scatter(x, y, s=20, c=None, marker='o', cmap=None, alpha=0.7, \*\*kwargs)
+
+    补充：
+        1. 固定随机种子
+            np.random.seed(42)
+            每次运行生成的随机点一模一样，方便复现。
+        2. 生成数据
+            x = np.random.rand(N)
+            np.random.rand(N) 生成 [0,1) 之间均匀分布 的 N 个随机数
+        3. 随机颜色
+            colors = np.random.rand(N)
+            生成 100 个 0~1 数值，每个数值对应一个点的颜色映射值配合
+                cmap 自动渐变上色。
+        4. 随机大小
+            sizes = 1000 * np.random.rand(N)
+                - np.random.rand(N) → 0~1
+                - 乘 1000 → 点的大小范围 0 ~ 1000，所以每个散点大小完全不一样。
+
+        5. 核心：ax.scatter 参数精讲
+            scatter = ax.scatter(
+                x, y,
+                s=sizes,        # 每个点的大小
+                c=colors,       # 每个点的颜色映射值
+                cmap='viridis', # 配色方案
+                alpha=0.7,      # 整体透明度
+                edgecolors='black', # 点的边框颜色
+                linewidth=1     # 边框粗细
+            )
+                - s：点大小，可以传列表 / 数组 → 每个点大小不同
+                - c：颜色映射值，传数组 → 配合 cmap 渐变着色
+                - cmap='viridis'：经典彩虹渐变色
+                - alpha=0.7：半透明，点重叠也能看清
+                 -edgecolors='black'：每个圆点加黑色描边，轮廓更清晰
+                - linewidth=1：描边宽度
+
+        6. 颜色条
+            cbar = plt.colorbar(scatter)
+            cbar.set_label('颜色映射值', fontsize=10)
+            - 把散点的颜色数值刻度显示在右侧
+            - 告诉看图的人：什么颜色对应多大的 colors 值
+
+        7. colors = np.random.rand(N) 为什么能当颜色？
+            它不是直接当颜色，而是当「颜色的序号 / 数值」，
+            matplotlib 会根据这个数字，自动从 cmap（配色板）里取对应的颜色！
+            - np.random.rand(N) → 生成 0~1 之间的数值
+            - 你写了 cmap='viridis' → 这是一整条渐变色谱
+            - matplotlib 自动做一件事：
+                数字越小 → 取色谱左边的颜色
+                数字越大 → 取色谱右边的颜色
+                colors 数值：  0.1   0.5   0.9
+                              ↓     ↓     ↓
+                viridis色板： 深紫 → 浅蓝 → 黄亮
+            colors 不是颜色本身，是「颜色位置索引」！
+
+        8. 为什么 sizes=1000*np.random.rand(N)，点却不大？
+            scatter 里的 s= 不是直径，是「点的面积」！
+            单位是 像素平方（pixel²）
+                - s = 1000 → 面积 = 1000
+                - 直径 ≈ sqrt (1000) ≈ 31.6 像素
+            看到的点直径大约 0.05（坐标单位），是因为坐标范围是 0~1，图上像素很多，所以坐标单位看起来很小！
+                - s=100 → 很小
+                - s=500 → 中等
+                - s=1000 → 很大
+            sizes = 1000 * np.random.rand(N)，点面积从 0 ~ 1000 随机，非常合理！
+
+
+两个问题:
+    1、 plt.subplots，返回画布对象，坐标轴对象，在坐标轴上画图，但显示图像时使用plt.show()，没有涉及到画布对象，是因为.show（）默认显示所有的画布对象吗？
+        plt.show () 会自动显示当前所有已创建的画布（figure），不需要手动传入 fig！
+        fig, ax = plt.subplots(figsize=(10,8))
+        这句做了两件事：
+            - 创建一个画布 fig
+            - 创建一个坐标轴 ax 放在画布上
+            - matplotlib 内部自动记住了这个画布
+        ax.scatter(...)
+            - 所有图都画在 fig 里面的 ax 上
+        plt.show()
+            _ matplotlib 会把当前所有创建过的画布，全部显示出来！
+
+        为什么不需要用 fig.show ()？
+            - plt.show () 是全局显示函数
+            - 它会自动找到 当前所有 figure 画布
+            - 自动展示它们
+            所以你不需要手动调用 fig.show ()甚至不需要把 fig 赋值给变量，下面这样也能跑:
+                plt.subplots()  # 不写 fig, ax = ...
+                ax = plt.gca()  # 获取当前轴
+                ax.plot([1,2,3])
+                plt.show()      # 照样显示！
+
+        只有一种情况需要用 fig.show (),在 Jupyter Notebook 以外的某些 GUI 环境里
+        但日常写代码 99% 都只用 plt.show ()
+
+    2、 为什么设置接受返回值的变量时如果变量名都是fig, ax，最后显示的绘图不会相互影响？
+        因为每次执行 plt.subplots ()，都会创建一块【全新、独立】的画布！
+        后面的 fig, ax 变量，会【重新指向】新画布，不会覆盖、不会影响前面的图！
+        fig, ax = plt.subplots()
+            都会发生 3 件事：
+            1. 创建一张新画布（新 Figure）
+                - 和之前的画布完全无关
+                - 有自己独立的内存、独立的坐标系
+                - 就像你拿了一张新的画纸
+            2. 创建一个新的坐标轴（新 Axes）
+                - 画在新画纸上
+            3. 把新画布、新坐标轴 赋值给 fig, ax
+                - 变量名虽然一样，但指向的是【新对象】！
+                - 旧的图已经保存在内存里了，不会被删掉
+                - fig, ax 只是 “名字标签”
+                - 第一次：指向 画布 1
+                - 第二次：指向 画布 2
+                - 画布 1 还静静地待在内存里，没有消失！
+
+
+
+
 
 
 

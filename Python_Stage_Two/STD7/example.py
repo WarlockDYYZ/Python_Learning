@@ -284,7 +284,33 @@ plt.tight_layout()
 plt.show()
 
 
-
+# 散点图
+# 创建数据
+np.random.seed(42)
+N = 100
+x = np.random.rand(N)
+y = np.random.rand(N)
+colors = np.random.rand(N)  # 颜色
+sizes = 1000 * np.random.rand(N)  # 大小
+# 创建图表
+fig, ax = plt.subplots(figsize=(10, 8))
+# 绘制散点图
+scatter = ax.scatter(x, y, s=sizes, c=colors, cmap='viridis',
+                    alpha=0.7, edgecolors='black', linewidth=1)
+# 设置标题和标签
+ax.set_title('散点图示例', fontsize=16, fontweight='bold')
+ax.set_xlabel('X值', fontsize=12)
+ax.set_ylabel('Y值', fontsize=12)
+# 添加颜色条
+cbar = plt.colorbar(scatter)
+cbar.set_label('颜色映射值', fontsize=10)
+# 设置坐标轴范围
+ax.set_xlim(0, 1)
+ax.set_ylim(0, 1)
+# 添加网格
+ax.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()
 
 
 
