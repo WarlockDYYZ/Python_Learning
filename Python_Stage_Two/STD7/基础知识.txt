@@ -462,7 +462,10 @@
         散点图用于显示两个变量之间的关系。
 
         基本语法：
-            plt.scatter(x, y, s=20, c=None, marker='o', cmap=None, alpha=0.7, \*\*kwargs)
+            plt.scatter(x, y, s=20, c=None, marker='o', cmap=None, alpha=0.7, **kwargs)
+
+            iris.py
+            使用鸢尾花数据集做得散点图对比
 
     补充：
         1. 固定随机种子
@@ -573,19 +576,236 @@
                 - 第二次：指向 画布 2
                 - 画布 1 还静静地待在内存里，没有消失！
 
+        9. 在实际的数据分析工作中，我们极少手动去写上面的双重循环。
+            Python 的 Pandas 和 Seaborn 库内置了极其强大的散点图矩阵绘制函数，一行代码就能完美实现，且自带图例和美化。
+                为没写着看，有个印象以后用到就好了：
+                # 一行代码生成散点图矩阵，c参数根据类别上色
+                scatter_matrix(df, figsize=(12, 10), c=['red', 'green', 'blue'][i] for i in df['target'], marker='o')
+
+        10. df = pd.DataFrame(iris.data, columns=iris.feature_names)
+            将 scikit-learn 提供的原始数据，转换成一个带有漂亮表头的、标准的 Pandas 表格（DataFrame）
+            可以把它拆解成三个部分来理解：
+            1. iris.data（原材料）
+                当使用 load_iris() 加载鸢尾花数据集时，它返回的 iris.data 本质上是一个 150行 x 4列的纯数字矩阵（通常是 NumPy 数组）。
+                它里面只有冷冰冰的数值，比如 5.1, 3.5, 1.4, 0.2，并没有直接表明这些数字分别代表什么。
+            2. columns=iris.feature_names（贴标签）
+                iris.feature_names 是一个包含 4 个字符串的列表，它提供了这 4 列数据的标准名称：
+                ['sepal length (cm)', 'sepal width (cm)', 'petal length (cm)', 'petal width (cm)']
+                （即：花萼长度、花萼宽度、花瓣长度、花瓣宽度）
+                把它传给 columns 参数，就相当于给上面的纯数字矩阵贴上了清晰的“列名标签”。
+            3. pd.DataFrame(...)（装进表格）
+                pd.DataFrame 是 Pandas 库中最核心的二维表格数据结构。
+                这一步就是把“纯数字矩阵”和“列名标签”组装起来，变成一个功能强大的 Pandas 表格对象，并赋值给变量 df。
+            这样做：
+                - 可读性极强： Excel 一样带表头的清晰表格
+                - 操作更方便：有了 DataFrame，你就可以通过列名直接提取数据
+                - 功能更强大：Pandas 提供了极其丰富的数据分析函数
+                        （比如 df.describe() 一键生成统计摘要，df.plot() 直接绘图等），这些是原始的数字矩阵所不具备的。
+
+            axes[idx].scatter(...)
+                在索引为 idx 的特定子图上绘制散点图。
+
+            df[features[j]] 和 df[features[i]]
+                散点图矩阵的精髓在于两两特征的对比。
+                这里通过循环变量 i 和 j，分别提取鸢尾花的两个不同特征（比如“花萼长度”和“花瓣宽度”）作为 X 轴和 Y 轴的数据。
+
+            c=df['target'].map(lambda x: colors[x])
+                这是给点上色的关键。df['target'] 里存的是 0, 1, 2 这样的类别数字(代表花的种类)。
+                map(lambda x: colors[x]) 的作用就是把 0 映射成 colors[0]（红色），1 映射成 colors[1]（绿色），以此类推。
+                这样不同种类的鸢尾花在图上就会显示为不同的颜色。
+            alpha=0.6
+                设置点的透明度。因为散点图可能会有很多点重叠在一起，设置一定的透明度可以让你更清楚地看到数据点的密集程度。
+
+            axes[idx].set_xlabel(features[j], fontsize=8)
+            axes[idx].set_ylabel(features[i], fontsize=8)
+                给当前的子图加上 X 轴和 Y 轴的标题（比如 "sepal length (cm)"）。
+                fontsize=8 用来控制标签字体的大小，防止字太大在矩阵图中显得拥挤。
+
+            axes[idx].axis('off')
+                执行后，这个子图的 X 轴、Y 轴、刻度线、刻度数字以及边框线都会全部消失，只留下画布中间的散点图。
+                实际使用建议：在散点图矩阵中，通常不建议对所有的子图都使用 axis('off')。
+                        因为如果把所有坐标轴都关了，就不知道每个子图对应的具体数值范围了。
+                一般会保留最左侧一列子图的 Y 轴，和最下方一行子图的 X 轴，只把矩阵内部（非边缘）子图的坐标轴隐藏掉，这样既能保持图表整洁，又能看清数据刻度。
 
 
+三、金融领域图表绘制
+    3.1 K 线图（Candlestick Chart）
+        K 线图是金融分析中最常用的图表类型。
+
+        使用 mplfinance 库绘制 K 线图：
+            candlestick_chart.py
+
+        核心的 4 个函数（必须记住）
+            - pd.DataFrame() → 创建 K 线数据表
+            - mpf.make_marketcolors() → 设置涨跌颜色
+            - mpf.make_mpf_style() → 设置整体风格
+            - mpf.plot() → 画 K 线图（万能核心）
+
+        mplfinance 画的 K 线图 自带布局，不兼容 plt.tight_layout()，所以会报警告
+
+        要不然看不懂：
+            - 整条竖线 → 当天 最低价 ～ 最高价
+            - 长方形实体 → 当天 开盘价 ～ 收盘价
+            - 红：涨；绿：跌
+
+        移动平均线的意义是什么，跟可视化的关系不大，知道在图里是什么就行
+
+            K2.py
+        不使用 mplfinance 画的 K 线图，用的 matplotlib ，我觉得也挺好看的
 
 
+    补充：
+        1. np.random.normal(0, 2)
+            中心 0，波动大约 ±2
+        2. prices[-1] + change
+            取最后一个价格 + 波动生成新价格，加到列表末尾
+        模拟股票价格一天天连续波动，价格波动因该是线性的，比直接生成对应数量范围内的随机数更符合现实情况
 
+        3. 生成df时的一些参数
+            Open（开盘价）
+                'Open': np.array(prices[:-1]) + 噪音
+                - prices[:-1] = 前 29 个价格（第 1 天～第 29 天）
+                - 加上小随机数，模拟开盘价
+            High（最高价）
+                'High': np.array(prices[:-1]) + 噪音
+                - 比基准价高一点，模拟当天最高点
+            Low（最低价）
+                'Low': np.array(prices[:-1]) - 噪音
+                - 比基准价低一点，模拟当天最低点
+            Close（收盘价）
+                'Close': prices[1:]
+                - prices[1:] = 后 29 个价格（第 2 天～第 30 天）
+            第1天价格 → 作为第1天开盘    Open  = prices[0]  → 第1天开盘    Open  = prices[1]  → 第2天开盘
+            第2天价格 → 作为第1天收盘    Close = prices[1]  → 第1天收盘    Close = prices[2]  → 第2天收盘
+            - 30 个价格，只能组成 29 根 K 线
+            - N 个价格 → 只能生成 N-1 根 K 线
 
+            Volume（成交量）
+                当天股票交易了多少手 / 多少股。
+            在 K 线图里，它是必须的一列数据，让 mplfinance 自动画出 下方成交量柱状图
 
+        4. marketcolors = mpf.make_marketcolors(...)
+            创建一套 K 线颜色方案后面要传给 mpf.plot() 才能生效。
+            up='red'
+                - K 线上涨时的颜色
+                - 当 收盘价 > 开盘价
+                - K 线实体变成 red（红色）
+            down='green'
+                - K 线下跌时的颜色
+                - 当 收盘价 < 开盘价
+                - K 线实体变成 green（绿色）
 
+        5. style = mpf.make_mpf_style(...)
+            1. marketcolors=自定义颜色方案
+                    - 红涨绿跌就是在这里生效的
+                    - 告诉函数：K 线的颜色用我定义好的那套
+            2. figcolor='white'
+                整个图表的背景颜色
+                    - white = 白色背景
+                    - 你也可以改成 black（黑）、lightblue（浅蓝）
+                注意：改变的是背景颜色，背景是桌子的话，所绘图片是桌子上的纸，改变桌子颜色
+            3. gridcolor='gray'
+                网格线颜色
+                    - K 线图里的横竖虚线
+                    - gray = 灰色网格
+                    - 不想要网格可以后面关掉，这里只是设颜色
+            4. rc={'font.family': 'SimHei', 'axes.unicode_minus': False}
+                这是 字体设置，非常重要！
+                font.family': 'SimHei'
+                    - 设置中文黑体
+                    - 不加这个，中文标题会显示成方框 □□□
+                    - SimHei = 黑体
+                axes.unicode_minus': False
+                    - 解决负号 - 显示成方框
+                    - 不加这个，坐标轴负号会乱码
+                这个 style 最后要传给 mpf.plot () 才能生效！(这很重要)
+                    mpf.plot(df, style=style, ...)
 
+        5. mpf.plot(...)
+            1. df
+                必须是标准金融时间序列 DataFrame
+                    - 列名固定：Open, High, Low, Close, Volume
+                    - 索引必须是 datetime64 日期索引
+                mplfinance 只认这种格式，少列、列名错、索引不是日期都报错。
+            2. type='candle'
+                指定画什么类型：
+                    - candle：标准蜡烛图 K 线（实体 + 上下影线）
+                    - ohlc：OHLC 四根线形式
+                    - line：只画收盘价折线
+                    - renko：砖形图
+                日常股票看盘就用 candle。
+            3. style=style
+                传入前面用 mpf.make_mpf_style() 定义好的：
+                    - K 线涨跌颜色
+                    - 背景色、网格色
+                    - 中文字体、负号修复
+                相当于给图表套用一套完整皮肤。
+            4. mav=(5, 20)
+                移动平均线
+                    - 自动计算并画出 5 日均线、20 日均线
+                    - 写法：mav=(5,10,20,60) 可以多条随便加
+                    - 均线颜色库自带默认配色，不用自己画
+            5. volume=True
+                - True：在 K 线下方多出一个副图，画成交量柱状图
+                - False：只画 K 线，不显示成交量
+            6. returnfig=True
+                重点！
+                - True：返回 fig, axes 画布和坐标轴对象
+                    之后可以手动：
+                    - 加标题 axes[0].set_title()
+                    - 改坐标轴、加文字标注
+                - False：直接弹出图，不返回对象，没法后续自定义修改
+                想后期微调图表，必须开 returnfig=True
+            7. figsize=(12, 8)
+                画布大小：宽 12，高 8 （单位英寸）
+            8. figscale=1.2
+                整张图整体放大倍数文字、K 线、网格全部按比例放大 1.2 倍，防止字太小。
+            9. figratio=(12, 8)
+                固定画布宽高比例和 figsize 配合，控制图表不拉伸、不变形。
 
+    3.2 移动平均线（Moving Average）
+        移动平均线用于分析价格趋势。
 
+    改正：
+        1. np.zeros(100)：生成长度 100、全是 0的 numpy 数组
+        2. np.random.normal(均值, 标准差)，第二个参数是标准差，不是方差
 
+    补充：
+        1. ma5 = pd.Series(prices).rolling(window=5).mean()
+            - pd.Series(prices)
+                把 prices 价格列表 → 变成 Pandas 序列只有 Pandas 才能用滚动计算。
+            - .rolling(window=5)
+                滚动窗口 = 5意思：每次取连续 5 个数据，像一个滑动的窗口。
+            - .mean()
+                对每个窗口里的 5 个数字 求平均值。
+            计算 5 日移动平均线（5 日均线），每一个值 = 最近 5 天价格的平均值
 
+        2. ax.plot(dates, prices, 'k-', linewidth=1, label='收盘价')
+            - dates：X 轴（时间）
+            - prices：Y 轴（价格）
+            - 'k-'：黑色实线（k=black）
+            - linewidth=1：线宽
+            - label='收盘价'：图例名字
+            画出原始收盘价曲线（黑线）
 
+        3. plt.gcf().autofmt_xdate()
+            - plt.gcf() = get current figure
+                    获取当前画布对象
+            - .autofmt_xdate() = 自动格式化 X 轴日期
+            作用（超级重要）：
+            - X 轴日期自动倾斜 45°，不重叠
+            - 自动调整间距
+            - 让日期看得清清楚楚
 
+    3.3 成交量分析（Volume Analysis）
+        成交量是分析股票走势的重要指标
 
+    回忆：
+        1. ax1.plot(dates, prices, 'k-', linewidth=2, label='价格')
+            plot() 是 Matplotlib 中最核心的函数，用于绘制折线图。
+            它通过连接给定的 x 和 y 坐标点来创建线条，支持自定义颜色、线型、标记和线宽。
+            - dates → X 轴（时间）
+            - prices → Y 轴（价格）
+            - 'k-' → 黑色实线（k=black）
+            - linewidth=2 → 线宽
+            - label='价格' → 图例名称
