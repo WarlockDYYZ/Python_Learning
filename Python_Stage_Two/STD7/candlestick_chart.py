@@ -3,9 +3,6 @@ import mplfinance as mpf
 import pandas as pd
 import numpy as np
 
-# 设置中文字体（mplfinance需要特殊处理）
-plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
-plt.rcParams['axes.unicode_minus'] = False
 
 # 创建示例数据
 # 生成一组连续的日期，生成 30 天
