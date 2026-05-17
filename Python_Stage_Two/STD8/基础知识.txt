@@ -1,0 +1,87 @@
+一、Seaborn 基础架构与核心概念
+
+    1.1 Seaborn 与 Matplotlib 的关系及优势
+        Seaborn 是建立在 Matplotlib 基础上的一个高级可视化库，它通过封装 Matplotlib 的一些功能，简化了绘图过程，尤其在样式和颜色搭配上提供了更多内置选项。
+        与 Matplotlib 相比，Seaborn 具有以下显著优势：
+            - 简洁性与美观性：Seaborn 提供了更高级的绘图接口，能够用较少的代码创建出美观且复杂的统计图表。
+                    它自带了许多预设的主题和调色板，使得生成的图表具有较高的美观度和专业性，默认的绘图风格比 Matplotlib 更加现代和吸引人。
+            - 统计分析集成：Seaborn 专注于统计图形的生成，其绘图函数能够自动执行必要的统计聚合和语义映射。
+                    例如，当处理具有多个测量值的数据集时，Seaborn 会自动计算均值和 95% 置信区间，并绘制误差线表示估计的不确定性。
+            - 数据导向的 API：Seaborn 的 API 设计理念是让用户专注于数据的语义映射而非具体的绘制细节。
+                    它的函数操作于包含完整数据集的 DataFrame 和数组，内部执行必要的语义映射和统计聚合以生成信息丰富的图表。
+
+        简单示例：
+            test.py
+
+            1. sns.set_theme()
+                作用：开启 Seaborn 美观绘图风格
+                    - 不加这行：图是 matplotlib 默认样式(纯白背景，加了以后背景淡灰色的，还有白色网格线条)
+                    - 加了这行：背景变灰、网格好看、字体舒服
+                    - 就是一键美化
+            2. tips = sns.load_dataset("tips")
+                作用：加载餐厅小费数据集这是 seaborn 最经典的示例数据，包含：
+                    - total_bill：账单总金额
+                    - tip：小费金额
+                    - smoker：是否抽烟（Yes/No）
+                    - sex：性别
+                    - day：星期几
+                    - time：午餐 / 晚餐
+                    - size：人数
+            3. sns.relplot(...)
+                作用：画 relational plot = 关系散点图
+                参数：
+                    - data=tips：用 tips 这个数据
+                    - x="total_bill"：X 轴 = 账单金额
+                    - y="tip"：Y 轴 = 小费
+                    - hue="smoker"：用颜色区分是否抽烟
+                        抽烟 = 一种颜色
+                        不抽烟 = 另一种颜色
+                这张图想表达：账单越高，小费是不是越多？抽烟的人小费习惯不一样吗？
+
+                补充：
+                    hue = 颜色分组
+                        - 给数据按类别自动分颜色
+                        - 一张图里同时看两个维度的关系
+                    tips 数据集里这些都可以当 hue：
+                        - hue="smoker"	是否抽烟（Yes/No）
+                        - hue="sex"	性别（Male/Female）
+                        - hue="day"	星期几（Thu/Fri/Sat/Sun）
+                        - hue="time"	午餐 / 晚餐（Lunch/Dinner）
+
+                    不用 hue：只能看到：账单 vs 小费所有点一个颜色，看不出人群差异。
+                    用了 hue：能同时看到，账单 vs 小费，不同类别之间的差异（抽烟 / 不抽烟、男 / 女等）
+                    一张图 = 两张图的信息量！
+
+                    默认情况下：颜色 100% 自动分配：
+                        - Seaborn 自动识别有几组（Yes / No → 2 组）
+                        - 自动从当前主题配色板里挑最协调、最好看的颜色
+                        - 自动上色 + 自动生成图例
+                        - 完全不用管颜色
+
+                    自动颜色规则（超简单）
+                        1. 分类数据（文字，如男 / 女、是 / 否）
+                            - 用 定性色板（区别明显的颜色）
+                            - 两组：蓝 + 橙
+                            - 三组：蓝 + 橙 + 绿
+                            - 四组：更多颜色……
+                        2. 数字数据（如年龄、金额）
+                            - 用 渐变色（从浅到深）
+
+                    自己指定颜色！使用 palette 参数
+                        sns.relplot(
+                            data=tips,
+                            x="total_bill",
+                            y="tip",
+                            hue="smoker",
+                            palette={"Yes": "red", "No": "green"}  # 抽烟=红，不抽烟=绿
+                        )
+
+                        最常用的好看配色（直接复制用）：
+                            - palette="Set2"
+                            - palette="Dark2"
+                            - palette="coolwarm"
+                            - palette="rainbow"
+                            - palette="viridis"
+            4. plt.show()
+                作用：把图画出来显示在窗口不加这行，图不会弹出来。
+                
