@@ -76,7 +76,7 @@
                             palette={"Yes": "red", "No": "green"}  # 抽烟=红，不抽烟=绿
                         )
 
-                        最常用的好看配色（直接复制用）：
+                        最常用的好看配色：
                             - palette="Set2"
                             - palette="Dark2"
                             - palette="coolwarm"
@@ -84,3 +84,64 @@
                             - palette="viridis"
             4. plt.show()
                 作用：把图画出来显示在窗口不加这行，图不会弹出来。
+
+        数据格式要求：Seaborn 主要支持两种数据格式：
+            1. 长格式（Long-form）数据：
+                - 每列 = 一个变量（如：year、month、passengers）
+                - 每行 = 一次观测（一个样本）
+                - 每个单元格 = 一个值
+                - 优点：适合复杂数据集，可显式指定变量角色
+                - 示例：
+                    year  month  passengers
+                    1949  Jan      112
+                    1949  Feb      118
+                    1949  Mar      132
+                长格式绘图（最常用）
+                    直接把列映射到 x/y/hue 等，语义清晰：
+                        sns.relplot(
+                            data=flights,
+                            x="year", y="passengers",
+                            hue="month", kind="line"
+                        )
+
+            1. 宽格式（Wide-form）数据：
+                - 行索引 = 主体 / 维度（如：年份）
+                - 每列 = 一个组别 / 指标（如：每个月）
+                - 单元格 = 对应组合的数值
+                - 优点：适合简单数据集，更直观
+                - 示例：
+                    month  Jan  Feb  Mar  ...
+                    year
+                    1949   112  118  132  ...
+                    1950   115  126  141  ...
+                flights 转宽：
+                    flights_wide = flights.pivot(index="year", columns="month", values="passengers")
+                    print(flights_wide.head())
+                宽格式绘图（不指定 x/y）
+                    Seaborn 自动把索引当 x、列当分组、值当 y：
+                        sns.relplot(data=flights_wide, kind="line")
+
+            画图优先长格式，表格查看用宽格式：
+                长格式：绝大多数 Seaborn 绘图（relplot/catplot/lmplot）、需要分组 / 分面 / 多维度映射时。
+                宽格式：快速画多列对比线图 / 箱线图、数据本身就是透视表结构时。
+
+            长 → 宽（pivot）：
+                wide = flights.pivot(index="year", columns="month", values="passengers")
+            宽 → 长（melt）：
+                long = wide.reset_index().melt(id_vars="year", var_name="month", value_name="passengers")
+
+    1.3 核心对象体系
+        Seaborn 的核心对象体系包括三大网格对象：
+            1. FacetGrid（分面网格）：用于在数据集的不同子集上绘制相同图表的多个实例，最多支持三个维度：row、col 和 hue。
+            2. PairGrid（配对网格）：将数据集中的每个变量映射到网格的列和行，用于展示变量间的成对关系。
+            3. JointGrid（联合网格）：用于创建包含主图和边际图的联合图表，适合展示双变量分布。
+
+
+二、核心绘图功能详解
+
+    2.1 关系类图表（Relational Plots）
+        关系类图表主要用于展示变量间的关联关系，Seaborn 提供了两种基础类型：
+            散点图（scatterplot）、折线图（lineplot）：
+                relational_plots.py
+
+        relplot () 高级应用：relplot 是一个 figure-level 函数，结合了 FacetGrid 和轴级函数（scatterplot 或 lineplot），可以轻松创建多子图
