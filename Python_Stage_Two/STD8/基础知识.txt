@@ -531,7 +531,7 @@
         sns.barplot()：当需要比较数值大小时使用。例如：对比不同班级的平均分、不同部门的销售额、不同实验组的反应时长等。
         sns.countplot()：当需要统计样本数量时使用。例如：查看男女比例、统计各地区用户人数、分析不同好评等级的订单数量等。
 
-        4. 点图
+        4. 点图(折线图加点再加线)
             sns.pointplot 点线图
             主打：展示分组均值趋势 + 对比差异 + 附带置信区间
             适合：看类别间变化趋势、组间差异，比条形图更适合看走势
@@ -578,4 +578,101 @@
                 - 多分组同时对比走势差异
                 - 需要直观判断数据差异是否显著（看误差线重叠）
                 - 大数据量精简展示均值走势
-                
+
+
+    2.4 回归分析图表
+
+        Seaborn 提供了强大的回归分析可视化功能：
+            regression_analysis.py
+
+        1. sns.regplot ( ) 基础回归图
+            - 散点：每一笔账单和小费的真实数据
+            - 直线：拟合的线性回归直线（x 如何影响 y）
+            - 浅蓝色阴影 = 95% 置信区间（直线的可信度范围）
+        作用
+            - 看 账单越大，小费是不是越高
+            - 看 是不是线性关系
+        核心特点
+            - 只能画 一张图、一条线
+            - 不能分 col、row、hue（这些是 lmplot 的功能）
+
+        2. sns.lmplot ( ) 分面 / 分组回归图（更高级）
+            regplot 的超级升级版：自动分面、分组、画多条线
+            图里会看到：
+                - 左边图 = 午餐 (time=Lunch)
+                - 右边图 = 晚餐 (time=Dinner)
+                - 每种颜色 = 是否吸烟，各画一条回归线
+                - 阴影 = 置信区间
+            作用：
+                - 同时对比多组数据的回归关系
+                - 看：午餐 / 晚餐、吸烟 / 不吸烟的小费趋势是否一样
+            核心区别（超级重要）：
+                - regplot：画单张图
+                - lmplot：可以 col row hue 分面、分组
+
+        3. sns.regplot (order=2) 多项式回归（曲线）
+            当数据不是直线关系，用曲线拟合
+                - 默认 order=1 → 直线
+                - order=2 → 二次曲线（抛物线）
+                - order=3 → 更弯曲的曲线
+            当散点不是直线上升，而是先快后慢、先升后降时用。
+
+        总结：
+            函数	                类型	    能否分面 col/row	能否分组 hue	线条
+            regplot	            基础回归	不能	            不能	        直线
+            lmplot	            分面回归	可以	            可以	        直线
+            regplot(order=2)	曲线回归	不能	            不能	        曲线
+
+        4. 关于一些显示问题
+            sns.lmplot 是一个 “独立大图”，会自动清空画布，导致后面的 regplot 画不上去
+                - regplot = 画在当前画布（Axes）
+                - lmplot = 自动创建一整张图（Figure），画完就占据整个窗口，清空之前所有内容
+            解决：
+                - 每次绘图后都显示：plt.show()
+                - 用子图 plt.subplot(1,2,1)：
+                    （行，列，位置）
+                    lmplot 不能放进 subplot，把它放最后
+
+            1. Matplotlib 里可以同时存在 多张图（多个 Figure）
+                - 画 subplot → 生成 Figure 1
+                - 画 lmplot → 生成 Figure 2
+                - 两个图互相独立，互不干扰
+            2. plt.show() 是 “批量显示所有图”
+                不管画了多少张图，只要没调用过 show()最后一次 plt.show() 会一次性把所有图全部弹出。
+
+
+三、多子图布局高级技巧
+
+    3.1 FacetGrid 分面网格详解
+        FacetGrid 是 Seaborn 中最重要的多子图布局工具，它能够根据数据集的结构自动创建网格布局：
+            FacetGrid = Seaborn 的「分面画布神器」
+            它能自动把数据分组，排成多行多列的小图网格，一眼对比不同子集的数据规律。
+
+            sns.FacetGrid(tips, col="time")
+                拿 tips 数据
+                按 time 列的值分成两列小图(1 * 2)
+            g.map(sns.histplot, "tip")
+                在每个小图里都画一个直方图
+                画的是 tip 这一列
+
+            row="smoker"
+                上下分成两行：吸烟 / 不吸烟
+            col="time"
+                左右分成两列：午餐 / 晚餐
+            margin_titles=True
+                把行 / 列标题放在边上，更清晰
+            g.map(sns.scatterplot, "total_bill", "tip")
+                每个小格子里都画散点图，x = 账单，y = 小费
+            g.add_legend()
+                加图例
+
+        用 FacetGrid：
+            一眼对比多组数据；自动排版，不用自己画子图；代码超级简洁；论文、报表、数据分析必备
+            
+        补充:
+            map = 把一个绘图函数，批量应用到每一个小图上(语言部分学过)
+                g.map(sns.histplot, "tip") =
+                对每个小图：画 sns.histplot(x=tip)
+
+                g.map(sns.scatterplot, "total_bill", "tip") =
+                对每个小图：画 sns.scatterplot(x=total_bill, y=tip)
