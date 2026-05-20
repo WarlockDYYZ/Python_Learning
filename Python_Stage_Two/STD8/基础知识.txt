@@ -676,3 +676,357 @@
 
                 g.map(sns.scatterplot, "total_bill", "tip") =
                 对每个小图：画 sns.scatterplot(x=total_bill, y=tip)
+
+        高级配置选项：
+            facet_grid.py
+
+            FacetGrid + map(kdeplot) 写法：
+            最新版的 Seaborn，官方其实非常推荐使用 sns.displot(kind='kde', ...) 这种图形级（figure-level）函数来替代，
+                    不仅代码更简洁，而且能自动处理好分面和坐标轴共享的问题。
+
+            1. 旧版写法中的 palette=pal
+                当把这个字典传给 FacetGrid 的 palette 参数时，Seaborn 会执行以下操作：
+                    - 寻找分色依据：因为在创建 g 时指定了 hue="time"，Seaborn 知道要根据 time 这一列（包含 Lunch 和 Dinner）来给数据点上色。
+                    - 查字典配色：它会拿着数据里的 time 值去 pal 字典里“查表”。
+                        遇到 Lunch 的数据点，就自动填上海绿色。
+                        遇到 Dinner 的数据点，就填上深灰色。
+
+                如果不写 palette=pal，Seaborn 也会自动分配颜色（比如默认的蓝色和橙色），但使用自定义的 palette 有以下好处：
+                    - 业务语义更强：可以用更直观的颜色表达含义（例如用绿色代表健康的午餐，灰色代表普通的晚餐）。
+                    - 保持图表风格统一：在做一系列报告时，强制规定所有图中“午餐”必须是绿色，“晚餐”必须是灰色，显得非常专业。
+
+                palette 的其他常见写法：
+                    除了用字典精确指定外，palette 还可以直接传入 Seaborn 内置的主题名称，例如：
+                        - palette="deep" / "muted" / "pastel"：使用预设的协调色系。
+                        - palette="Set1" / "tab10"：适合分类较多的情况。
+                        - palette="viridis" / "coolwarm"：适合连续数值或冷热对比的情况。
+                    简单来说，palette=pal 就是告诉 Seaborn 严格按照‘颜色字典’来上色
+
+            2. 关于旧写法中的 “搭台” 和 “唱戏” 两个步骤
+                搭台子（初始化 FacetGrid）
+                    当执行 g = sns.FacetGrid(tips, col="day", ...) 时，做了两件至关重要的事：
+                        - 交出了数据主权：你把完整的 tips 数据集交给了 FacetGrid。此时，这个网格对象 g 的内部就已经把这份数据存好了，
+                                并且根据 col="day" 把数据悄悄拆分成了周四、周五、周六、周日这四份。
+                        - 画好了空白格子：Seaborn 创建好了对应数量的空白子图（Axes），搭建好了一个等待填充的画布框架。
+                唱戏（使用 .map() 映射绘图）
+                    接着执行 g.map(sns.barplot, "sex", "total_bill", ...) 时：
+                        - .map() 的作用就是拿着之前存在 g 里面的那份数据，去遍历每一个空白的子图。
+                        - 传入的 "sex" 和 "total_bill" 只是字符串形式的列名。.map() 会自动从绑定的数据中提取这两列，
+                                分别作为 x 轴和 y 轴的数据传给 sns.barplot。
+                        - 因此，不需要（也不能）在 .map() 里再次写 data=tips，因为它早就知道该用哪份数据了。
+
+            3. 使用新版的变化
+
+                facet_grid_to_new.py
+
+                将旧版的 FacetGrid + map() 写法改为新版 Seaborn 的图形级（figure-level）函数，代码会变得更加简洁、直观且高效。
+                针对旧版本三段代码，我们可以分别用 catplot（用于分类数据条形图）和 displot（用于分布图）来完美替代：
+                    - sns.catplot（它是专门处理分类数据的图形级接口），直接通过参数指定顺序。
+                    - sns.displot（统一的分发图接口），通过 row 参数实现分行。
+                    - 第三个图并没有进行分面（没有 col 或 row），只是单纯地按 time 上色。
+                            这种情况下，其实不需要动用复杂的 FacetGrid 或 displot，直接使用轴级函数 sns.scatterplot 是最标准的新版写法。
+
+                FacetGrid + .map() 的写法非常灵活，适合需要高度定制化的复杂多维绘图。
+                在新版 Seaborn 中，像 sns.catplot、sns.displot 这类图形级函数已经把底层的 FacetGrid 封装好了，写起来会更省心！
+                （我保存了两种方法生成的图片，看缩略图是一样的）
+
+                总结新版写法的优势：
+                    - 告别 map 映射：不再需要先创建空白的 FacetGrid 再用 .map() 去填充，直接在函数里把数据和分面维度（col, row）交代清楚即可。
+                    - 参数更直观：像 order、hue、palette 等参数都可以直接在主函数中设置，Seaborn 会自动帮处理好各个子图的逻辑。
+                    - 代码量更少：原本需要三四行的操作，现在往往一两行就能优雅地完成！
+
+        使用自定义函数：
+
+            custom_function.py
+
+            1. _, xr = stats.probplot(x_vals, fit=False)
+                - 核心：计算分位数
+                - probplot 会把数据转换成标准正态分位数
+                - 返回两个东西：(理论分位数, 实际样本分位数)
+                - 我们只需要实际分位数，所以用 _ 丢掉第一个
+
+            2. plt.scatter(xr, yr, **kwargs)
+                - 把 x 的分位数 和 y 的分位数 画成散点
+                - 如果点几乎在一条直线上 → 两个分布非常像
+                - 这就是 QQ 图的意义
+
+            3. g = sns.FacetGrid(tips, hue="time", col="sex", height=4)
+                - 把数据分成多个子图
+                - col="sex"：按性别分成 2 列（男、女）
+                - hue="time"：按午餐 / 晚餐用不同颜色区分
+                - 最终会生成 2 个子图 × 2 种颜色 的图
+
+            4. g.map_dataframe(qqplot, x="total_bill", y="tip")
+                - 关键：让 FacetGrid 调用你写的 qqplot
+                - 自动把每一组数据传给你的函数
+                - 自动传 x="total_bill", y="tip"
+                - 自动处理颜色、分组
+
+            5. 关于数据分组
+                g = sns.FacetGrid(tips, hue="time", col="sex", height=4)
+                    1. col="sex" → 按性别分成两个独立数据组
+                        - 原始 tips 数据集：有男有女
+                        - FacetGrid 看到 col="sex" 后，自动把数据切成两份：
+                            第一个子图数据：全部是男性（Male）
+                            第二个子图数据：全部是女性（Female）
+                    2. hue="time" → 在每个组内，再按用餐时间分颜色
+                    3. map_dataframe 做的事
+                        - 先把纯男性数据传给 qqplot 画左边图
+                        - 再把纯女性数据传给 qqplot 画右边图
+
+            6. 关于趋势线
+                根据散点的位置，用数学方法算出一条最贴合的直线，然后画在图上。
+                slope, intercept = np.polyfit(xr, yr, deg=1)
+                    算直线的斜率和截距：
+                        - np.polyfit：numpy 自带的拟合函数
+                        - xr, yr：就是 QQ 图里的散点坐标
+                        - deg=1：表示要拟合一条直线（一次方程）
+                        - 计算结果：
+                            slope：斜率（直线倾斜程度）
+                            intercept：截距（直线与 y 轴交点）
+                    用数学公式找最贴合散点的直线参数
+
+                line = slope * xr + intercept
+                    根据参数生成直线上的所有点
+                    直线公式：y = kx + b
+                        - x = xr（散点的 x 坐标）
+                        - k = slope
+                        - b = intercept
+                    算出直线上每个 x 对应的 y 值
+
+                第三行画图就没必要再讲了
+
+            补充：
+                xr 是 numpy 数组 (ndarray)，不是普通的 Python 列表。
+                NumPy 数组支持向量化运算 + 广播机制
+                    - slope 是单个数字（标量）
+                    - xr 是一整组数字（数组）
+                NumPy 会自动：
+                    - 把标量 slope 广播成和 xr 一样长
+                    - 每个元素相乘
+                    - 再加上标量 intercept（再次广播）
+                最终得到一个和 xr 长度完全一样的新数组 line。
+                因为 xr 是 NumPy 数组，所以可以直接用数学公式批量计算趋势线上的所有 y 值。
+
+            巩固：
+                广播机制（Broadcasting）
+                    定义：NumPy 在两个形状不同的数组做运算时，自动补齐维度、对齐形状，让运算合法执行，不复制多余数据，节省内存。
+                    核心规则
+                        - 从最后一维开始比对维度大小
+                        - 维度相等 或 其中一个维度为1，就能广播
+                        - 维度不足的数组，自动左侧补 1 扩充维度
+                        - 维度为 1 的那一层，自动复制延展对齐另一数组长度
+
+                向量化运算
+                    定义：不用写 for/while 循环遍历每个元素，直接对整个数组整体做数学运算，底层 C 语言批量执行。
+                    向量化 = 抛弃显式循环，数组整体并行计算
+
+                关于向量
+                    Python/Numpy 里的「向量化运算」里的向量，就是数学里的向量，本质是同一个东西。
+                    「向量」体现在：把一组有序数值整体当成一个向量对象，不再拆成单个数字逐个算。
+
+                    二者含义：
+                        1. 狭义：一维场景 → 完全等同
+                            数学一维向量 ↔ Numpy 一维数组
+                            数乘、加减、线性组合规则完全一致
+                            QQ 图里的 xr、yr 全是一维，100% 就是数学向量。
+                        2. 广义拓展
+                            数学里还有二维向量、高维向量、矩阵
+                            Numpy 也对应：二维数组 (矩阵)、多维数组
+                            向量化运算同样兼容，逻辑一脉相承
+                        3. 微小区别
+                            数学向量偏代数定义、几何意义（方向、模长、夹角等）
+                            编程向量化偏执行方式：利用向量结构，批量并行计算、规避循环
+                            底层数据结构与运算规则完全同源。
+
+
+    3.2 PairGrid 配对网格高级应用
+
+        PairGrid 专门用于展示变量间的成对关系，是探索性数据分析的利器：
+            pair_grid.py
+
+        基础：
+            sns.PairGrid(iris)
+                初始化一个绘图网格对象。
+                Seaborn 会自动识别 iris（鸢尾花）数据集中的所有数值型变量（如花瓣长度、花萼宽度等），并为它们两两之间的关系预留出子图位置。
+            g.map_diag(sns.histplot)
+                专门设置对角线上的子图样式。
+                因为对角线是同一个变量与自身的对比，所以适合用来展示该变量的单变量分布情况，这里使用了直方图（histplot）来呈现频数分布。
+            g.map_offdiag(sns.scatterplot)
+                专门设置非对角线上的子图样式。
+                这些位置展示的是两个不同变量之间的关系，这里使用了散点图（scatterplot）来直观地观察它们是否存在相关性。
+
+        着色：
+            hue="species"
+                这是 PairGrid 的核心参数之一。
+                它告诉程序根据 species（物种）这一列的分类信息，用不同的颜色来区分数据点。
+                这样就能一眼看出不同种类的鸢尾花在特征分布上有什么差异。
+            g.map_diag(sns.kdeplot)
+                这次在对角线上换成了核密度估计图（KDE）。相比直方图，KDE 能够画出更平滑的曲线，从而更优雅地展示数据的概率密度分布。
+            g.add_legend()
+                因为我们引入了 hue 颜色分组，必须加上这行代码来手动显示图例，否则图表中就不会标注哪种颜色代表哪个物种。
+
+        总结：
+            PairGrid 就像是一个灵活的“乐高底板”，它本身不画图，而是提供一个结构化的网格。
+            需要通过 .map_diag()（画对角线）、.map_offdiag()（画非对角线）或者 .map_upper() / .map_lower()（画上/下三角）等方法，
+            把具体的绘图函数（如散点图、直方图、KDE图等）填进去，从而打造出高度定制化的多维数据分析图表。
+
+        高级配置：
+            vars=["sepal_length", "sepal_width"]
+                默认情况下，PairGrid 会把数据集中所有的数值型字段都拉进来两两配对。
+                如果只想聚焦于某几个特定的特征（比如只看花萼的长度和宽度），就可以通过 vars 参数来指定，这样生成的网格会更简洁、更有针对性。
+            hue="species"
+                继续按物种分类着色，能直观看到不同种类的鸢尾花在“花萼长宽”这个二维平面上的分布差异。
+            g.map(sns.scatterplot)
+                因为这里只选了2个变量，网格非常简单，直接用 .map() 把所有子图统一画成散点图即可。
+
+            PairGrid 最强大的功能之一，它把一个正方形的网格切分成了三个独立区域，允许填入完全不同的图表：
+                - g.map_upper(...)：负责绘制对角线右上方的所有子图。
+                    这里用了基础的散点图，展示两个变量的原始数据关系。
+                - g.map_lower(...)：负责绘制对角线左下方的所有子图。
+                    这里换成了核密度估计图（KDE），并且加了 fill=True 让它带有颜色填充。KDE图能很好地展示数据的密度聚集区，弥补了散点图在数据重叠时的不足。
+                - g.map_diag(...)：依然是处理对角线，用直方图展示单个变量的频数分布。
+                这样一来，一张图里既包含了原始数据点，又包含了平滑的密度分布，还包含了单变量的统计特征，信息量极大。
+
+            自定义单行/单列的非对称网格
+                前面的 PairGrid 画出来的都是正方形的矩阵，而这里打破了常规：
+                    - y_vars=["tip"] 和 x_vars=["total_bill", "size"]
+                        当分别指定 x_vars 和 y_vars 时，Seaborn 就不再画全量的配对矩阵，而是根据你的指令生成一个非对称的网格。
+                        这里的意思是：Y轴固定看小费（tip），X轴分别去对比总账单（total_bill）和用餐人数（size）。
+                    - 实际效果：最终会生成一个 1行2列 的图表。
+                        左边是“总账单 vs 小费”的散点图，右边是“用餐人数 vs 小费”的散点图。
+                        这种画法非常适合用来专门研究某一个核心指标（如 tip）与其他多个因素之间的相关性。
+                    - height=4：设置每个子图的高度为4英寸，让图表整体看起来更大、更清晰。
+
+            补充：
+                关于 .map 和 .map_dataframe
+                    .map 和 .map_dataframe 看起来都是把绘图函数“映射”到网格上，但它们处理数据的方式有着本质的区别。
+                    .map 传递的是纯数组（底层数据），而 .map_dataframe 传递的是完整的 DataFrame（带标签的切片）。
+
+                    - 在 Seaborn 中，.map 是 PairGrid 最基础、最常用的方法。
+                        当你调用 g.map(sns.scatterplot) 时，Seaborn 会在后台自动提取当前子图对应的 X 轴和 Y 轴的纯数值数组
+                        （比如 Numpy 数组或 Pandas Series），然后直接传给 sns.scatterplot。
+                    - .map_dataframe 的存在，是为了解决那些必须依赖完整 DataFrame 结构才能工作的复杂绘图需求。
+                        当你使用 .map_dataframe(func, x="列名A", y="列名B") 时，Seaborn 不会只提取两个孤立的数组，
+                        而是会把当前子图所对应的整块数据切片（一个小型的 DataFrame）完整地传递给绘图函数 func。
+
+                    两者的核心区别：
+                        维度	        .map(func)	                            .map_dataframe(func, x="...", y="...")
+                        传递的数据	纯粹的坐标数组 (Array/Series)	            带有列名的完整 DataFrame 切片
+                        适用场景	    绝大多数 Seaborn/Matplotlib 原生绘图函数	需要依赖列名在函数内部进行复杂逻辑处理的自定义函数
+                        通俗比喻	    像是直接把切好的菜（数组）递给厨师	        像是把装着菜的整个篮子（DataFrame）递给厨师
+
+                    在绘制标准的散点图、直方图时，直接用 .map 是最简洁的；
+                    一旦你要像写 QQ 图那样深度定制，通过列名去操作数据，.map_dataframe 就是不二之选
+
+                扩展：
+                    map_upper、map_lower 和 map_diag 在默认情况下，确实都是传递纯数值数组（Array/Series）的。
+                    不过，这三者在传递数组时，有一个非常关键的区别：它们传递给绘图函数的数据量是不一样的。
+                        方法	                    传递的数据量	        典型绘图函数需求
+                        map_diag	            1 个数组 (单变量)	    只需要 x (如直方图、KDE图)
+                        map_upper / map_lower	2 个数组 (双变量)	    需要 x 和 y (如散点图、热力图)
+                        map_dataframe	        完整的 DataFrame 切片	需要在自定义函数内部通过列名找数据
+
+                    虽然它们传递的都是数组，但很多 Seaborn 的原生绘图函数（如 sns.histplot, sns.scatterplot）其实非常“智能”。
+                    它们既能接收纯数组，也能接收带有列名的 DataFrame。
+                    这就引出了两种不同的调用习惯：
+                        1. 隐式传递（直接喂数组）
+                            g.map_diag(sns.histplot) 或 g.map_upper(sns.scatterplot) 时，
+                            Seaborn 会在后台默默地把对应的数组提取出来，直接塞进绘图函数里。
+                            这种写法最简洁，也是官方文档中最常见的用法。
+                        2. 显式传递（指定 x 和 y）
+                            如果写成 g.map_upper(sns.scatterplot, x="sepal_length", y="sepal_width")，这时候 Seaborn 就会切换模式：
+                            它不再盲目地按顺序提取数组，而是会根据指定的列名，去底层的 DataFrame 里精准查找对应的两列数据，
+                            然后再以数组的形式传给 scatterplot。
+                    只要使用的绘图函数能够兼容接收纯数组（绝大多数 Seaborn 和 Matplotlib 函数都可以），
+                    直接使用 map_diag、map_upper 和 map_lower 就是最方便的选择！
+
+        pairplot 快捷函数：
+            sns.pairplot(iris, hue="species", height=2.5)
+                - height=2.5：控制图中每一个小方格（子图）的高度（单位是英寸）。
+                    因为 pairplot 生成的是正方形网格，设置高度后，宽度会自动匹配。数值越大，整张图的尺寸就越大，看得越清晰。
+
+            下面那个进阶版：
+                - palette="Set2"：指定调色板。
+                    当使用了 hue 进行分组后，Seaborn 需要为不同组别分配颜色。
+                    "Set2" 是 Seaborn/Matplotlib 内置的一种配色方案，它能提供一组视觉上比较柔和且区分度高的颜色。
+                    也可以换成 "husl", "deep", "Set1" 等其他配色主题。
+                - diag_kind="kde"：专门控制对角线子图的显示方式。
+                    默认情况下，对角线画的是直方图（histogram）"hist"。
+                    设置为 "kde" 后，对角线会改为绘制核密度估计图（Kernel Density Estimate）。
+                    KDE 是一条平滑的曲线，能比直方图更直观地展示出单个变量的概率分布形态（比如是单峰、双峰还是偏态分布）。
+
+        补充：
+            sns.pairplot() 非常智能，它会自动读取并筛选数据集中的数值列（如 int、float 类型）来进行绘图。
+                具体来说，它的工作逻辑是这样的：
+                    - 自动提取数值列：当把整个 DataFrame（比如 iris）传进去时，Seaborn 会自动识别出哪些是数值型特征，并将这些列作为绘图的变量。
+                    - 自动忽略非数值列：对于字符串、分类对象等非数值类型的列，pairplot 默认会直接跳过，不会把它们纳入矩阵的行列中。
+                    - hue 参数的特殊性：虽然 pairplot 只画数值列的关系，但像在代码中使用的 hue="species"，
+                            这里的 "species" 即使是一个分类（非数值）列也没关系。因为它的作用仅仅是给数据点“上色”分组，而不是用来画坐标轴的。
+
+            **kwargs Keyword Arguments（关键字参数）
+                **kwargs 允许在调用函数时传入任意数量的、带有名字（键名）的参数。
+                在函数的内部，这些参数会被自动打包成一个字典（dict），方便你灵活地提取和使用。
+
+    3.3 JointGrid 联合网格应用
+        JointGrid 用于创建包含主图和边际图的联合图表：
+            joint_grid.py
+
+
+    3.4 复杂多子图布局组合
+        不能通过组合不同的网格对象，创建复杂的多子图布局，因为：
+            Seaborn 有两类图：
+            1. 轴级图（能放进 subplot）
+                regplot
+                scatterplot
+                histplot
+                boxplot
+                barplot
+                pointplot
+                kdeplot
+                特点：
+                    - 都有 ax= 参数
+                    - 可以放在 plt.subplots 任意位置
+                    - 能组合成复杂布局
+            2. 图级图（不能放进 subplot）
+                FacetGrid
+                PairGrid
+                JointGrid
+                lmplot
+                catplot
+                relplot
+                特点：
+                    - 没有 ax= 参数
+                    - 自己创建独立画布
+                    - 不能嵌入子图布局
+                    - 不能和别的图共享一个画布
+                    
+        如果一定要 4 张图整齐排列在一个窗口
+        只能用：
+            - 轴级图 + matplotlib 子图
+        不能用任何 Grid 类。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

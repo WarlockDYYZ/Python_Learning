@@ -311,11 +311,3 @@ ax.set_ylim(0, 1)
 ax.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.show()
-
-
-
-
-
-
-
-
