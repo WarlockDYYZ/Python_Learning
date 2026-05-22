@@ -21,4 +21,11 @@ fig.update_layout(
     title='3D Surface: z = sin(√(x²+y²))'
 )
 
+# 相机控制
+fig.update_layout(
+    scene_camera=dict(
+        eye=dict(x=1.5, y=1.5, z=1)  # 设置相机位置
+    )
+)
+
 fig.show()

@@ -91,3 +91,177 @@
 
                 plotly_graoh_objects.py
                 3D 表面图，厉害
+            3D 图表支持完整的相机控制，可以通过scene_camera参数设置视角
+
+        Dash 集成：构建交互式 Web 应用
+            Dash 是 Plotly 开发的 Web 应用框架，允许用户使用纯 Python 创建交互式 Web 应用。这为数据可视化提供了全新的可能性。
+
+            一个简单的 Dash 应用示例：
+                plotly_dash.py
+
+                dash.Dash(__name__)：这是创建 Dash 应用的实例。它相当于给的网页应用搭建了一个最基础的骨架。
+
+                px.data.gapminder()：这里直接调用了 Plotly Express (px) 内置的一个经典数据集（全球各国的人口、预期寿命等数据）。
+                .query("country=='Canada'") 则是像写 SQL 一样，从这个庞大的数据表中精准筛选出了“加拿大”的数据行，并赋值给 df（DataFrame）。
+                补充：
+                    .query() 是 Python 数据分析神器 Pandas（DataFrame）中一个非常强大且优雅的数据筛选函数。
+                    .query() 允许直接传入一个字符串形式的条件表达式，来过滤 DataFrame 中的行。
+                    它的语法非常接近自然语言或者数据库里的 SQL 语句，读起来特别顺畅。
+                    "country=='Canada'" 的意思就是：找出 country（国家）这一列的值完全等于 'Canada'（加拿大）的所有记录。
+
+                    与传统方法相比：
+                        # 传统写法（实现同样的筛选，通常需要使用“布尔索引”，比较啰嗦，符号多容易眼花）
+                        # 先加载一次数据
+                        full_df = px.data.gapminder()
+                        # 再对已经加载好的数据进行筛选
+                        df = full_df[full_df['country'] == 'Canada']
+
+                        # .query() 写法（极其简洁、直观）
+                        df = px.data.gapminder().query("country == 'Canada'")
+                    px.data.gapminder() 的作用是从 Plotly 的内置库里加载一份完整的全球数据集。
+
+                    还可以使用复杂的逻辑：
+                        # 使用 & 表示“并且”，| 表示“或者”
+                        filtered_df = df.query("year > 2000 & lifeExp > 80")
+                        # !=、not in 和 not 都可以表示非
+                        df.query("country != 'Canada'")
+                        df.query("country not in ['Canada', 'United States']")
+                        df.query("not country == 'Canada'")
+
+                app.layout 决定了网页长什么样，它是由一个个组件像搭积木一样嵌套组成的：
+                    - html.Div([...])：这是一个通用的容器，相当于 HTML 里的 <div> 标签，用来包裹页面上的其他元素。
+                    - html.H1(...)：在页面上渲染出一个一级标题，显示文字“Canada Life Expectancy Trend”。
+                    - dcc.Graph(...)：这是 Dash 专门用来承载 Plotly 交互式图表的核心组件。
+                        - id='life-expectancy-chart'：给这个图表起了一个唯一的身份证号，
+                                如果以后想通过按钮或滑块来控制这个图表，就需要通过这个 ID 来找到它。
+                        - figure=px.line(...)：直接把刚才准备好的加拿大数据 df，用 Plotly Express 画成了一张折线图（x轴是年份，y轴是预期寿命），
+                                然后塞进了 dcc.Graph 里进行展示。
+
+                启动服务器
+                if __name__ == '__main__':：这是 Python 的标准写法，确保只有当直接运行这个脚本时，下面的代码才会执行。
+                app.run(debug=True)：它会启动一个本地服务器，默认端口通常是 8050。
+                debug=True 开启了调试模式，它的最大好处是热重载：
+                        当修改了代码并保存后，网页会自动刷新更新，不需要手动重启程序，非常适合开发阶段使用。
+
+
+            Dash 支持丰富的组件库，包括按钮、滑块、下拉菜单等，使可以创建复杂的交互式仪表板。
+            最新版本的 Dash 3.3.0 还集成了 Plotly Cloud，提供了更强大的开发工具。
+
+
+    2.2 Bokeh 高级应用
+        Bokeh 专注于高性能的 Web 可视化，特别适合处理大型数据集和需要实时更新的场景。
+
+        1. Web 应用集成能力
+            Bokeh 的一个重要特性是其强大的 Web 集成能力。它可以将可视化嵌入到现有的 Web 应用中，支持多种部署方式：
+
+            - 简单嵌入：使用server_document函数可以轻松将 Bokeh 应用嵌入到网页中
+                from bokeh.embed import server_document
+                script = server_document("https://demo.bokeh.org/sliders")
+            - Django 集成：通过bokeh-django库，可以将 Bokeh 无缝集成到 Django 项目中
+                这个配置好麻烦，我现在不用这个，就不硬改了
+            - 独立服务器部署：Bokeh 可以作为独立的服务器应用运行，支持通过 SSH 隧道访问受限主机。
+
+        2. 处理大规模数据集的策略
+            Bokeh 在处理大规模数据集方面表现出色，提供了多种优化策略：
+
+            - WebGL 支持：使用ScatterGL代替Scatter可以显著提升大数据集的性能：
+                base_ScatterGL.py
+
+                LinearColorMapper（线性颜色映射器）：它就像一个“翻译官”。
+                    把数值 z（比如 0 到 100）交给它，它会按照指定的调色板（代码中用的 Viridis256 一种从紫到黄的科学渐变色），
+                    把每个具体的数字精准地翻译成对应的 RGB 颜色。
+                    low 和 high 告诉它翻译的数值范围。
+                ColumnDataSource（列式数据源）：这是 Bokeh 官方强烈推荐的“标准数据容器”。
+                    它把原本独立的 NumPy 数组 x, y, z 打包成一个字典格式。
+                    这样做不仅能让 Bokeh 在处理大量数据时跑得更快，还能让你在后面的绘图代码中直接用 'x', 'y', 'z' 这样的字符串来引用数据列。
+
+                'x', 'y', source=source：这里不再直接传 NumPy 数组，而是去 source 这个数据容器里，找名为 'x' 和 'y' 的两列数据作为横纵坐标。
+                color={'field': 'z', 'transform': color_mapper}：
+                    - 'field': 'z' —— 找准“原材料”
+                        含义：在数据容器（ColumnDataSource）里，找到名为 'z' 的那一列数据。
+                        作用：它指定了用哪个变量来决定颜色。
+                                Bokeh 会提取出这一列里的每一个数值（比如第1个点的 z=10，第2个点的 z=85...），作为后续计算颜色的基础原材料。
+                    - 'transform': color_mapper —— 交给“翻译官”
+                        含义：把刚才找到的 'z' 的数值，交给对象 color_mapper 去处理。
+                        作用：这里的 color_mapper 就是前面定义的 LinearColorMapper。
+                                它是一个严格的规则制定者，负责把抽象的数字翻译成具体的 RGB 颜色。
+                            - 比如它内部的规则是：数值 0 对应紫色，数值 50 对应绿色，数值 100 对应黄色。
+                            - 当 Bokeh 拿到某个点 z=75 时，就会通过这个 transform 自动算出它应该显示为“黄绿色”。
+
+                render_mode='webgl'：scatter 方法不支持这个参数，删掉后图表就能正常渲染了。
+
+                ColorBar：如果没有这根颜色条，看图表的人只能看到五颜六色的点，却不知道什么颜色代表大数值、什么颜色代表小数值。
+                    ColorBar 就是把这个“翻译规则”以图例的形式展示出来。
+                    - label_standoff=12：刻度数字（标签）与颜色条本体之间的水平间距 12 个像素的距离。
+                    - location=(0, 0)：它决定了颜色条的锚点（起点）在哪里。
+
+                p.add_layout(color_bar, 'right')：把这根颜色条像挂件一样，添加到画布 (p) 的右侧。
+                    颜色条整体放在了画布的右侧边栏里。此时，location=(0, 0) 指的就是这个右侧边栏的左下角作为起点。
+
+                注意：
+                    render_mode='webgl'
+                    Bokeh 中，只有 line（折线图）、patch（区块图）等少数几个图形支持 'webgl' 渲染模式，而 scatter 散点图是不支持的。
+                    虽然去掉了 WebGL 加速，Bokeh 默认的 HTML5 Canvas 渲染引擎在处理 10 万个数据点时依然非常流畅，完全能够满足需求。
+                    如果你未来确实需要用 'webgl' 来绘制超大规模的图表（比如百万级以上），建议改用 p.line() 或者 p.patch() 等方法，它们才支持开启 WebGL 硬件加速。
+                    对实例代码散点图需求，直接使用默认配置就是最佳选择！
+
+            - 数据分块处理：对于超大规模数据，可以采用分块加载的策略：
+                bokeh_server_flow.py
+                分段流式动态加载数据，还有动画效果
+
+            - 使用 Datashader 进行大数据可视化：Bokeh 与 Datashader 集成，可以处理千万级数据点：
+
+        3. 自定义交互功能
+            Bokeh 提供了丰富的交互工具和事件处理机制，允许创建高度定制的交互效果：
+            基本交互工具：
+                PanTool：平移工具
+                WheelZoomTool：滚轮缩放
+                BoxZoomTool：框选缩放
+                TapTool：点击选择
+                LassoSelectTool：套索选择
+                bokeh_data_shader.py
+
+            - 自定义 JavaScript 回调：可以为图表元素添加 JavaScript 回调函数：
+                JS_callback.py
+                ColumnDataSource：这是 Bokeh 的核心数据容器。
+                        它类似于一个字典或表格，专门用来存放绘图所需的数据（这里是 x 和 y 坐标）。Bokeh 的交互功能高度依赖它。
+                figure()：创建一个基础的绘图区域（画布），后续所有的图形元素都会添加到这里。
+
+                js_on_event('tap', callback)：给画布 p 绑定了一个“轻触/点击（tap）”事件。
+                        当在图表上点击时，就会触发上面定义的 callback 回调函数。我试了，可以用。
+
+            - 滑块和小部件集成：Bokeh 提供了丰富的小部件库，可以创建交互式仪表板：
+                - 关于 doc 参数
+                    因为 Bokeh 服务器（Bokeh Server）要求：所有「带 Python 交互」的图表，必须由一个函数创建，
+                    并且这个函数必须接收一个参数：doc（文档对象），它是页面与 Python 后台之间的桥梁。
+                    doc = Bokeh Document：它是整个页面的根，所有图表、滑块、按钮、回调必须挂在它上面；它负责：
+                        - 把 Python 代码 → 变成网页
+                        - 把浏览器操作 → 传回 Python 执行
+
+                    slider.on_change('value', update_plot)
+                        只有在 modify_doc 内部，才能使用 Python 回调！
+                        这个回调必须运行在 Bokeh 服务环境里，必须连接到 doc，外面写 → 无法工作 → 报警告。
+
+                    doc.add_root(layout)：把做好的整个布局，挂到文档上，让服务器能显示。
+
+                    静态 HTML（不用函数，不用 doc）：show(layout)
+                    Bokeh 服务（必须用函数 + doc）：
+                        def modify_doc(doc):
+                            # 代码
+                            doc.add_root(layout)
+
+
+    2.3 Altair 声明式语法精要
+        Altair 采用独特的声明式语法，让用户专注于 “做什么” 而不是 “怎么做”，这种设计理念大大简化了复杂图表的创建过程。
+
+            声明式语法的核心概念：
+                Altair 的声明式语法基于 “图形语法”（Grammar of Graphics）的理念。
+                在 Altair 中，创建图表的过程是声明性的：只需要告诉 Altair 想要展示什么，而不需要详细描述如何绘制。
+
+            基本的 Altair 图表创建遵循以下模式：
+                base_altair.py
+
+            这个简单的例子展示了 Altair 的核心概念：
+                - alt.Chart(data)：指定数据源
+                - .mark_circle()：指定标记类型（圆形）
+                - .encode()：指定数据到视觉属性的映射
