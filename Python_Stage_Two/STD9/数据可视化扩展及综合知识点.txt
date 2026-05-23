@@ -254,14 +254,52 @@
     2.3 Altair 声明式语法精要
         Altair 采用独特的声明式语法，让用户专注于 “做什么” 而不是 “怎么做”，这种设计理念大大简化了复杂图表的创建过程。
 
-            声明式语法的核心概念：
+            - 声明式语法的核心概念：
                 Altair 的声明式语法基于 “图形语法”（Grammar of Graphics）的理念。
                 在 Altair 中，创建图表的过程是声明性的：只需要告诉 Altair 想要展示什么，而不需要详细描述如何绘制。
 
-            基本的 Altair 图表创建遵循以下模式：
-                base_altair.py
+                基本的 Altair 图表创建遵循以下模式：
+                    base_altair.py
 
-            这个简单的例子展示了 Altair 的核心概念：
-                - alt.Chart(data)：指定数据源
-                - .mark_circle()：指定标记类型（圆形）
-                - .encode()：指定数据到视觉属性的映射
+                这个简单的例子展示了 Altair 的核心概念：
+                    - alt.Chart(data)：指定数据源
+                    - .mark_circle()：指定标记类型（圆形）
+                    - .encode()：指定数据到视觉属性的映射
+
+            - 统计变换的强大功能
+                Altair 内置了强大的统计变换功能，可以直接在图表规范中进行数据处理，无需在 Python 中预先计算。
+                    altair_statistical_transformation.py
+
+                    - 数据分箱（Binning）是常用的统计变换之一：
+                        alt.Chart(cars).mark_bar().encode(...)
+                            使用 cars 汽车数据集, 画 柱状图, 定义 X、Y 轴
+                        alt.X('Horsepower').bin()
+                            把马力从低到高分成一段一段（比如 50-100，100-150...）,就是直方图
+                        y='count()'
+                            统计每个马力区间里有多少辆车, 对应柱子的高度
+                        补充：
+                            alt.X() 作用
+                                是的，专门声明 X 轴字段与轴配置，配套还有alt.Y()，用来精细定义坐标轴映射、格式、分箱等属性。
+                            .bin() 分组规则
+                                无参bin()：Altair 自动根据数据范围、数据量自适应划分区间组数
+                                可手动指定：
+                                    bin(maxbins=N) 限定最大分组数
+                                    bin(step=N) 固定每个区间跨度
+                            加 bin 和不加 bin 的区别：
+                                不加 bin：以单个唯一马力值为横坐标，一个数值对应一根柱子，数值离散无合并
+                                加 bin：把连续数值划分为区间段，同区间数据合并统计，一根柱子代表一个数值区间
+                    - 聚合操作（Aggregation）支持多种统计函数：
+                        支持的聚合函数包括：count()、sum()、mean()、median()、min()、max()等。
+                        y='mean(Miles_per_Gallon)'
+                            指定计算平均值，自动根据 X 轴分组后再计算平均值
+                    - 分组聚合（Grouped Aggregation）可以按多个维度分组：
+                        示例代码中改部分的操作和上一步的操作都是分组聚合
+                    - 数据变换（Transformations）提供了更复杂的数据处理能力：
+                        1. 计算变换（transform_calculate）：创建新的计算字段
+
+
+
+
+
+
+
