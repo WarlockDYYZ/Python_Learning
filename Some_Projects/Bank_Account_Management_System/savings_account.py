@@ -1,5 +1,5 @@
-from Python_Stage_Two.Bank_Account_Management_System.bank_account import BankAccount
-from Python_Stage_Two.Bank_Account_Management_System.account_exceptions import *
+from Some_Projects.Bank_Account_Management_System.bank_account import BankAccount
+from Some_Projects.Bank_Account_Management_System.account_exceptions import *
 
 
 class SavingsAccount(BankAccount):

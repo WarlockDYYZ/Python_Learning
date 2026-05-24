@@ -1,7 +1,7 @@
-from Python_Stage_Two.Bank_Account_Management_System.account_exceptions import *
-from Python_Stage_Two.Bank_Account_Management_System.checking_account import CheckingAccount
-from Python_Stage_Two.Bank_Account_Management_System.premium_account import PremiumAccount
-from Python_Stage_Two.Bank_Account_Management_System.savings_account import SavingsAccount
+from Some_Projects.Bank_Account_Management_System.account_exceptions import *
+from Some_Projects.Bank_Account_Management_System.checking_account import CheckingAccount
+from Some_Projects.Bank_Account_Management_System.premium_account import PremiumAccount
+from Some_Projects.Bank_Account_Management_System.savings_account import SavingsAccount
 
 
 class Bank:

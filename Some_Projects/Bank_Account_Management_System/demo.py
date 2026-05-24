@@ -1,6 +1,6 @@
-from Python_Stage_Two.Bank_Account_Management_System.bank import Bank
-from Python_Stage_Two.Bank_Account_Management_System.checking_account import CheckingAccount
-from Python_Stage_Two.Bank_Account_Management_System.premium_account import PremiumAccount
+from Some_Projects.Bank_Account_Management_System.bank import Bank
+from Some_Projects.Bank_Account_Management_System.checking_account import CheckingAccount
+from Some_Projects.Bank_Account_Management_System.premium_account import PremiumAccount
 
 
 def main():
