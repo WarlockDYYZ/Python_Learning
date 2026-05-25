@@ -45,3 +45,197 @@
 
         这种分层架构的优势在于高内聚低耦合，每一层都可以独立发展和优化，同时通过标准化接口进行协作。
         例如，开发者可以在不改变业务逻辑的情况下，从 PyMySQL 切换到 mysql-connector-python，或者从原生 SQL 切换到 ORM 操作。
+
+
+二、SQL 增删改查核心语法与高级技巧
+
+    2.1 基础增删改查语法详解
+
+        - INSERT 语句（增）用于向表中插入新记录，基本语法为：
+            INSERT INTO table_name (column1, column2, column3, ...)
+            VALUES (value1, value2, value3, ...);
+
+            INSERT 语句支持多种高级用法：
+                批量插入可以显著提升性能，使用INSERT INTO ... VALUES (...),(...),(...)的形式一次插入多条记录；
+                INSERT IGNORE可以忽略重复键错误；
+                INSERT ... ON DUPLICATE KEY UPDATE支持冲突处理，特别适合需要更新或插入的场景(duplicate v.重复 n.副本)。
+
+        - SELECT 语句（查）是 SQL 中最复杂和最重要的语句，基本语法为：
+            SELECT column1, column2, ...
+            FROM table_name
+            WHERE condition
+            GROUP BY column
+            HAVING condition
+            ORDER BY column
+            LIMIT offset, count;
+
+            SELECT 语句的核心组件包括：
+                - 投影列：指定要查询的列，可以使用别名、表达式、聚合函数等
+                - 连接操作：支持 INNER JOIN、LEFT JOIN、RIGHT JOIN、FULL JOIN 等多种连接方式
+                - 筛选条件：WHERE 子句用于行级过滤，HAVING 子句用于分组后的过滤
+                - 排序和分页：ORDER BY 用于结果排序，LIMIT 用于限制返回结果数量
+
+        - UPDATE 语句（改）用于更新表中的记录：
+            UPDATE table_name
+            SET column1 = value1, column2 = value2, ...
+            WHERE condition;
+
+            UPDATE 语句的执行流程涉及复杂的内部机制，包括行锁获取、数据读取、表达式计算、Redo 日志写入等步骤。
+            WHERE 子句是 UPDATE 操作的 “安全阀”，缺失 WHERE 条件会导致全表更新，属于高危操作。
+
+        - DELETE 语句（删）用于删除表中的记录：
+            DELETE FROM table_name
+            WHERE condition;
+
+            DELETE 操作必须谨慎使用，务必添加 WHERE 条件，否则会删除全表数据且难以恢复。可以使用LIMIT子句限制删除数量，提高操作安全性。
+
+
+    2.2 高级查询技巧与优化
+
+        - 子查询技术是 SQL 查询的重要组成部分，可在 WHERE、FROM 或 SELECT 子句中使用。
+            标量子查询返回单个值，可用于比较操作；
+            相关子查询依赖外层查询的字段，形成循环引用。
+            例如：
+                SELECT name, salary
+                FROM employees
+                WHERE salary > (SELECT AVG(salary) FROM employees);
+
+                需要注意的是，相关子查询可能导致严重的性能问题，因为外层查询每行都要执行一次子查询。
+                优化方法包括改写为 JOIN+GROUP BY、使用窗口函数或添加适当索引。
+
+            补充：
+                在 SQL 中，不仅子条件（比如 WHERE 后面的括号里）可以使用 SELECT，而且在这个子查询的 SELECT 里面使用聚合函数
+                        （如 AVG, SUM, COUNT, MAX, MIN 等），是极其常见且标准的用法。
+                像 AVG(salary) 这样的聚合函数，它的作用就是把一堆数据计算成一个单一的值。
+                数据库的执行逻辑是这样的：
+                    - 先执行括号里的子查询：(SELECT AVG(salary) FROM employees)。这一步会算出全公司的平均工资，假设结果是 7000。
+                    - 再执行外层的主查询：相当于把刚才算出来的结果代入进去，变成了 WHERE salary > 7000。
+                这种返回单个值的子查询，在专业上被称为“标量子查询”。只要子查询能算出一个确定的值，就可以把它放在比较运算符（>, <, = 等）的右边来使用。
+                更多示例在 SQL 语句实例中查看
+
+
+        - JOIN 操作优化是提升查询性能的关键。
+            多表关联查询时，连接顺序的选择对性能影响巨大。
+            MySQL 优化器会根据统计信息选择最优连接顺序，但开发者也可以通过STRAIGHT_JOIN强制指定连接顺序(straight n.直线 adj.直的 adv.笔直的)。
+            连接条件必须使用等值条件，避免使用非等值连接导致的全表扫描。
+
+        - 索引优化策略是查询性能优化的核心。索引的底层算法使用 B + 树结构，具有高效的范围查询能力。创建索引时需要考虑：
+            - 在 WHERE、JOIN、ORDER BY、GROUP BY 字段上创建索引
+            - 避免在低基数列（如性别、状态）上创建索引
+            - 使用复合索引时遵循 “最左前缀” 原则
+            - 定期分析和重建索引，维护统计信息
+
+        - 查询性能分析工具：
+            - EXPLAIN 语句：用于分析查询执行计划，显示表的连接顺序、使用的索引、扫描行数等信息(explain v.解释)
+            - 慢查询日志：记录执行时间超过阈值的查询，默认阈值为 10 秒
+            - SHOW PROFILE：提供查询执行的详细时间分析，包括解析、优化、执行等各个阶段(profile n.轮廓、侧面)
+            EXPLAIN 和 SHOW PROFILE 是 MySQL 中两个非常经典的 SQL 性能分析工具。
+            简单来说，EXPLAIN 负责“事前诸葛亮”（预测 SQL 会怎么执行），而 SHOW PROFILE 负责“事后复盘”（记录 SQL 实际跑了多久、时间花在哪了）。
+            具体应用因该属于优化部分，这里不具体学习
+
+
+    2.3 数据类型与约束管理
+
+        MySQL 支持丰富的数据类型，合理选择数据类型对性能和存储效率有重要影响：
+            - 数值类型包括 TINYINT（1 字节）、SMALLINT（2 字节）、INT（4 字节）、BIGINT（8 字节）等整数类型，
+                    以及 FLOAT（4 字节）、DOUBLE（8 字节）、DECIMAL 等浮点类型。
+                    其中 DECIMAL 类型适合存储精确的货币值，避免浮点精度问题。
+            - 字符串类型包括 CHAR（固定长度）、VARCHAR（可变长度）、TEXT（大文本）等。
+                    选择时需要考虑存储效率和查询性能，例如经常用于 WHERE 条件的字段使用 CHAR 可能更高效。
+            - 日期时间类型包括 DATE、TIME、DATETIME、TIMESTAMP 等。
+                    DATETIME 存储范围更大（1000-9999 年），TIMESTAMP 占用空间更小（4 字节）且具有自动更新特性。
+
+        约束管理确保数据完整性：
+            - 主键约束（PRIMARY KEY）：保证数据的唯一性和完整性，加速查找，每张表只能有一个主键
+            - 唯一约束（UNIQUE）：确保字段值的唯一性，可以有多个唯一约束
+            - 外键约束（FOREIGN KEY）：建立表间关联关系，保证引用完整性
+            - CHECK 约束：限制字段值的范围，但 MySQL 对 CHECK 约束的支持有限
+
+        补充：
+            核心特性	        主键约束 (PRIMARY KEY)	        唯一约束 (UNIQUE)
+            允许空值 (NULL)	绝对不允许	                    允许（通常允许出现一个或多个NULL）
+            每张表的数量	    只能有 1 个	                    可以有 多个
+            核心定位	        行的唯一身份标识（如人的身份证号）	防止特定业务字段重复（如邮箱、手机号）
+            索引类型	        默认创建聚集索引 (Clustered Index)	默认创建非聚集索引 (Non-Clustered Index)
+            被外键引用	    最常被其他表的外键引用	            可以被引用，但相对较少
+            聚集索引，数据在硬盘上会按照主键的顺序物理存储，查询速度极快。
+
+            CHECK 约束（检查约束）
+                是数据库中用于保证数据完整性的“守门员”。它的核心作用就是给表中的某一个或多个字段设定一个合法的取值范围或条件。
+                当向数据库插入新数据，或者修改现有数据时，数据库会自动检查这些数据是否符合设定的 CHECK 约束条件。
+                如果符合，操作才会成功；如果不符合，数据库就会直接报错并拒绝写入。
+                常见应用场景：
+                    限制数值范围：比如规定员工的年龄必须在 18 到 65 岁之间 (Age >= 18 AND Age <= 65)，或者商品的价格必须大于 0 (Price > 0)。
+                    规范数据格式：比如要求用户的手机号必须符合特定的正则表达式规则，或者邮箱地址中必须包含 @ 符号 (Email LIKE '%@%')。
+                    多列逻辑校验：比如在一个活动表中，要求活动的结束日期必须晚于开始日期 (EndDate > StartDate)。
+                使用示例一样
+
+
+    2.4 事务处理与并发控制
+
+        事务（Transaction）是一组 SQL 操作的原子性单元，要么全部执行，要么全部回滚。事务具有 ACID 特性：
+            - 原子性（Atomicity）：基于 undo log 实现，事务回滚时通过 undo log 将数据恢复到修改前的状态
+            - 一致性（Consistency）：事务的最终目标，由原子性、隔离性、持久性共同保证
+            - 隔离性（Isolation）：基于锁机制和 MVCC 实现，解决并发事务的冲突
+            - 持久性（Durability）：基于 redo log 实现，事务提交时 redo log 必须刷新到磁盘
+
+        事务隔离级别定义了事务之间的可见性规则，SQL 标准定义了四个隔离级别，从低到高分别是：
+            - 读未提交（Read Uncommitted）
+            - 读已提交（Read Committed, RC）
+            - 可重复读（Repeatable Read, RR）
+            - 串行化（Serializable）
+        InnoDB 默认的隔离级别是可重复读（RR），并通过 Next-Key Lock 机制解决了幻读问题。
+
+        锁机制是并发控制的基础。MySQL 支持多种锁类型：
+            - 共享锁（S 锁）：允许读取但不允许修改数据
+            - 排他锁（X 锁）：不允许其他事务获取任何锁
+            - 意向锁（IS/IX）：表示事务意图在表的某些行上获取锁
+            - 行锁（Row Lock）：InnoDB 默认使用行级锁，锁定特定的行
+            - 表锁（Table Lock）：锁定整张表，MyISAM 引擎只支持表锁
+
+        MVCC（多版本并发控制）是 InnoDB 实现高并发性能的关键技术。
+        它通过在每行记录后添加两个隐藏字段（创建版本号和删除版本号），实现了读不加锁的并发控制。
+        读取操作可以看到数据的历史版本，而不需要等待写操作完成，大大提升了并发性能。
+
+
+三、pymysql 实战应用与最佳实践
+
+    3.1 基础连接与操作流程
+
+        pymysql 的基本操作流程遵循标准的数据库操作模式：
+            第一步：建立数据库连接
+                conn_pymysql.py
+
+                连接参数说明：
+                    host：数据库服务器地址，本地为localhost或 127.0.0.1
+                    port：MySQL 默认端口为 3306
+                    user：数据库登录用户名
+                    password：数据库登录密码
+                    database：要操作的数据库名称
+                    charset：推荐使用 utf8mb4，支持完整的 Unicode 字符集
+
+            第二步：创建游标对象
+                游标对象是执行 SQL 语句和获取结果的核心工具，类似操作手柄。
+                可以通过指定 cursorclass 参数来改变结果的返回类型，如使用 DictCursor 返回字典类型的结果，便于数据处理。
+
+            第三步：执行 SQL 语句
+
+            第四步：处理查询结果
+                pymysql 提供了三种获取查询结果的方法：
+                    fetchone()：获取单条记录
+                    fetchall()：获取所有记录（返回元组的元组）
+                    fetchmany(size)：获取指定数量的记录
+
+            第五步：提交或回滚事务
+                对于 INSERT、UPDATE、DELETE 等修改操作，必须显式提交事务才能使更改生效
+                    conn.commit()    # 提交事务
+                    conn.rollback()  # 回滚事务
+
+            第六步：关闭资源
+                关闭游标和连接(传说一些框架可以自动完成这部分内容，with 应该也可以)
+
+            补充：
+                启动服务	net start mysql	可以直接用 net start mysql
+                停止服务	net stop mysql	可以直接用 net stop mysql
+
+            代码运行成功！！！

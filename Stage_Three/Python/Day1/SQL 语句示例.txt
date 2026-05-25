@@ -1,0 +1,248 @@
+INSERT
+
+    INSERT INTO users (username, email, age, created_at)
+    VALUES ('zhangsan', 'zhangsan@example.com', 25, '2024-05-25 10:30:00');
+        - 省略了 id 列：
+            如果 id 是自增主键（如 MySQL 的 AUTO_INCREMENT），插入时可以不指定该列，数据库会自动生成唯一值。
+        - 显式指定列名：
+            明确列出要插入数据的列（username, email, age, created_at），避免因表结构变化导致错误。
+        - 值的顺序与列严格对应：
+            VALUES 中的值顺序必须和 INSERT INTO 后的列顺序一致。
+        - 字符串用单引号包裹：
+            字符串类型（如 username, email）需用 ' ' 包裹，日期时间也按字符串格式传入。
+
+    INSERT INTO users (username, email, created_at)
+    VALUES ('xiaoming', 'xiaoming@demo.com', NOW());
+        - 使用数据库函数（如 NOW()）自动获取当前时间：
+
+    INSERT INTO users (username, email)
+    VALUES
+        ('user1', 'user1@test.com'),
+        ('user2', 'user2@test.com'),
+        ('user3', 'user3@test.com');
+        - 一次插入多条记录（高效写法）
+
+
+    INSERT IGNORE INTO users (username, email)
+    VALUES ('lisi', 'zhangsan@example.com');
+
+        INSERT IGNORE：直接跳过冲突行，不报错
+            核心逻辑：当插入数据与唯一索引/主键冲突时，跳过该行，不报错，继续执行后续操作。
+        email 有唯一约束(unique adj.唯一的)：email VARCHAR(100) NOT NULL UNIQUE
+        - 执行时 INSERT IGNORE 因 email 重复被静默跳过（无错误，自增列 id 仍正常生成）。
+        - 不会更新已有记录（zhangsan 的 username 仍是原值）。
+        - 适用于“只插入新数据，旧数据无需修改”的场景（如日志去重写入）。
+
+
+    -- 尝试插入一个已存在的 email，冲突时更新 login_count
+    INSERT INTO users (username, email, login_count)
+    VALUES ('zhangsan_updated', 'zhangsan@example.com', 1)
+    ON DUPLICATE KEY UPDATE
+        login_count = login_count + 1,  -- 登录次数 +1
+        username = VALUES(username);    -- 用新插入的 username 覆盖旧值
+
+        INSERT ... ON DUPLICATE KEY UPDATE：冲突时更新指定字段
+            核心逻辑：当插入数据与唯一索引/主键冲突时，执行 UPDATE 操作，更新指定字段。
+        - VALUES(username) 表示本次插入语句中提供的 username 值（即 'zhangsan_updated'）。
+        - login_count = login_count + 1 中的 login_count 指原记录的值（即 5+1=6）。
+        - 适用于“存在则更新，不存在则插入”的场景（如统计用户活跃次数）。
+
+    注意事项
+        - 仅对唯一索引/主键生效
+            两种方法仅在冲突涉及唯一约束（UNIQUE KEY）或主键（PRIMARY KEY）时触发，普通索引冲突仍会报错。
+        - INSERT IGNORE 的潜在风险
+            如果插入数据违反其他约束（如非空字段为 NULL），仍会报错，并非完全“忽略所有错误”。
+        - ON DUPLICATE KEY UPDATE 的更新逻辑
+            更新语句中：
+                直接写字段名（如 login_count）表示原记录的值。
+                VALUES(column) 表示本次插入语句中提供的值。
+        - MySQL 特有语法
+
+    应用场景建议
+        - 用 INSERT IGNORE：
+            用户行为日志写入（相同事件只记录一次）、防止重复订阅。
+        - 用 ON DUPLICATE KEY UPDATE：
+            商品库存更新（超卖检测）、用户活跃度统计、配置表“存在则覆盖”。
+
+
+SELECT
+    - 投影列（SELECT 子句）
+        核心作用：指定返回的列，支持别名、表达式、聚合函数等
+        关键特性：
+            - * 表示所有列（不推荐生产环境使用）
+            - 别名用 AS 定义（可省略 AS）
+            - 表达式支持数学运算/字符串函数等
+            - 聚合函数需配合 GROUP BY 使用
+
+        基础投影 + 别名
+            SELECT
+                name AS 员工姓名,
+                salary * 1.1 AS "加薪后工资",  -- 表达式计算
+                CONCAT(dept_id, '-部门') AS 部门代码  -- 字符串函数
+            FROM employees;
+
+        聚合函数 + 别名
+            SELECT
+                COUNT(*) AS 员工总数,
+                AVG(salary) AS 平均工资,
+                MAX(hire_date) AS 最新入职日期
+            FROM employees;
+
+    - 连接操作（JOIN）(join n.连接)
+        核心作用：关联多表数据
+        关键区别：
+            - INNER JOIN：仅返回匹配行
+            - LEFT JOIN：返回左表所有行 + 匹配的右表数据（无匹配则 NULL）
+            - RIGHT JOIN：与 LEFT 相反（MySQL 中可用 LEFT JOIN 逆向实现）
+            - FULL JOIN：返回所有匹配行（MySQL 不支持，需用 UNION 模拟）
+
+        INNER JOIN（最常用）
+            SELECT
+                e.name AS 员工,
+                d.dept_name AS 部门
+            FROM employees e
+            INNER JOIN departments d
+                ON e.dept_id = d.dept_id;
+
+        LEFT JOIN（保留左表所有数据）
+            SELECT
+                d.dept_name AS 部门,
+                COUNT(e.id) AS 员工人数  -- 无员工的部门返回 0
+            FROM departments d
+            LEFT JOIN employees e
+                ON d.dept_id = e.dept_id
+            GROUP BY d.dept_name;
+
+    - 筛选条件（WHERE vs HAVING）
+        核心区别：
+            WHERE：行级过滤（在分组前执行，不能用聚合函数）
+            HAVING：分组后过滤（必须配合 GROUP BY，可使用聚合函数）
+
+        WHERE（行级过滤）
+            SELECT name, salary
+            FROM employees
+            WHERE
+                salary > 7000  -- 直接过滤原始数据，AVG(salary) 会报错
+                AND hire_date >= '2022-01-01';
+
+        HAVING（分组后过滤）
+            SELECT
+                dept_id AS 部门ID,
+                AVG(salary) AS 平均工资
+            FROM employees
+            GROUP BY dept_id
+            HAVING 平均工资 > 7000;  -- 过滤分组结果（WHERE 无法用 AVG）
+
+    - 排序和分页（ORDER BY + LIMIT）
+        核心作用：
+            - ORDER BY：控制结果排序（ASC 升序/DESC 降序）
+            - LIMIT：限制返回行数（分页关键）
+        重要规则：
+            - ORDER BY 必须在 GROUP BY 之后、LIMIT 之前
+            - LIMIT offset, count：跳过 offset 行，取 count 行（offset 从 0 开始）
+
+        基础排序 + 分页
+            SELECT name, salary
+            FROM employees
+            ORDER BY salary DESC, hire_date ASC  -- 先按工资降序，同工资按入职日期升序
+            LIMIT 1, 2;  -- 跳过第1行，取2行（第2-3名）
+
+        分页查询（第2页，每页2条）
+            SELECT name, dept_id
+            FROM employees
+            ORDER BY id
+            LIMIT 2, 2;  -- 第1页：LIMIT 0,2；第2页：LIMIT 2,2
+                LIMIT 后面的第一个数字（偏移量）是第二个数字（每页条数）的整数倍，它大概率就是在做标准的分页操作。
+                LIMIT (当前页码 - 1) × 每页条数, 每页条数
+
+        操作	        作用时机	        能否用聚合函数	典型场景
+        WHERE	    分组前的行级过滤	❌ 不能	    筛选特定条件的原始数据
+        HAVING	    分组后的组级过滤	✅ 能	    筛选满足聚合条件的分组
+        ORDER BY	最终结果排序	    ✅ 能	    控制展示顺序
+        LIMIT	    最后执行（结果截断）❌ 不能	    分页、只取Top N
+
+    综合应用
+    -- 查询各部门平均工资 > 6000 的部门，按平均工资降序，取第1页（2条）
+    SELECT
+        d.dept_name AS 部门,
+        ROUND(AVG(e.salary), 2) AS 平均工资,  -- 聚合函数 + 表达式
+        COUNT(e.id) AS 员工数
+    FROM employees e
+    INNER JOIN departments d ON e.dept_id = d.dept_id
+    WHERE e.hire_date > '2021-01-01'  -- 行级过滤（先筛选新员工）
+    GROUP BY d.dept_name
+    HAVING 平均工资 > 6000           -- 分组后过滤
+    ORDER BY 平均工资 DESC
+    LIMIT 0, 2;                      -- 分页
+    执行顺序：FROM → JOIN → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT
+    务必注意：SELECT 中定义的别名（如 平均工资）只能在 HAVING/ORDER BY/LIMIT 中使用，不能在 WHERE 中使用！
+
+
+UPDATE
+    - 更新单条记录的多个字段
+        UPDATE employees
+        SET salary = 6000
+        WHERE name = '张三';
+            在 SET 后面可以用逗号分隔，一次性修改多个列的值。
+
+    - 批量更新多条记录
+        UPDATE employees
+        SET salary = salary + 500
+        WHERE dept_id = 101;            -- 同一部门有多条数据，有统一的 dept_id
+
+
+DELETE
+    - 删除单条指定记录
+        DELETE FROM employees
+        WHERE name = '李四';
+
+    - 删除单条指定记录
+        DELETE FROM employees
+        WHERE dept_id = 101;
+
+
+所谓更多示例：
+    - 找比最高工资还高的记录（虽然逻辑上不存在，但语法完全正确）：
+        SELECT * FROM employees
+        WHERE salary > (SELECT MAX(salary) FROM employees);
+
+    - 找出员工人数超过 50 人的部门：
+        SELECT dept_name FROM departments
+        WHERE id IN (
+            SELECT dept_id FROM employees
+            GROUP BY dept_id
+            HAVING COUNT(*) > 50
+        );
+
+    注意：
+        聚合函数绝对不能直接用在主查询的 WHERE 子句中。
+        必须套一层 SELECT 变成子查询
+
+
+CHECK
+    - 创建一个员工表的语法如下：
+        CREATE TABLE Employees (
+            EmployeeID INT PRIMARY KEY,
+            Age INT,
+            -- 添加 CHECK 约束，确保年龄在 18 到 65 之间
+            CONSTRAINT chk_Age CHECK (Age >= 18 AND Age <= 65)
+        );
+
+        CONSTRAINT chk_Age CHECK (Age >= 18 AND Age <= 65)
+            CONSTRAINT 是一个关键字，意思是“约束”。
+            它的具体作用是：给后面紧跟的条规则起一个专属的名字。
+            声明 名字 CHECK(具体内容)
+
+    - 给已经存在的表添加约束，可以使用 ALTER TABLE 语句：
+        ALTER TABLE Employees
+        ADD CONSTRAINT chk_Age CHECK (Age >= 18 AND Age <= 65);
+    不同数据库如 SQL Server、PostgreSQL 的语法大同小异，核心都是定义一个返回 TRUE 或 FALSE 的逻辑表达式。
+
+    CHECK 约束的两个关键注意事项：
+        1. MySQL 的版本陷阱
+            CHECK 约束在 MySQL 8.0.16 之前的版本中虽然能写进去，但不会被真正执行！
+            因此，在使用前务必通过 SELECT VERSION(); 确认数据库版本是否支持。
+        2. 对 NULL（空值）的特殊处理
+            CHECK 约束只拦截计算结果为 FALSE 的数据。
+            由于数据库中的 NULL 代表“未知”，它的计算结果既不是 TRUE 也不是 FALSE（而是 UNKNOWN），所以 CHECK 约束通常不会拦截 NULL 值。
+            如果希望该字段既满足条件又不能为空，需要额外加上 NOT NULL 约束。
