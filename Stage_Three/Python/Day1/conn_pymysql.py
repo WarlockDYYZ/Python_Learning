@@ -43,9 +43,44 @@ except Exception as e:
     print(f"插入失败: {e}")
 
 
+# 安全的参数化查询
+username = "test_user"
+password = "123456"
+query_sql = "SELECT * FROM user WHERE username = %s AND password = %s"
+try:
+    cursor.execute(query_sql, (username, password))
+
+    # 查看结果, 取出所有数据
+    result = cursor.fetchall()
+    if result:
+        print("查询结果：", result)
+    else:
+        print("结果为空")
+except Exception as e:
+    print(f"查询失败: {e}")
+
+
+# 批量插入数据（速度提升10-50倍）
+data = [
+    ("张三", 20),
+    ("李四", 21),
+    ("王五", 22)
+]
+insert_sql = "INSERT INTO user (name, age) VALUES (%s, %s)"
+try:
+    cursor.executemany(insert_sql, data)
+    conn.commit()
+    print("数据插入成功")
+except Exception as e:
+    conn.rollback()
+    print(f"插入失败: {e}")
+
+
 # 关闭游标
 cursor.close()
 print("游标已关闭")
+
+
 # 关闭连接
 conn.close()
 print("数据库连接已关闭")
