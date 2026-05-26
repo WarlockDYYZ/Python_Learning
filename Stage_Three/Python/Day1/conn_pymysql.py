@@ -66,7 +66,7 @@ data = [
     ("李四", 21),
     ("王五", 22)
 ]
-insert_sql = "INSERT INTO user (name, age) VALUES (%s, %s)"
+insert_sql = "INSERT INTO user2 (name, age) VALUES (%s, %s)"
 try:
     cursor.executemany(insert_sql, data)
     conn.commit()
