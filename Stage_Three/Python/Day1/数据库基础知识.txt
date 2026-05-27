@@ -459,3 +459,72 @@
 
                 创建连接引擎的语句看起来是比传统方式简洁，其实该有的还是都有。
                 read_sql() 和 to_sql()，操作比前面的数据库操作方式方便了很多
+
+
+    4.2 数据分析与处理最佳实践
+
+        - 数据查询与基础统计对比：
+
+            查询 2020-2024 年城镇收入数据
+                MySQL 实现：
+                    SELECT year, urban_income FROM income_data WHERE year BETWEEN 2020 AND 2024;
+                Python (pandas/numpy) 实现：
+                    df_2020_2024 = df[(df["year"] >= 2020) & (df["year"] <= 2024)][["year", "urban_income"]]
+                pandas 支持更灵活的条件筛选
+
+            计算城乡收入均值 / 标准差
+                MySQL 实现：
+                    SELECT AVG(urban_income) AS urban_avg,
+                           STDDEV(urban_income) AS urban_std,  -- STDDEV() 计算标准差
+                           AVG(rural_income) AS rural_avg,
+                           STDDEV(rural_income) AS rural_std
+                    FROM income_data;
+                Python (pandas/numpy) 实现：
+                    urban_avg = np.mean(df["urban_income"])
+                    rural_avg = np.mean(df["rural_income"])
+                numpy 计算更高效（大数据量）
+
+            计算城乡收入差距
+                MySQL 实现：
+                    SELECT year, (urban_income - rural_income) AS income_gap FROM income_data;
+                Python (pandas/numpy) 实现：
+                    df["income_gap"] = df["urban_income"] - df["rural_income"]
+                pandas 支持列级运算
+
+        数据清洗对比：
+
+            处理缺失值（填充均值）
+                MySQL 实现：
+                    UPDATE income_data
+                    SET urban_income = (SELECT AVG(urban_income)
+                    FROM income_data) WHERE urban_income IS NULL;
+                Python (pandas/numpy) 实现：
+                    df["urban_income"].fillna(df["urban_income"].mean(), inplace=True)
+                pandas 更简洁，支持批量操作
+
+            识别异常值（3σ 原则
+                MySQL 实现：
+                    需要嵌套多步复杂查询L;
+                Python (pandas/numpy) 实现：
+                    def detect_outliers(data):
+                        mean = np.mean(data)
+                        std = np.std(data)
+                        return data[(data > mean + 3*std)]
+                (data < mean - 3*std)
+
+        Pandas 本地筛选：简单，但要先加载全表
+        SQL 筛选：高效，只取需要的数据
+        真正项目里，一定用 SQL 先筛选！
+
+        数据分析性能优化建议：
+            - 使用 pandas 的read_sql()指定查询条件，只读取需要的数据，避免全表加载
+            - 使用 numpy 向量化运算替代循环操作，提升计算效率
+            - 对于超大表，使用分块读取（chunksize参数）
+            - 对常用查询结果进行缓存，减少重复查询
+
+
+    4.3 数据可视化与报告生成
+
+        使用 matplotlib 进行数据可视化：
+
+            mysql_matplotlib.py

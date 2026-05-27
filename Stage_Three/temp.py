@@ -1,1 +1,0 @@
-# D:\mysql-8.0.46-winx64\bin\mysql -u root -p
