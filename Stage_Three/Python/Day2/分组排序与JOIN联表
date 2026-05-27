@@ -1,0 +1,393 @@
+一、分组排序基础语法与执行原理
+
+    1.1 GROUP BY 基础语法回顾
+
+        - GROUP BY是 SQL 中用于对数据进行分组的核心子句，其基本语法格式为：
+
+            SELECT 列名, 聚合函数(...)
+            FROM 表名
+            [WHERE 条件]
+            GROUP BY 分组字段
+            [HAVING 分组后过滤条件]
+            [ORDER BY 排序列];
+
+        - 核心规则：
+            SELECT 列表中的列要么出现在GROUP BY子句中，要么被包裹在聚合函数内
+            分组字段可以是单个列或多个列的组合
+            聚合函数包括：COUNT()、SUM()、AVG()、MAX()、MIN()、GROUP_CONCAT()等。
+
+        - 执行顺序（理解 GROUP BY 的关键）：
+            1. FROM：确定数据源
+            2. WHERE：过滤原始行（分组前过滤）
+            3. GROUP BY：将剩余行按指定字段分组
+            4. 聚合函数计算：对每组计算聚合值
+            5. HAVING：过滤分组后的结果（分组后过滤）
+            6. SELECT：选择要显示的列
+            7. ORDER BY / LIMIT：排序和限制结果
+
+        - MySQL 与 SQLite 的差异：
+            MySQL 严格模式要求：SELECT 列表中的所有非聚合列必须全部出现在 GROUP BY 子句中，否则会报错
+            SQLite 宽松模式：允许 SELECT 列表包含不在 GROUP BY 子句中的非聚合列，但值是不确定的
+            别名使用：MySQL 中所有派生表必须有别名，SQLite 不需要
+
+
+    1.2 聚合函数详解
+
+        - 基础聚合函数：
+            COUNT(*)：统计行数（含 NULL）
+            COUNT(column)：统计指定列的非 NULL 值数量
+            SUM(column)：求和
+            AVG(column)：平均值
+            MAX(column)：最大值
+            MIN(column)：最小值
+
+        - 高级聚合函数：
+            GROUP_CONCAT(column)：将组内值拼接成字符串，可指定排序和分隔符
+            STDDEV(column)：标准差
+            VARIANCE(column)：方差
+
+            SQL 语句中 1
+
+
+    1.3 HAVING 子句与 WHERE 子句的核心区别
+
+        - WHERE 子句：
+            在分组前对原始数据进行过滤
+            不能使用聚合函数（因为此时还未分组）
+            执行效率高，应优先使用
+
+        - HAVING 子句：
+            在分组后对聚合结果进行过滤
+            可以使用聚合函数和 SELECT 别名
+            用于筛选分组后的结果集
+
+        - 对比表格：
+            对比维度	        WHERE	HAVING
+            执行时机	        分组之前	分组之后
+            能否使用聚合函数	不能	    可以
+            能否使用列别名 	不能	    可以
+            性能影响	        提前过滤，减少分组数据量	处理所有分组后的数据
+            适用场景	        行级条件过滤	分组聚合结果过滤
+
+        组合使用示例：
+            2.
+
+
+二、分组排序高级技巧与优化
+
+    2.1 多字段分组技术
+
+        - 多字段分组语法，示例：
+            SELECT
+                department_id,
+                role,
+                COUNT(*) AS cnt
+            FROM employees
+            GROUP BY department_id, role;
+
+        - 执行原理：
+            先按第一个字段分组（department_id）
+            然后在第一个字段值相同的组内再按第二个字段分组（role）
+            分组依据是所有分组字段值的组合
+
+        示例结果：
+            department_id	role	cnt
+            1	            工程师	2
+            1	            产品经理	1
+            2	            设计师	2
+
+
+    2.2 WITH ROLLUP 多维汇总
+
+        - WITH ROLLUP 语法：
+            SELECT
+                year,
+                country,
+                SUM(profit) AS profit
+            FROM sales
+            GROUP BY year, country WITH ROLLUP;
+
+            示例：
+                3.
+
+            - WITH ROLLUP 是 MySQL 中 GROUP BY 子句的一个扩展修饰符。
+                它的核心作用是在常规分组查询的基础上，自动生成额外的“超级聚合”行（即小计和总计）。
+                不需要多次运行 SQL 语句或在代码里手动累加，就能一次性拿到从“明细”到“汇总”的完整数据视图。
+                结果集不仅会返回常规的 (year, country) 组合利润，还会额外生成以下两种层级的汇总行：
+                    1. 按年份的小计：当 country 字段变为 NULL 时，代表该年所有国家的总利润。
+                    2. 全局总计：当 year 和 country 字段同时为 NULL 时，代表所有年份、所有国家的全局总利润。
+
+            - 功能说明：
+                在分组结果基础上增加额外的汇总行
+                支持多层次分析（如年→国家→总计）
+                NULL 值标识汇总行
+
+            - 示例结果：
+                year	country	profit
+                2023	China	10000
+                2023	USA	    15000
+                2023	NULL	25000
+                2024	China	12000
+                2024	USA	    18000
+                2024	NULL	30000
+                NULL	NULL	55000
+
+            注意：
+                - NULL 值标识：MySQL 会在高级别聚合行的对应列中用 NULL 来标记这是汇总数据。
+                        例如，某一行显示 year = 2023, country = NULL, profit = 100万，就表示 2023 年的全球总利润。
+                - 区分真实 NULL 与汇总 NULL：如果原始数据中本身就存在 NULL 值，为了准确区分哪些 NULL 是由 ROLLUP 生成的，
+                        可以使用 MySQL 8.0 提供的 GROUPING() 函数。
+                        如果该列是因为 ROLLUP 操作而被置为 NULL，GROUPING(列名) 会返回 1，否则返回 0。
+                - 不能直接使用 ORDER BY：在 MySQL 中，WITH ROLLUP 和 ORDER BY 是互斥的，不能直接一起使用。
+                        如果需要对包含 ROLLUP 的结果进行排序，需要将其作为派生表（子查询），在外层再应用 ORDER BY。
+                补充：
+                    GROUPING() 函数的返回值是针对每一行（Row-level）独立计算
+                        - 只要当前行的该列是因为 ROLLUP 汇总而被置为 NULL，那么在这一行中，GROUPING(列名) 就会返回 1。
+                        - 如果当前行的该列是正常的分组数据（或者包含原始数据中的真实 NULL），那么在这一行中，GROUPING(列名) 就会返回 0。
+
+
+    2.3 GROUP BY 性能优化策略
+
+        - 索引优化：
+            为 GROUP BY 字段创建索引，避免临时表和文件排序
+            使用覆盖索引，包含所有查询列
+            遵循最左匹配原则
+
+        - 执行计划分析：
+            使用EXPLAIN命令分析查询执行计划，重点关注：
+                type：访问类型（index或ref优于ALL全表扫描）
+                key：实际使用的索引
+                Extra：特别关注Using temporary（使用临时表）、Using filesort（使用文件排序）
+
+        - MySQL 8.0 新特性：
+            GROUP BY 不再隐式排序，需显式添加 ORDER BY
+            窗口函数（ROW_NUMBER()、RANK()）提供了分组内计算的新方式
+            派生条件下推优化，减少中间结果集大小
+
+        补充：
+            1. 为 GROUP BY 字段创建索引，避免临时表和文件排序
+                核心原理：
+                    当 GROUP BY 的字段没有合适的索引时，MySQL 无法直接按顺序读取数据，只能将符合条件的全部数据读出来，
+                    在内存或磁盘中创建一个“临时表”（Using temporary），然后再进行哈希或排序分组。
+                    如果数据量较大，还会触发“文件排序”（Using filesort），导致性能断崖式下跌。
+                如何优化：
+                    通过建立索引，让 MySQL 能够顺着 B+ 树索引的顺序扫描，遇到相同的值就切分一组。
+                    这样既不需要额外的排序，也不需要临时表，速度极快。
+                避坑指南：
+                    单字段 GROUP BY a，必须有 INDEX(a)。
+                    多字段 GROUP BY a, b，必须是联合索引 INDEX(a, b)，反过来建 INDEX(b, a) 是没用的。
+                    如果带有 WHERE 条件，例如 WHERE c = 1 GROUP BY a, b，最优索引应该是 INDEX(c, a, b)，把过滤字段放在最左边。
+
+            2. 使用覆盖索引，包含所有查询列
+                核心原理：
+                    普通二级索引的叶子节点只存储了“索引列的值 + 主键值”。
+                    如果查询的字段超出了索引的范围，MySQL 就必须拿着主键去聚簇索引里查找完整的行数据，
+                    这个过程叫作“回表”，会带来大量的随机 I/O 开销。
+                    而覆盖索引是指查询所需的所有字段（包括 SELECT、WHERE、GROUP BY 涉及的列）都包含在了同一个索引中，
+                    MySQL 无需回表，直接从索引树上就能拿到全部数据。
+                如何优化：
+                    在设计索引时，不仅要考虑 WHERE 和 GROUP BY 的字段，还要把 SELECT 后面需要返回的非主键字段也追加到索引的最后面。
+                验证方法：
+                    执行 EXPLAIN 查看执行计划，如果 Extra 列显示 Using index，就说明成功命中了覆盖索引；
+                    如果显示的是 Using where; Using index condition，则说明依然发生了回表。
+
+            3. 遵循最左匹配原则
+                核心原理：
+                    这是联合索引生效的“交通规则”。
+                    联合索引在底层 B+ 树中是按照定义的顺序从左到右逐层排序的（比如先按 a 排，a 相同再按 b 排）。
+                    因此，查询必须从索引的最左侧列开始连续匹配，不能跳过中间的列。
+                实战举例：
+                    假设为了优化上面的场景建立了联合索引 INDEX(c, a, b)：
+                    有效：WHERE c = 1 GROUP BY a, b。这完美符合最左前缀，索引可以一路畅通到底。
+                    失效：如果你跳过了最左边的 c，直接写 WHERE a = 1 GROUP BY b，
+                            由于在不知道 c 的情况下，a 在全局是无序的，这个联合索引就会失效，导致全表扫描。
+
+            总结建议：
+                在实际开发中，设计一条高效的 GROUP BY 查询，通常需要综合这三点：
+                    1. 根据 WHERE 等值条件和 GROUP BY 字段的顺序设计联合索引（遵循最左匹配）
+                    2. 将 SELECT 中需要的其他字段追加到索引末尾（形成覆盖索引）
+                    3. 通过 EXPLAIN 确认没有出现 Using temporary 和 Using filesort，且命中了 Using index。
+
+            4. 创建索引
+                - 基础语法
+                    CREATE INDEX 索引名 ON 表名 (字段1, 字段2, ...);
+
+                - 针对 GROUP BY 优化的建索引实战
+                    假设有一条高频查询的 SQL 如下：
+                        SELECT user_id, COUNT(*), MAX(created_at)
+                        FROM orders
+                        WHERE status = 'paid'
+                        GROUP BY user_id;
+                    根据“最左匹配”和“覆盖索引”原则，需要创建一个包含过滤字段、分组字段以及 SELECT 中非聚合字段的联合索引：
+                        -- 顺序必须是：WHERE过滤字段 -> GROUP BY字段 -> SELECT中的非聚合字段
+                        CREATE INDEX idx_status_user_created ON orders(status, user_id, created_at);
+                    原理解析：
+                        status 放在最左边，满足 WHERE 条件的高效过滤；
+                        user_id 紧随其后，利用 B+ 树天然有序的特性支持分组；
+                        created_at 放在末尾，覆盖 MAX() 函数取值，避免回表查询。
+
+                - 多字段 GROUP BY 的建索引规则
+                    如果的查询涉及多个分组字段，例如：
+                        SELECT city, school, AVG(age) AS avg_age
+                        FROM fooStudent
+                        WHERE LENGTH(name) > 5
+                        GROUP BY city, school;
+                    索引列顺序必须严格与查询逻辑保持一致：
+                        CREATE INDEX fooStudent_1 ON fooStudent(name, city, school, age);
+
+                在实际开发中，以下几种写法会直接导致索引失效，退化为临时表和文件排序：
+                    - 对字段做函数操作：如 GROUP BY DATE(created_at) 或 GROUP BY UPPER(name)，这会破坏索引的有序性。
+                    - 索引顺序不匹配：如果你建的是 (a, b) 联合索引，但查询写的是 GROUP BY b，由于跳过了最左侧的 a，索引无法生效。
+                    - 范围过大的 WHERE 条件：如果使用了不等于（!=）、NOT IN 等条件，MySQL 优化器可能会因为选择性太差而主动放弃走索引。
+
+                - 验证索引是否生效
+                    创建完索引后，务必执行以下命令查看执行计划：
+                        EXPLAIN FORMAT=TREE SELECT ... GROUP BY ...;
+                    理想状态：Extra 列显示 Using index，说明成功走了索引扫描且无需回表。
+                    需优化状态：Extra 列显示 Using temporary; Using filesort，表示创建了临时表并进行了文件排序，
+                            此时需要重新检查索引设计是否符合上述规则。
+
+
+三、JOIN 联表操作详解
+
+    3.1 JOIN 基础概念与分类
+
+        JOIN 的本质：
+            - 基于两个或多个表之间的相关列，将这些表中的行组合起来
+            - 先确定一个主表作为结果集，然后把其他表的行有选择性地 "连接" 在主表结果集上
+            - 所有连接都基于左右数据集的笛卡尔积
+                (笛卡尔积是指两个集合之间所有可能有序对的集合，通常表示为A×B，其中每个有序对的第一个元素来自集合A，第二个元素来自集合B)
+                (A×B={(a,b)∣a∈A,b∈B})
+                (笛卡尔积的元素数量等于两个集合元素数量的乘积)
+
+        JOIN 类型汇总：
+            JOIN 类型	说明	                    语法
+            内连接	    返回两个表中匹配的行	    INNER JOIN / JOIN
+            左外连接	    返回左表所有行，右表匹配行	LEFT JOIN / LEFT OUTER JOIN
+            右外连接	    返回右表所有行，左表匹配行	RIGHT JOIN / RIGHT OUTER JOIN
+            全外连接	    返回左右表所有行	        FULL JOIN / FULL OUTER JOIN
+            交叉连接	    返回笛卡尔积	            CROSS JOIN
+            自连接	    表与自身连接	            JOIN ... ON ...
+
+
+    3.2 内连接（INNER JOIN）
+
+        语法格式：
+            SELECT
+                table1.column,
+                table2.column
+            FROM table1
+            INNER JOIN table2
+            ON table1.column = table2.column;
+
+        执行原理：
+            - 根据连接条件结合两个表的列值创建新结果表
+            - 查询会把 table1 中的每一行与 table2 中的每一行进行比较
+            - 找到所有满足连接谓词的行的匹配对
+
+        MySQL 与 SQLite 的差异：
+            - 在 MySQL 中，JOIN、CROSS JOIN和INNER JOIN是等价的
+            - 在 SQLite 中，INNER JOIN、JOIN和逗号（,）连接完全可以互换
+
+        示例：4.
+
+
+    3.3 外连接（OUTER JOIN）
+
+        左外连接（LEFT JOIN）
+            语法格式：
+                SELECT
+                    table1.column,
+                    table2.column
+                FROM table1
+                LEFT JOIN table2
+                ON table1.column = table2.column;
+
+            执行原理：
+                - 返回左表（table1）的所有行
+                - 以及右表（table2）中匹配的行
+                - 如果右表中没有匹配项，则右表的列显示为NULL
+
+            示例：5.
+
+        右外连接（RIGHT JOIN）
+            语法格式：
+                SELECT
+                    table1.column,
+                    table2.column
+                FROM table1
+                RIGHT JOIN table2
+                ON table1.column = table2.column;
+
+            执行原理：
+                - 返回右表（table2）的所有行
+                - 以及左表（table1）中匹配的行
+                - 如果左表中没有匹配项，则左表的列显示为NULL
+
+        MySQL 与 SQLite 的重要差异：
+            - MySQL 支持：RIGHT JOIN和RIGHT OUTER JOIN
+            - SQLite 限制：不直接支持RIGHT JOIN，但可以通过交换表的位置并使用LEFT JOIN来模拟
+
+
+    3.4 全外连接（FULL JOIN）
+
+        语法格式：
+            SELECT
+                table1.column,
+                table2.column
+            FROM table1
+            FULL JOIN table2
+            ON table1.column = table2.column;
+
+        执行原理：
+            - 是LEFT JOIN和RIGHT JOIN的组合
+            - 返回左表和右表中的所有行
+            - 不匹配的列填充为NULL
+
+        MySQL 与 SQLite 的严重差异：
+            - MySQL 不支持：MySQL 不支持原生的FULL JOIN或FULL OUTER JOIN(82)
+            - SQLite 不支持：SQLite 同样不支持原生的FULL OUTER JOIN(80)
+
+        替代方案：
+            -- MySQL和SQLite都使用UNION模拟FULL JOIN
+            SELECT * FROM table1 LEFT JOIN table2 ON condition
+            UNION
+            SELECT * FROM table1 RIGHT JOIN table2 ON condition;
+
+
+    3.5 自连接（SELF JOIN）
+
+        语法格式：
+            SELECT
+                t1.column,
+                t2.column
+            FROM table AS t1
+            JOIN table AS t2
+            ON t1.column = t2.column;
+
+        应用场景：
+            - 处理层级数据（如员工表中的上下级关系）
+            - 同一表中数据的比较
+            - 需要为表起不同的别名
+
+        示例：6.
+
+
+    3.6 JOIN 性能优化
+
+        索引优化：
+            - JOIN 列必须有索引：ON 子句里的字段必须两边都有索引
+            - 覆盖索引：创建覆盖索引，包含所有查询列
+            - 最左匹配原则：将选择性高的列放在多列索引最前列
+
+        执行顺序优化：
+            - 小表驱动大表（先分组小表，再 JOIN 大表）
+            - 先过滤后 JOIN：将过滤条件下推到 JOIN 操作之前
+            - 合理使用 STRAIGHT_JOIN 强制指定连接顺序
+
+        性能分析工具：
+            使用EXPLAIN分析 JOIN 执行计划，重点关注：
+                - type：连接类型（eq_ref、ref优于ALL）
+                - key：使用的索引
+                - rows：预估扫描行数
+                - Extra：Using index表示使用了覆盖索引

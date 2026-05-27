@@ -1,0 +1,79 @@
+-- 1. 统计每个客户的订单总数和总金额
+SELECT
+    customer_id,
+    COUNT(order_id) AS total_orders,
+    SUM(amount) AS total_amount,
+    AVG(amount) AS avg_amount,
+    MAX(amount) AS max_amount,
+    MIN(amount) AS min_amount
+FROM orders
+GROUP BY customer_id;
+
+-- 2. 先筛选2023年上半年数据，再按销售人员分组，找出总销售额超过1000的
+SELECT
+    salesperson,
+    SUM(sales_amount) AS total_sales
+FROM sales
+WHERE sale_date BETWEEN '2023-01-01' AND '2023-06-30'
+GROUP BY salesperson
+HAVING total_sales > 1000;
+
+-- 3.1 WITH ROLLUP 多维汇总(简单)
+SELECT year, country, SUM(profit) AS profit
+FROM sales
+GROUP BY year, country WITH ROLLUP;
+
+-- 3.2 作为派生表 + 外层排序
+SELECT * FROM (
+    SELECT
+        year,
+        country,
+        SUM(profit) AS total_profit,
+        GROUPING(year) AS is_year_rollup,      -- 标记是否为年份汇总
+        GROUPING(country) AS is_country_rollup  -- 标记是否为国家汇总
+    FROM sales
+    GROUP BY year, country WITH ROLLUP
+) AS sub_query
+-- 在外层应用 ORDER BY：
+ORDER BY
+    is_year_rollup ASC,   -- 先排年份：0(明细/小计)在前，1(全局总计)在后
+    year ASC,             -- 再按年份正序排列
+    is_country_rollup ASC,-- 同一年份内：0(国家明细)在前，1(年份小计)在后
+    country ASC;          -- 最后按国家名称正序排列
+/*
+    “0 或 1 的标识位”是在内层子查询（括号内的部分）中形成的。
+    具体来说，它是由 MySQL 8.0+ 提供的 GROUPING() 函数生成的。
+    执行位置：数据库在执行最内层的 SELECT 语句时，会逐行扫描经过 ROLLUP 处理后的结果集。
+    生成逻辑：当遇到某一行数据时，GROUPING() 函数会检查当前行的这一列是否是因为 ROLLUP 操作而被置为 NULL 的超级聚合行。
+            如果是，就返回 1；如果不是（即正常的明细数据），就返回 0。(此时生成的标志位)
+            is_year_rollup 和 is_country_rollup 在原有的每一行数据上，新增了两个列（字段）。
+    作为临时字段传递：这些计算出来的 0 和 1 被赋予了别名（如 is_year_rollup），成为了子查询结果集的一部分。
+            外层查询随后就可以像操作普通数字列一样，利用这些标识位进行精准的排序控制。
+    ASC 升序    DESC 降序
+*/
+
+-- 4. 查询学生姓名和对应的课程名称
+SELECT
+    students.student_name,
+    courses.course_name
+FROM students
+INNER JOIN courses
+ON students.course_id = courses.course_id;
+
+-- 5. 查询所有客户及其订单（包括没有订单的客户）
+SELECT
+    customers.customer_id,
+    customers.name,
+    orders.order_id,
+    orders.amount
+FROM customers
+LEFT JOIN orders
+ON customers.customer_id = orders.customer_id;
+
+-- 6. 查询员工及其经理信息
+SELECT
+    e.employee_name AS 员工,
+    m.employee_name AS 经理
+FROM employees AS e
+JOIN employees AS m
+ON e.manager_id = m.employee_id;

@@ -22,6 +22,7 @@ plt.rcParams["font.sans-serif"] = ["SimHei"]
 plt.rcParams["axes.unicode_minus"] = False
 # 创建画布
 plt.figure(figsize=(12, 8))
+
 # 1. 折线图：城乡收入趋势对比
 plt.subplot(2, 2, 1)
 plt.plot(df["year"], df["urban_income"], label="城镇居民收入", color="red", marker="o", linewidth=2)
@@ -31,6 +32,7 @@ plt.xlabel("年份")
 plt.ylabel("收入（元）")
 plt.legend()
 plt.grid(True, alpha=0.3)
+
 # 2. 柱状图：城乡收入对比
 plt.subplot(2, 2, 2)
 x = np.arange(len(df["year"]))
@@ -42,6 +44,7 @@ plt.xlabel("年份")
 plt.ylabel("收入（元）")
 plt.xticks(x, df["year"])
 plt.legend()
+
 # 3. 饼图：2024年城乡收入占比
 plt.subplot(2, 2, 3)
 df_2024 = df[df["year"] == 2024]
@@ -52,6 +55,7 @@ explode = (0.05, 0)  # 突出城镇部分
 plt.pie(sizes, explode=explode, labels=labels, colors=colors,
         autopct="%1.1f%%", shadow=True, startangle=90)
 plt.title("2024年城乡居民收入占比", fontsize=12, fontweight="bold")
+
 # 4. 箱线图：收入分布对比
 plt.subplot(2, 2, 4)
 data_to_plot = [df["urban_income"], df["rural_income"]]
