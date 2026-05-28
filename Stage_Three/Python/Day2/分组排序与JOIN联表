@@ -440,3 +440,174 @@
         - GROUP BY 分组查询
         - JOIN 联表查询
         - 多表 JOIN 与分组示例
+
+            pymysql_mysql.py
+
+
+    5.2 sqlite3 操作 SQLite 示例
+
+        - 基础连接与执行
+        - GROUP BY 分组查询示例
+        - JOIN 联表查询示例
+        - SQLite 特有的 JOIN 语法
+
+            create_data.py：创建 sqlite3 数据库、表、插入数据
+            show_table.py：显示表中数据
+            sqlite3_sqlite.py：数据 JOIN 操作示例
+
+        说明：
+            出现 None 是 LEFT JOIN（左连接） 的典型特征：
+                - 用了 NATURAL LEFT OUTER JOIN，以左表 users 为主，左表所有行都会保留。
+                - Emma 是 users 表里 country='USA' 的用户（user_id=4），但 orders 表中没有任何一条数据关联 user_id=4。
+                - 右表 (orders) 无匹配数据时，对应字段 (order_id) 在查询结果里就会显示为 NULL，Python 读取后转为 None。
+
+        补充：
+            - conn.row_factory = sqlite3.Row 的核心作用是改变数据库查询结果中每一行数据的返回格式。
+                在 Python 的 sqlite3 模块中，默认情况下（即 row_factory = None），执行查询后获取到的每一行数据都是一个普通的元组（tuple）。
+                        例如：(1, 'Alice', 'China')。
+                    这种纯元组的格式虽然节省内存，但在实际开发中存在明显的局限性：
+                        它只能通过数字索引（如 row[0], row[1]）来访问数据，缺乏语义可读性，一旦 SQL 语句中的列顺序发生改变，代码就会出错。
+                将 row_factory 设置为 sqlite3.Row 后，数据库游标返回的每一行都会变成一个 sqlite3.Row 对象。这个对象具有以下显著优势：
+                    - 支持通过列名访问：可以像使用字典一样，直接通过字符串键名来获取字段值（例如 row['username']），
+                            这极大地提高了代码的可读性和健壮性。
+                    - 兼容索引访问：它依然保留了元组的高效特性，仍然可以通过数字索引（例如 row[0]）来访问数据，兼顾了性能需求。
+                    - 可转换为标准字典：如果需要将数据传递给前端接口或进行 JSON 序列化，可以直接使用 dict(row) 将其轻松转换为标准的 Python 字典。
+                需要注意的是，给连接对象的 row_factory 属性赋值时，只会影响该连接之后创建的新游标，而不会影响已经存在的游标。
+                因此，最佳实践是在建立数据库连接后、创建游标执行任何查询之前，就提前设置好这一属性。
+
+            - cursor.execute() 会自动提交查询语句吗？
+                在 Python 的 sqlite3 模块中，默认处于“非自动提交”模式。
+                所有的数据库操作（包括 INSERT、UPDATE、DELETE 等数据修改语句）都是在事务（Transaction）中执行的。
+                对于查询语句（SELECT）：execute() 仅仅是向数据库发送指令并获取结果集，它不涉及数据的持久化修改，因此不存在“提交”的概念。
+                对于增删改语句：执行后必须显式调用 conn.commit() 才能将更改永久写入数据库文件；
+                        如果忘记提交或程序意外终止，这些更改将会被回滚（撤销）。
+
+            - cursor.fetchall() 里面保存的是上一次提交的 SQL 语句的执行结果吗？
+                实际上 Cursor 只是连接程序与当前结果集的“桥梁”和访问工具。
+                只记录最后一次查询：fetchall() 获取的是最近一次通过该游标执行 SELECT 语句所产生的结果集。
+                如果在两次查询之间执行了其他无关的 SQL 语句，或者重新执行了另一个查询，游标内部的指针就会指向新的结果集，
+                        之前的查询结果将无法再通过这个游标获取。
+                内存中的快照：当你执行完 group_sql 后，数据库生成了符合条件的数据行。
+                此时调用 fetchall()，它会一次性将结果集中的所有剩余行加载到内存中，并以元组列表的形式返回给你。
+
+            - 参数化查询，mysql 用 s%，sqlite 用 ?
+
+
+    5.3 性能对比测试示例
+
+        以下是一个简单的性能对比测试代码：
+
+            mysql_and_sqlite.py
+            for_group_by.py: 创建使用的 sqlite 数据
+
+        补充：
+            - 个人感觉，重复执行相同语句，来测试性能，在表中数据量不大的时候，不太可以显示出数据库对 GROUP BY 操作的优化。确实基本速度一样
+                数据量	    MySQL vs SQLite	    差距
+                20 条	    几乎一样	            1 倍
+                1 万条	    MySQL 开始变慢	    2~5 倍
+                10 万条	    SQLite 明显更快	    5~20 倍
+                100 万条	    SQLite 极快	        30~100 倍
+
+            - time.time() 拿到的时间格式是浮点数（float）。
+                具体来说，它返回的是一个自 Unix 纪元（即 1970年1月1日 00:00:00 UTC）起至当前时刻经过的总秒数，也就是我们常说的“时间戳”。
+                由于该数值包含小数部分，因此能够提供微秒级别的精度。
+                核心特点与使用场景：
+                    - 便于计算：这种浮点数格式非常适合用于计算机内部的时间差计算。
+                            例如，在测量一段代码的执行耗时时，只需将结束时的时间戳减去开始时的时间戳即可直接得到精确的秒数间隔。
+                    - 不易读：虽然方便机器处理，但纯数字的时间戳对人类来说并不直观。
+                            如果需要将其转换为人类可读的日期格式（如 YYYY-MM-DD HH:MM:SS），则需要配合其他函数进行转换，
+                            例如使用 time.localtime() 将其转为本地时间元组，或者使用 datetime.fromtimestamp() 进行格式化输出。
+
+            - [<sqlite3.Row object at 0x0000020BBECE41C0>, ...]
+                代码中设置了 conn.row_factory = sqlite3.Row 后，执行数据库查询并使用 cursor.fetchall() 拿到的完整结果集。
+                列表中的每一个元素（即 <sqlite3.Row object at ...>）都代表了从数据库中查出来的一行记录。
+                row_factory，原本默认的元组（tuple）被替换成了 sqlite3.Row 对象。
+                它是 Python 内置的一个轻量级数据结构，专门用来存储单条查询记录。
+                内部采用了类似字典的形式保存数据。这意味着可以像操作字典一样，直接通过列名（例如 row['customer_id']）来获取具体的字段值，
+                        而不再需要死记硬背数字索引（如 row[0]）。
+
+
+六、数据分析场景应用案例
+
+    6.1 销售数据分析
+
+        需求：分析各地区、各产品类别的销售情况，包括销售额、销售量、平均单价等。
+
+            MySQL 实现：
+                sales_analysis.py
+
+        补充：
+            - 关于值得读取
+                你用 pymysql 取出来的数据只有值，没有列名
+                pandas 不知道哪一列叫 region
+                必须手动指定列名才能用 groupby('region')
+                    # 关键：手动指定列名！！！
+                    columns = ["region", "category", "total_quantity", "total_revenue", "avg_price", "max_price", "min_price"]
+                    df = pd.DataFrame(results, columns=columns)  # 必须加 columns
+
+            - 从 MySQL 读取出来的 SUM/AVG 结果，pandas 默认当成字符串，不是数字
+                必须用：pd.to_numeric()，转成数字才能画图。
+                    # 把 revenue 转成数字类型（关键修复）
+                    df["total_revenue"] = pd.to_numeric(df["total_revenue"])
+                    df["total_quantity"] = pd.to_numeric(df["total_quantity"])
+                    # 然后再分组画图
+                    region_revenue = df.groupby('region')['total_revenue'].sum()
+                    region_revenue.plot(kind='bar', color='skyblue')
+
+            - region_revenue = df.groupby('region')['total_revenue'].sum()
+                把表格数据 按地区分组 -> 只看 总销售额 这一列 -> 对每个组的销售额 求和 -> 把计算结果存到变量里, 结果:
+                    North    15000.50
+                    South    12000.75
+                    East     18000.25
+                    Name: total_revenue, dtype: float64
+
+            - region_revenue.plot(kind='bar', color='skyblue')
+                把上面算好的地区销售额，画成【柱状图】
+                df.groupby(...).sum()
+                    → 返回 Series（一维数据），返回多列就是 DataFrame 或者最后添加 .to_frame()
+                series.plot() / df.plot()
+                    → pandas 自带绘图，底层自动使用 matplotlib
+                不需要自己手动处理 matplotlib，pandas 全包了！
+
+
+    6.2 用户行为分析
+
+        需求：分析电商用户的购买行为，包括复购率、客单价、购买频次等。
+
+            SQLite 实现：
+                for_user.py: 创建数据
+                user_behavior.py
+
+        补充：
+            - (JulianDay('now') - JulianDay(MAX(o.order_date))) AS days_since_last_order
+                计算 今天 距离 用户最后一次下单 过了多少天
+                JulianDay(日期)：
+                    JulianDay 是 SQLite 独有的日期函数
+                    作用：把日期变成一个连续的数字（儒略日）
+                        - 日期越早 → 数字越小
+                        - 日期越晚 → 数字越大
+                    就像把日期变成了 “第几天”，方便做减法。
+                JulianDay('now')：获取今天的儒略日数字
+                JulianDay(MAX(o.order_date))：
+                    MAX(o.order_date) = 用户最后一次下单日期
+                    转成数字
+
+            - execute() = 执行单条 SQL
+
+            - executescript() = 一次执行多条 SQL 语句
+                1. 可以执行多条语句
+                    用 ; 分号隔开就行。
+                2. 专门给 SQLite 用
+                    MySQL 不用这个，MySQL 用 execute() 或者批量插入。
+                3. 自带提交（commit）
+                    在 SQLite 里，executescript() 执行完自动提交，不用写：conn.commit(),（当然写也没问题，更保险）
+                    用 executescript () 是为了一次性运行建表 + 插入多条数据，非常方便！
+            补充：
+                什么时候绝对不能用 cursor.executescript ()？
+                    1. 带参数（% s / ?）的 SQL → 绝对不能用！
+                        executescript 不支持参数化查询，只能用类似 cursor.execute("INSERT INTO t VALUES (?)", (100,))
+                    2. MySQL 数据库 → 没有这个方法！
+                    3. 需要精确控制事务（失败回滚）→ 不推荐用
+                        executescript() 会自动提交事务，控制不了。
+                    4. 只想执行 1 条 SQL → 没必要用
+                    executescript () 只能用在 1 个场景：SQLite + 纯初始化脚本 + 无参数 + 多条 SQL
