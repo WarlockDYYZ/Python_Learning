@@ -391,3 +391,52 @@
                 - key：使用的索引
                 - rows：预估扫描行数
                 - Extra：Using index表示使用了覆盖索引
+
+
+四、MySQL 与 SQLite 在分组排序和 JOIN 操作上的差异汇总
+
+    4.1 分组排序差异对比
+        功能特性	        MySQL	                                        SQLite
+        GROUP BY 严格性	严格模式要求 SELECT 所有非聚合列必须在 GROUP BY 中	宽松模式，允许 SELECT 包含不在 GROUP BY 中的列
+        派生表别名	    所有派生表必须有别名	                            派生表可以没有别名
+        隐式排序	        8.0 前默认隐式排序，8.0 后需显式指定	                无隐式排序行为
+        聚合函数支持	    支持所有标准聚合函数（COUNT、SUM、AVG、MAX、MIN 等）	支持基本聚合函数，部分高级函数需自定义
+        WITH ROLLUP	    支持	                                            支持
+        性能	            大数据量分组性能更好	                            小数据量分组性能更好
+
+    4.2 JOIN 操作差异对比
+        功能特性	        MySQL	                            SQLite
+        JOIN 等价性	    JOIN、CROSS JOIN、INNER JOIN 等价	    JOIN、INNER JOIN、逗号连接等价
+        RIGHT JOIN 支持	支持	                                不支持，需用 LEFT JOIN 模拟
+        FULL JOIN 支持	不支持，需用 UNION 模拟	            不支持，需用 UNION 模拟
+        连接优先级	    JOIN 优先级高于逗号	                所有连接优先级相同，从左到右处理
+        连接语法灵活性	    遵循标准 SQL 语法	                    支持非标准连接语法（如 OUTER LEFT NATURAL JOIN）
+        性能（简单查询）	较慢（~0.8ms）	                    较快（~0.3ms，快 2.6 倍）
+        性能（复杂查询）	较快（~5ms）	                        较慢（~20ms，慢 4 倍）
+
+
+    4.3 特殊差异说明
+        - 数据类型差异：
+            SQLite 是 "灵活类型"，MySQL 是 "严格类型"
+            SQLite 没有单独的 BOOLEAN 和 DATETIME 类型
+            SQLite 允许将 2000 字符存储到 VARCHAR 列中
+
+        - 语法差异：
+            列名引用：MySQL 用反引号（`），SQLite 用方括号（[ ]）
+            字符串字面量：SQLite 接受双引号，MySQL 用单引号
+            关键字使用：SQLite 允许关键字作为标识符
+
+        - 性能特点：
+            SQLite 在简单查询和单行操作上更快
+            MySQL 在复杂查询、并发处理和大数据量上更优
+            SQLite 适合嵌入式场景，MySQL 适合服务器端应用
+
+
+五、Python 中使用 pymysql 和 sqlite3 实现分组排序与 JOIN
+
+    5.1 pymysql 操作 MySQL 示例
+
+        - 基础连接与执行
+        - GROUP BY 分组查询
+        - JOIN 联表查询
+        - 多表 JOIN 与分组示例
