@@ -1,0 +1,762 @@
+一、索引基础理论与实践
+
+    1.1 索引的概念与作用
+
+        1.1.1 索引的定义与原理
+
+            数据库索引是一种特殊的数据结构，类似于书籍的目录，用于加速数据检索操作。
+            索引本质上是一种排序的数据结构，它存储了表中一列或多列的值以及对应的数据行物理地址，帮助数据库快速定位到目标数据。
+
+            索引的核心作用是减少磁盘 I/O 次数，将随机 I/O 转化为顺序 I/O，把 O (n) 的查询复杂度降低到 O (logn) 级别。
+            没有索引时，数据库需要全表扫描，逐行比对，效率极低；有了索引，数据库可以直接定位到数据所在位置，大幅提升查询速度。
+
+            索引不仅能提高查询速度，还能加速排序、分组、去重、关联查询，同时保证数据唯一性。
+            在实际应用中，合理使用索引可以使查询性能提升数倍甚至数百倍。
+
+        1.1.2 索引的数据结构
+
+            MySQL 和 SQLite 使用不同的索引数据结构：
+            MySQL 索引结构：
+            MySQL InnoDB 存储引擎使用B + 树作为索引的底层数据结构。
+            B + 树是一种平衡多路搜索树，专为磁盘存储系统设计，具有以下核心特性：
+                1. 非叶子节点只存储索引键，不存储数据，能存储的索引键数量大幅提升，树高极低
+                2. 叶子节点存储完整数据行（聚簇索引）或主键值（二级索引），并通过双向链表有序连接
+                3. 所有数据都存在叶子节点上，查询路径长度固定，性能稳定
+                4. 树高计算：以 16KB 数据页为例，非叶子节点存储 8 字节主键 + 6 字节指针，单个节点可存储约 1170 个索引，
+                        树高 3 层可存储 2 千多万行数据，仅需 3 次 IO 即可完成查询
+                (B+ 树的结构)
+
+            SQLite 索引结构：
+                SQLite 使用B 树作为索引的数据结构。
+                B 树是一种自平衡的树结构，它可以保持数据有序，在插入、删除和查找等操作中具有较高的效率。
+                与 B + 树相比，B 树的每个节点既存储索引键也存储数据，树高相对较高。
+
+
+    1.2 MySQL 索引操作详解
+
+        1.2.1 索引创建语法
+
+            MySQL 创建索引的基本语法为：
+                CREATE [UNIQUE | FULLTEXT | SPATIAL] INDEX index_name
+                [USING {BTREE | HASH}]
+                ON tbl_name (key_part,...)
+                [INDEX OPTIONS]
+                [ALGORITHM OPTION | LOCK OPTION];
+
+            索引类型说明：
+                UNIQUE：创建唯一索引，确保索引列的值唯一 (unique adj. 唯一的)
+                FULLTEXT：创建全文索引（仅适用于 CHAR、VARCHAR、TEXT 类型）
+                SPATIAL：创建空间索引（适用于空间数据类型） (spatial adj. 空间的)
+                USING BTREE：使用 B 树索引（默认）
+                USING HASH：使用哈希索引（MEMORY 存储引擎支持）
+                ALGORITHM：执行 DDL 操作时采用哪种内部机制来处理表数据和索引。
+                    - INPLACE（原地执行）：这是现代 MySQL（5.6及以上版本）的默认推荐方式。
+                            它直接在原表上进行操作，不需要重建整张表，也不需要拷贝数据到新临时表。
+                            这种方式极大地减少了磁盘 I/O 和空间占用，并且支持并发 DML（增删改）操作。
+                    - COPY（复制表）：这是早期版本的旧模式。这个过程非常消耗资源，且在复制期间会长时间阻塞对原表的写入操作。
+                    - INSTANT（即时生效）：MySQL 8.0 引入的极速算法。
+                            对于某些不涉及实际数据重组的操作（如添加列），它只需瞬间修改元数据即可完成，几乎没有性能开销。
+                    - DEFAULT（默认）：让 MySQL 自行判断。
+                            系统会根据当前操作的类型，优先选择 INSTANT，如果不支持则尝试 INPLACE，最后才考虑 COPY。
+                LOCK：控制在执行 DDL 操作期间，目标表对其他事务施加何种级别的锁定，直接决定了业务的并发度。
+                    - NONE（无锁/最高并发）：允许在创建或删除索引的同时，进行并发的读写操作（INSERT、UPDATE、DELETE）。
+                            这是生产环境中最理想的配置，能最大程度保证服务可用性。
+                    - SHARED（共享锁）：允许其他事务并发读取（SELECT），但会阻塞所有的写入操作（DML）。
+                            如果在此期间有写请求，会被挂起等待。
+                    - EXCLUSIVE（排他锁）：最严格的锁。DDL 操作期间，不允许任何读或写操作，所有访问该表的线程都会被阻塞。
+                    - DEFAULT（默认）：MySQL 会自动评估当前操作，选择能满足要求的最小必要锁级别。
+
+            key_part 语法：
+                key_part: {col_name [(length)] | (expr)} [ASC | DESC]
+                    - col_name：要索引的列名
+                    - length：字符串列的前缀长度（仅适用于 CHAR、VARCHAR、BINARY、VARBINARY）
+                    - expr：表达式索引（MySQL 8.0 + 支持）
+                    - ASC/DESC：指定升序或降序（默认升序）
+
+                示例：INDEX func_index ((ABS(col1))) 或 CREATE INDEX idx1 ON t1 ((col1 + col2))。
+                作用：允许对计算结果直接建立索引，从而优化包含复杂表达式的查询性能。
+
+            示例：
+                -- 创建普通索引
+                CREATE INDEX idx_name ON users(name);
+                -- 创建唯一索引
+                CREATE UNIQUE INDEX idx_email ON users(email);
+                -- 创建复合索引
+                CREATE INDEX idx_name_age ON users(name, age);
+                -- 创建全文索引
+                CREATE FULLTEXT INDEX idx_content ON articles(content);
+                -- 创建表达式索引（MySQL 8.0+）
+                CREATE INDEX idx_upper_name ON users(UPPER(name));
+
+        1.2.2 索引查看与删除
+
+            - 查看索引信息：
+                使用SHOW INDEX语句查看表的索引信息：
+                    SHOW INDEX FROM table_name [FROM db_name] [WHERE expr];
+
+                示例：
+                    SHOW INDEX FROM users;
+                    SHOW INDEX FROM users FROM test_db;
+
+            - 查询指定数据库中某张表的所有索引元数据信息：
+                SELECT *
+                FROM information_schema.statistics
+                WHERE table_name = 'users' AND table_schema = 'test_db';
+                    information_schema 是 MySQL 自带的系统数据库，专门用来存储所有数据库、表、列和索引的“元数据”（即关于数据的数据）。
+                    而 statistics 则是其中专门用于存储索引信息的系统视图，它记录了当前实例中所有表的索引细节。
+                    筛选条件为：表名是 users，所属数据库为 test_db
+
+            - 删除索引：
+                使用DROP INDEX语句删除索引：
+                    DROP INDEX index_name ON table_name;
+                示例：
+                    DROP INDEX idx_name ON users;
+                注意：
+                    主键索引不能使用DROP INDEX删除，必须使用ALTER TABLE：
+                        ALTER TABLE users DROP PRIMARY KEY;
+
+        1.2.3 索引类型详解
+
+            MySQL 支持多种索引类型，每种类型都有其特定的应用场景：
+
+                1. 主键索引（PRIMARY KEY）
+                    特性：唯一且非空，一张表只能有一个主键索引
+                    存储：InnoDB 中自动成为聚簇索引，叶子节点存储完整数据行
+                    作用：唯一标识表中的每一行记录，加速主键查询
+                    创建方式：创建表时指定PRIMARY KEY约束
+                        CREATE TABLE employees (
+                            emp_id INT PRIMARY KEY, -- 单列主键
+                            name VARCHAR(50)
+                        );
+
+                2. 唯一索引（UNIQUE INDEX）
+                    特性：保证列值唯一性，允许 NULL 值（可多个 NULL）
+                    作用：确保数据唯一性，如邮箱、手机号等
+                    创建语法：
+                        CREATE UNIQUE INDEX idx_email ON users(email);
+
+                3. 普通索引（NORMAL INDEX）
+                    特性：最基本的索引类型，无唯一性约束
+                    作用：加速数据查询，适用于 WHERE、JOIN 条件
+                    创建语法：
+                        CREATE INDEX idx_name ON users(name);
+
+                4. 复合索引（COMPOSITE INDEX）
+                    特性：基于多个列的索引，遵循最左前缀原则
+                    作用：适用于多列组合查询，减少索引数量
+                    创建语法：
+                        CREATE INDEX idx_name_age ON users(name, age);
+
+                5. 全文索引（FULLTEXT INDEX）
+                    特性：专门用于文本搜索
+                    适用类型：CHAR、VARCHAR、TEXT
+                    作用：快速定位包含特定关键词的文本记录
+                    创建语法：
+                        CREATE FULLTEXT INDEX idx_content ON articles(content);
+
+                6. 空间索引（SPATIAL INDEX）
+                    特性：用于空间数据类型（POINT、LINESTRING、POLYGON 等）
+                    作用：支持地理空间查询
+                    创建语法：
+                        CREATE SPATIAL INDEX idx_location ON places(location);
+                        (spatial adj. 空间的)
+
+
+    1.3 SQLite 索引操作详解
+
+        1.3.1 SQLite 索引语法特点
+
+            SQLite 的索引语法相对简单，支持的索引类型较少：
+
+            -创建索引语法：
+                CREATE [UNIQUE] INDEX [IF NOT EXISTS] index_name
+                ON table_name (column_name [ASC|DESC], ...);
+
+            - 与 MySQL 的主要差异：
+                仅支持 B 树索引：不支持哈希索引、全文索引等其他类型
+                语法简化：不支持 USING、INDEX OPTIONS 等复杂选项(B数 或 hash、对事物添加何种级别的锁)
+                IF NOT EXISTS 支持：创建索引时可使用IF NOT EXISTS避免错误
+                索引类型限制：只有普通索引和唯一索引两种类型
+
+            示例：
+                -- 创建普通索引
+                CREATE INDEX idx_name ON users(name);
+                -- 创建唯一索引
+                CREATE UNIQUE INDEX idx_email ON users(email);
+                -- 创建复合索引
+                CREATE INDEX idx_name_age ON users(name, age);
+                -- 创建索引时使用IF NOT EXISTS
+                CREATE INDEX IF NOT EXISTS idx_name ON users(name);
+
+        1.3.2 SQLite 索引查看与删除
+
+            - 查看索引信息：
+                SQLite 没有直接的SHOW INDEX命令，但可以通过以下方式查看：
+                    1. 使用.indices命令（SQLite 命令行工具）：
+                        .indices table_name
+                    2. 查询sqlite_master系统表：
+                        SELECT *
+                        FROM sqlite_master
+                        WHERE type = 'index' AND tbl_name = 'users';
+
+                        SQLite（3.33.0 及以上版本）中，官方引入了一个名为 sqlite_schema 的系统视图来替代原来的 sqlite_master：
+                            SELECT * FROM sqlite_schema WHERE type = 'index' AND tbl_name = 'users';
+                        两者的结构和功能是完全一致的，只是换了个更规范的名字。
+                补充：
+                    - 关于大小写的问题
+                        SQL 关键字是不区分大小写的，但存储在数据库里的文本数据是区分大小写的。
+                        MySQL 和 SQLite 的关键字都不区分大小写
+
+                        SQLite 内部默认使用一种叫做 NOCASE（不区分大小写）的排序规则来处理系统表中的元数据字符串。
+                        所以，无论查询时使用的是大写、小写还是混合大小写的字符串，SQLite 都能准确地匹配到对应的记录。
+
+                        这里的 'index'（带单引号）并不是一个 SQL 关键字，而是一个字符串常量。
+                        它是告诉数据库：“筛选出 sqlite_master 表中，type 这一列的值正好等于字符串 'index' 的那些行。”
+                        声明索引时（例如 CREATE INDEX ...），INDEX 是一个 SQL 关键字。
+                        SQLite 的语法规则规定，所有的 SQL 关键字（如 SELECT, FROM, WHERE, CREATE, INDEX 等）都是不区分大小写的。
+                        因此，写成 CREATE index、create INDEX 或者 Create Index，数据库都能正确识别并执行。
+                        SQL 语法层面（不区分）；数据内容层面（默认区分）
+
+                        虽然 SQLite 的数据比较默认区分大小写，但它也提供了灵活的控制方式：
+                            1. 使用大小写转换函数：LOWER(username) = 'admin'。
+                            2. 在查询时强制声明：username = 'admin' COLLATE NOCASE。
+                            3. 建表时直接指定该字段不区分大小写：username TEXT COLLATE NOCASE。
+
+                    - 关于大小写的问题2
+                        虽然语法上允许任意大小写，但在实际开发中，绝大多数团队和开发者都遵循“SQL 关键字全大写”的行业最佳实践。这主要是出于以下考虑：
+                            1. 提高可读性：将关键字（如 SELECT, WHERE, GROUP BY）大写，而表名、字段名保持小写，
+                                    可以让人一眼区分出 SQL 语句的结构部分和用户定义的数据部分，让代码更清晰。
+                            2. 团队协作与规范：统一的编码风格能极大降低代码审查、日志排查时的沟通成本。
+                        编写建议：关键字全大写，数据库名、表名、字段名全小写加下划线
+
+            删除索引：
+                DROP INDEX [IF EXISTS] index_name;
+                示例：
+                    DROP INDEX idx_name;
+                    DROP INDEX IF EXISTS idx_name;
+
+
+    1.4 Python 操作索引实战
+
+        1.4.1 pymysql 操作索引
+
+            pymysql_index.py
+
+            使用 pymysql 在 Python 中操作 MySQL 索引的完整流程：
+                1. 建立数据库连接
+                2. 创建索引
+                3. 查看索引信息
+                4. 删除索引
+                5. 性能对比测试
+
+
+        1.4.2 sqlite3 操作索引
+
+            sqlite_index.py
+
+            使用 Python 内置的 sqlite3 模块操作 SQLite 索引：
+                1. 建立数据库连接
+                2. 创建索引
+                3. 查看索引信息
+                4. 删除索引
+                5. 性能对比测试
+
+            补充：
+                - cursor.executemany() 是 Python sqlite3 模块中用于批量执行同一条 SQL 语句的方法。
+                    高效批量操作：它的主要作用是避免在 Python 代码中写循环去多次交互数据库。
+                        它会接收一个可迭代对象（如列表、生成器），并在底层进行优化，依次将不同的参数应用到同一条 SQL 语句上。
+                    减少通信开销：通过一次函数调用完成多行数据的处理，大幅减少了 Python 程序与 SQLite 引擎之间的通信次数，从而显著提升效率。
+
+                    标准语法格式：cursor.executemany(sql, seq_of_parameters)，例：
+                        cursor.executemany('INSERT INTO users (name, email, age) VALUES (?, ?, ?)', data_list)
+                        sql：包含占位符的 SQL 语句字符串（SQLite 中使用 ? 作为占位符）。
+                        seq_of_parameters：一个可迭代对象。其中的每个元素必须是一个元组或序列，分别对应 SQL 语句中每一行数据的值。
+
+                    典型应用场景：
+                        - 批量插入：INSERT INTO users (name, age) VALUES (?, ?)
+                        - 批量更新：UPDATE users SET age = ? WHERE name = ?
+                        - 批量删除：DELETE FROM users WHERE id = ?
+
+                    在实际开发中，掌握以下几个技巧可以让你的数据库操作更加专业和高效：
+                        - 支持生成器（节省内存）：executemany() 不仅接受列表，还支持传入生成器。
+                                如果需要从 CSV 文件或超大文本文件中读取百万级数据入库，使用生成器可以避免一次性将所有数据加载到内存中。
+                        - 事务控制（大幅提升速度）：在执行 executemany() 之前，
+                                建议显式开启事务（conn.execute("BEGIN")），执行完毕后再提交（conn.commit()）。
+                                如果不手动包裹事务，SQLite 可能会为每一条记录隐式地执行磁盘同步（fsync），导致写入速度极慢。
+                        - 推迟索引创建：向一张空表中插入海量数据，建议先删除表上的索引，等 executemany() 全部插入完成后，再重新创建索引。
+                                这能避免每次插入数据时都要动态维护 B+ 树，带来实质性的性能改善。
+
+                - 关于查看索引信息
+                    sqlite_master：这是 每当在数据库中创建一个表、索引或视图时，SQLite 都会在这里自动生成一条记录。
+                    SELECT name, sql：只抓取了两个最有用的字段。name 是索引的名字，而 sql 则是当初创建这个索引时执行的原始 SQL 语句。
+                    WHERE ...：做了双重过滤，确保查出来的都是属于 users 表的索引。
+                    fetchall()：这个方法会一次性把刚才 SQL 查询到的所有行都捞出来，并打包成一个列表返回给 Python。
+                        数据结构：在 sqlite3 模块中，每一行默认是一个元组（Tuple）。所以 index_info 的结构大概长这样：
+                        [('idx_name', 'CREATE INDEX idx_name ON users(name)'), ('idx_email', '...'), ...]
+                        做了一些修改，Python 的 sqlite3.Cursor 对象本身是支持迭代的，一旦开始遍历游标，游标的内部指针就会不断向下移动。
+                        修改后当数据量很大时，对内存友好。
+
+                - 关于速度
+                    当拥有 10 万条甚至 100 万条数据时，再次运行性能比对脚本，会发现：
+                        无索引查询：可能需要 0.0X 秒甚至更久（因为它必须逐行检查 10 万次）。
+                        有索引查询：依然稳定在 0.000X 秒左右。
+                            （因为 B+ 树的查找复杂度是对数级的，10 万条数据可能只需要跳 3-4 次就能找到目标）
+
+
+    1.5 索引优化策略
+
+        1.5.1 最左前缀原则
+            最左前缀原则是复合索引的核心规则，指在使用复合索引进行查询时，MySQL 只会使用索引中从最左边开始的连续字段。
+
+            - 核心规则：
+                查询条件必须包含复合索引的最左侧列，索引才能被使用
+                中间不能跳过任何列，必须连续使用
+                索引顺序至关重要，查询条件的顺序不影响索引使用（优化器会自动调整）
+
+            - 示例说明：
+                假设有复合索引 idx_name_age_email (name, age, email)
+
+            - 生效的查询：
+                WHERE name = '张三'  -- 使用name列
+                WHERE name = '张三' AND age = 20  -- 使用name和age列
+                WHERE name = '张三' AND age = 20 AND email = 'zhangsan@example.com'  -- 使用所有列
+
+            - 失效的查询：
+                WHERE age = 20  -- 缺少最左列name，索引失效
+                WHERE name = '张三' AND email = 'zhangsan@example.com'  -- 跳过age列，索引部分失效
+                WHERE age = 20 AND email = 'zhangsan@example.com'  -- 缺少最左列，索引失效
+
+            - 范围查询的影响：
+                当复合索引中出现范围查询（>、<、BETWEEN、LIKE 等）时，后面的列将无法使用索引：
+                WHERE name = '张三' AND age > 20 AND email = 'zhangsan@example.com'
+                -- 只有name和age列使用索引，email列不使用索引
+
+        1.5.2 索引失效场景
+            了解索引失效的场景对于优化查询性能至关重要：
+                1. 违背最左前缀原则
+                    复合索引查询时跳过最左列
+                    示例：索引(a,b,c)，查询WHERE b=1或WHERE a=1 AND c=1
+                2. 索引列使用函数或表达式
+                    在索引列上使用函数会导致索引失效
+                    示例：WHERE UPPER(name) = 'ZHANGSAN'、WHERE age+1 = 21
+                3. 隐式类型转换
+                    当查询条件的数据类型与索引列不匹配时，会发生隐式转换导致索引失效
+                    示例：字符串列使用数字查询WHERE phone = 13800138000
+                4. LIKE 左模糊匹配
+                    LIKE '%xxx'会导致索引失效（无法利用索引的有序性）
+                    LIKE 'xxx%'可以使用索引
+                    示例：WHERE name LIKE '%张三'（失效），WHERE name LIKE '张三%'（有效）
+                5. OR 条件使用不当
+                    当 OR 前后的列只有部分有索引时，可能导致索引失效
+                    示例：WHERE id = 1 OR name = '张三'（如果 name 没有索引，则全表扫描）
+                6. 数据量过小或过大
+                    当表数据量很少时（如几百条），全表扫描可能比索引更快
+                    当查询结果集占比过大（超过 20%-30%），优化器可能选择全表扫描
+                7. 低选择性列
+                    性别、状态等枚举值少的字段，单独建索引无意义
+                    选择性 = 不同值的数量 / 总行数
+                    一般选择性低于 0.01（1%）的列不建议单独建索引
+
+        1.5.3 索引设计原则
+            基于实践经验总结的索引设计最佳实践：
+                1. 索引创建原则
+                    只在高频查询的字段上创建索引
+                    区分度高的字段优先（如身份证号、手机号）
+                    经常用于 WHERE、JOIN、ORDER BY、GROUP BY 的字段
+                    单表索引数量控制在 5 个以内，过多影响写性能
+                2. 复合索引设计
+                    遵循 “最左前缀” 原则，将等值查询字段放在前面
+                    区分度高的字段优先（能快速过滤大量数据）
+                    范围查询字段放最后（>、<、BETWEEN 等）
+                    考虑查询频率和字段选择性，将常用字段组合
+                3. 索引类型选择
+                    主键：自增整数（INT/BIGINT），避免 UUID、字符串
+                    唯一约束：使用 UNIQUE INDEX 而非 CHECK 约束
+                    文本搜索：使用全文索引（FULLTEXT）
+                    空间数据：使用空间索引（SPATIAL）
+                4. 性能优化建议
+                    覆盖索引：查询的所有列都包含在索引中，避免回表
+                    前缀索引：对长字符串使用前缀索引（如name）
+                    定期维护：删除无用索引，重建碎片化索引
+                    批量操作：导入大量数据前先删除索引，导入后重建
+                5. 特殊场景处理
+                    频繁更新的表：减少索引数量，避免在更新频繁的字段建索引
+                    大表优化：使用分区表 + 索引，或考虑搜索引擎（如 Elasticsearch）
+                    冷热数据分离：热数据（近期数据）和冷数据（历史数据）分开存储
+
+
+二、事务基础理论与实践
+
+    2.1 事务的概念与 ACID 特性
+
+        2.1.1 事务的定义
+            事务（Transaction）是数据库操作的最小逻辑单元，由一系列数据库操作组成的一个完整的逻辑过程。
+            事务具有原子性，即这组操作要么全部执行成功，要么全部执行失败，不存在 “部分执行” 的中间状态。
+                事务的典型应用场景包括：
+                    银行转账：从账户 A 扣款，向账户 B 加款
+                    电商订单：扣减库存、生成订单、更新账户余额
+                    股票交易：买入卖出、资金冻结、份额变更
+            事务的基本操作：
+                -- 开启事务
+                START TRANSACTION;
+                -- 执行SQL操作
+                UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+                UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+                -- 提交事务（所有操作永久生效）
+                COMMIT;
+                -- 回滚事务（撤销所有未提交的操作）
+                ROLLBACK;
+
+        2.1.2 ACID 特性详解
+            ACID 是事务的四大核心特性，确保数据库操作的可靠性和一致性：
+            1. 原子性（Atomicity）
+                定义：事务中的操作要么全部成功，要么全部失败回滚
+                实现机制：通过 undo log（回滚日志）实现
+                作用：保证数据不会出现部分更新的情况
+                示例：转账事务中，扣款和加款必须同时成功或失败
+            2. 一致性（Consistency）
+                定义：事务执行前后，数据库的完整性约束保持不变
+                实现机制：由原子性、隔离性、持久性共同保证
+                作用：确保业务规则得到遵守（如余额不能为负）
+                示例：转账前后，A 账户减少的金额等于 B 账户增加的金额
+            3. 隔离性（Isolation）
+                定义：并发执行的事务之间相互隔离，一个事务的执行不能被其他事务干扰
+                实现机制：通过锁机制和 MVCC（多版本并发控制）实现
+                作用：防止并发事务之间的数据干扰
+                示例：多个用户同时查询账户余额时，看到的数据是一致的
+            4. 持久性（Durability）
+                定义：事务一旦提交，其对数据库的修改就是永久性的，即使数据库发生故障也不会丢失
+                实现机制：通过 redo log（重做日志）和双写缓冲区实现
+                作用：保证已提交的数据在任何情况下都不会丢失
+                示例：转账成功后，即使服务器断电，转账结果也不会丢失
+
+
+    2.2 事务隔离级别
+
+        2.2.1 隔离级别介绍
+            事务隔离级别定义了事务之间的可见性规则，解决并发事务可能出现的问题。SQL 标准定义了四个隔离级别，从低到高分别是：
+            隔离级别列表：
+                - 读未提交（Read Uncommitted） - 最低隔离级别
+                - 读已提交（Read Committed） - 大多数数据库的默认级别
+                - 可重复读（Repeatable Read） - MySQL InnoDB 的默认级别
+                - 串行化（Serializable） - 最高隔离级别
+
+            并发问题说明：
+                - 脏读（Dirty Read）：事务读取到其他事务未提交的数据
+                - 不可重复读（Non-repeatable Read）：同一事务内多次读取同一数据结果不一致
+                - 幻读（Phantom Read）：同一事务内多次查询同一范围，结果集行数不一致
+
+        2.2.2 四种隔离级别详解
+            1. 读未提交（Read Uncommitted）
+                特性：允许事务读取其他事务未提交的数据
+                解决的问题：无（会出现所有并发问题）
+                存在的问题：脏读、不可重复读、幻读
+                性能：最高（无锁开销）
+                适用场景：很少使用，仅适用于对数据准确性要求极低的场景
+                示例：(isolation n. 隔离状态)
+                    SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+                    START TRANSACTION;
+                    SELECT * FROM accounts WHERE id = 1;  -- 可能读到未提交的数据
+            2. 读已提交（Read Committed）
+                特性：只能读取其他事务已提交的数据，解决脏读问题
+                解决的问题：脏读
+                存在的问题：不可重复读、幻读
+                性能：中等
+                适用场景：大多数 OLTP（在线事务处理）场景
+                示例：
+                    SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+                    START TRANSACTION;
+                    SELECT * FROM accounts WHERE id = 1;  -- 只能读到已提交的数据
+            3. 可重复读（Repeatable Read）
+                特性：事务在开始时创建快照，整个事务期间数据保持一致
+                解决的问题：脏读、不可重复读
+                存在的问题：理论上存在幻读（但 MySQL 通过间隙锁解决了）
+                性能：中等偏高
+                适用场景：MySQL 默认级别，适用于大多数应用
+                示例：(repeatable adj. 可重复的)
+                    SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+                    START TRANSACTION;
+                    SELECT * FROM accounts WHERE id = 1;  -- 整个事务期间数据不变
+            4. 串行化（Serializable）
+                特性：事务完全串行执行，通过锁实现隔离
+                解决的问题：脏读、不可重复读、幻读
+                存在的问题：无（所有问题都解决）
+                性能：最低（强制串行执行）
+                适用场景：对数据一致性要求极高的场景（如银行核心系统）
+                示例：
+                    SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+                    START TRANSACTION;
+                    SELECT * FROM accounts WHERE id = 1;  -- 其他事务必须等待
+
+        2.2.3 MySQL 与 SQLite 隔离级别对比
+            MySQL 隔离级别支持：
+            MySQL InnoDB 支持全部四种隔离级别，默认是可重复读（REPEATABLE READ）。可以通过以下方式查看和设置：
+                -- 查看当前会话隔离级别
+                SELECT @@TRANSACTION_ISOLATION;
+                -- 查看全局隔离级别
+                SELECT @@GLOBAL.TRANSACTION_ISOLATION;
+                -- 设置会话隔离级别
+                SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+                -- 设置全局隔离级别（需要重启生效）
+                SET GLOBAL TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+            SQLite 隔离级别支持：
+            SQLite 的事务隔离机制与 MySQL 有很大差异：
+                仅支持 SERIALIZABLE 级别（通过数据库级锁实现）(serializable 可串行化的)
+                默认使用 SERIALIZABLE 级别
+                不支持行级锁，只有表级锁
+                通过 WAL（预写日志）模式支持并发读，但写操作仍需独占锁
+
+        关键差异总结：
+            特性	            MySQL (InnoDB)	                        SQLite
+            支持的隔离级别	    4 种（READ UNCOMMITTED 到 SERIALIZABLE）	仅 1 种（SERIALIZABLE）
+            默认隔离级别	    REPEATABLE READ	                        SERIALIZABLE
+            锁粒度	        行级锁 + 表级锁	                        仅表级锁
+            并发能力	        高（支持多读写并发）	                    低（写操作互斥）
+            MVCC 支持	    完整支持	                                有限支持（仅读）
+
+
+    2.3 事务操作详解
+
+        2.3.1 事务控制语句
+            MySQL 事务控制语法：
+                -- 开启事务
+                START TRANSACTION [transaction_characteristic ...];
+                -- 提交事务
+                COMMIT [WORK] [AND [NO] CHAIN] [RELEASE];
+                -- 回滚事务
+                ROLLBACK [WORK] [AND [NO] CHAIN] [RELEASE];
+                -- 设置自动提交模式
+                SET autocommit = {0 | 1};
+
+                transaction_characteristic 选项：
+                    WITH CONSISTENT SNAPSHOT：在可重复读隔离级别下创建一致性快照(with consistent snapshot 具有一致的快照)
+                    READ WRITE：设置事务为读写模式（默认）
+                    READ ONLY：设置事务为只读模式
+
+                示例用法：
+                    -- 开启事务并设置为只读
+                    START TRANSACTION READ ONLY;
+                    -- 开启事务并创建一致性快照
+                    START TRANSACTION WITH CONSISTENT SNAPSHOT;
+                    -- 提交事务并自动开启下一个事务（相同隔离级别）
+                    COMMIT AND CHAIN;
+                    -- 回滚事务并断开连接
+                    ROLLBACK RELEASE;
+
+            SQLite 事务控制语法：
+                SQLite 的事务语法相对简单：
+                    -- 开启事务
+                    BEGIN [TRANSACTION];
+                    -- 提交事务
+                    COMMIT [TRANSACTION];
+                    -- 回滚事务
+                    ROLLBACK [TRANSACTION];
+                SQLite 默认是自动提交模式，每条 SQL 语句自动作为一个事务执行。
+
+
+        2.3.2 事务使用示例
+            1. 银行转账示例
+                MySQL 实现：
+                    -- 银行转账事务示例
+                    START TRANSACTION;
+                    -- 从账户A扣款
+                    UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+                    -- 向账户B加款
+                    UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+                    -- 记录转账日志
+                    INSERT INTO transfer_logs (from_account_id, to_account_id, amount, create_time)
+                    VALUES (1, 2, 100, NOW());
+                    -- 提交事务
+                    COMMIT;
+
+                    异常处理示例：
+                        START TRANSACTION;
+                        -- 第一步：扣款
+                        UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+                        -- 模拟错误（余额不足）
+                        IF (SELECT balance FROM accounts WHERE id = 1) < 0 THEN
+                            ROLLBACK;
+                            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '余额不足';
+                        END IF;
+                        -- 第二步：加款
+                        UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+                        COMMIT
+
+            2. 电商订单处理
+                MySQL 实现：
+                    START TRANSACTION;
+                    -- 1. 创建订单主记录
+                    INSERT INTO orders (user_id, order_date, total_amount)
+                    VALUES (1, NOW(), 500);
+                    -- 2. 获取订单ID
+                    SET @order_id = LAST_INSERT_ID();
+                    -- 3. 创建订单明细
+                    INSERT INTO order_items (order_id, product_id, quantity, price)
+                    VALUES (@order_id, 1, 2, 200), (@order_id, 2, 1, 100);
+                    -- 4. 扣减库存
+                    UPDATE products SET stock = stock - 2 WHERE id = 1;
+                    UPDATE products SET stock = stock - 1 WHERE id = 2;
+                    -- 5. 记录日志
+                    INSERT INTO order_logs (order_id, status, create_time)
+                    VALUES (@order_id, '已创建', NOW());
+                    COMMIT;
+                补充：
+                    - 事务的“原子性”保障（ACID）
+                        代码使用了 START TRANSACTION 和 COMMIT 将这 5 个步骤包裹成一个不可分割的整体。
+                        作用：这保证了要么这 5 步全部执行成功并保存，要么只要其中任何一步报错（比如库存不足导致更新失败），整个订单创建就会全部回滚。
+                        场景价值：绝对避免了“订单生成了，但库存没扣减”或者“库存扣了，但订单日志没记下来”这种极其严重的数据不一致问题。
+                    - 会话变量的巧妙运用 (@order_id)
+                        在生成主订单后，立刻通过 SET @order_id = LAST_INSERT_ID(); 拿到了刚刚插入的主键 ID。
+                        为什么这么做？因为后续的订单明细表（order_items）和日志表（order_logs）都需要关联这个主订单 ID。
+                        使用 MySQL 的用户自定义变量（以 @ 开头）可以在同一个会话中方便地传递这个值，免去了在应用层（如 Java/Python）额外查一次数据库的开销。
+                    - 并发安全的库存扣减
+                        UPDATE products SET stock = stock - 2 WHERE id = 1;
+                        高并发下的安全性：这是一种非常优秀的写法。它直接在数据库层面进行计算，而不是先查出当前库存、在代码里做减法再写回去。
+                        这样即使有 100 个人同时买这件商品，数据库的行级锁也会保证库存绝对不会被扣成负数（超卖）。
+
+            3. 批量数据导入
+                使用事务提高批量导入的效率和可靠性：
+                    START TRANSACTION;
+                    -- 插入1000条数据
+                    INSERT INTO users (name, age, email) VALUES
+                    ('用户1', 20, 'user1@example.com'),
+                    ('用户2', 21, 'user2@example.com'),
+                    ...  -- 省略998条
+                    ('用户1000', 30, 'user1000@example.com');
+                    -- 批量更新
+                    UPDATE users SET age = age + 1 WHERE age < 25;
+                    COMMIT;
+
+
+    2.4 Python 事务操作实战
+
+        2.4.1 pymysql 事务操作
+            使用 pymysql 在 Python 中进行事务控制的完整示例：
+                1. 基本事务操作
+                    base_transaction.py
+
+                    conn.autocommit(False)：开启事务（关闭自动提交）
+                    conn.autocommit(True)：恢复自动提交模式
+
+                2. 带保存点的事务
+                    transaction_savepoint.py
+
+                    这个保存点的语法好像过时了，印象中在上次学的时候
+
+                3. 转账示例（完整实现）
+                    transfer_money.py
+
+        2.4.2 sqlite3 事务操作
+            使用 Python 内置的 sqlite3 模块进行事务控制：
+            (应该先创建好数据库然后，再操作)
+
+                1. 基本事务操作
+                    base_sqlite.py
+
+                2. 使用上下文管理器
+                    context_sqlite.py
+
+                3. 批量插入示例
+                    executemany_sqlite.py
+
+                4. 事务隔离级别设置（SQLite 仅支持 SERIALIZABLE）
+                    isolation_sqlite.py
+
+    2.5 事务最佳实践
+
+        2.5.1 事务设计原则
+            基于实践经验的事务设计最佳实践：
+            1. 事务大小控制
+                - 保持事务简短，只包含必要的数据库操作
+                - 避免在事务中执行耗时操作（如文件读写、网络请求）
+                - 大事务会持有锁时间过长，影响并发性能
+                - 建议单个事务执行时间不超过 1 秒
+            2. 事务边界控制
+                - 明确事务的开始和结束点
+                - 避免自动提交模式下的隐性事务
+                - 使用START TRANSACTION显式开启事务
+                - 及时COMMIT或ROLLBACK，避免事务悬挂
+                    事务的结束必须以 COMMIT 或 ROLLBACK 中的任一方式来完成，以确保数据的原子性（要么全部成功，要么全部失败）。
+                    需要特别注意的是，一旦执行了 COMMIT 操作，事务中的修改就会成为数据库的永久部分，此时就无法再对该事务进行回滚（ROLLBACK）了。
+                    因此，在执行提交前务必确保业务逻辑的正确性。
+            3. 锁竞争优化
+                - 按照相同顺序访问资源，避免死锁
+                - 减少事务中的锁持有时间
+                - 合理使用乐观锁（通过版本号或时间戳）
+                - 对于只读操作，使用READ ONLY事务
+            4. 异常处理策略
+                - 使用 try-except 块捕获所有数据库异常
+                - 事务内发生错误时立即回滚
+                - 记录详细的错误信息，但避免泄露敏感数据
+                - 考虑重试机制（适用于临时性错误）
+
+        2.5.2 事务性能优化
+            1. 批量操作优化
+                - 将多条 DML 语句放在一个事务中
+                - 使用executemany批量执行，减少网络往返
+                - 适当增大事务大小，但不要超过内存限制
+                - 示例：1000 条插入语句可在一个事务内完成
+            2. 锁优化
+                - 合理设置隔离级别，避免过度使用 SERIALIZABLE
+                - 使用索引减少锁的范围（行锁 vs 表锁）
+                - 对只读查询使用快照隔离（WITH CONSISTENT SNAPSHOT）
+                - 避免在事务内进行全表扫描
+            3. 连接管理
+                - 使用连接池复用数据库连接
+                - 事务结束后及时释放连接
+                - 避免长连接占用资源
+                - 合理设置连接超时时间
+            4. 数据库配置优化
+                - 调整 innodb_buffer_pool_size（建议为物理内存的 70-80%）
+                - 优化 innodb_log_file_size（影响事务提交性能）
+                - 启用 binlog（但会增加 I/O 开销）
+                - 考虑使用更快的存储引擎（如 MyRocks）
+
+
+三、连接池基础理论与实践
+
+    3.1 连接池的概念与原理
+
+        3.1.1 连接池的作用
+            数据库连接池是一种管理数据库连接的技术，它预先创建一定数量的数据库连接并保存在池中，需要时从池中获取连接，使用完毕后归还连接而不是直接关闭。
+
+            为什么需要连接池？
+                - 减少连接创建开销：数据库连接的建立需要 TCP 握手、身份认证、权限检查等步骤，耗时可达毫秒级
+                - 控制并发连接数：避免因并发过高导致数据库崩溃
+                - 提高响应速度：直接从池中获取连接，无需等待创建过程
+                - 统一管理连接：监控连接使用情况，及时回收失效连接
+
+            连接池的核心优势：
+                - 性能提升：避免频繁创建和销毁连接的开销
+                - 资源控制：限制最大连接数，保护数据库
+                - 连接复用：减少认证和初始化时间
+                - 监控管理：统计连接使用情况，优化配置
+
+        3.1.2 连接池工作原理
+            连接池的基本工作原理包括以下几个核心组件：
+                1. 连接池管理器
+                    - 创建和维护连接池
+                    - 监控连接状态（空闲、使用中、失效）
+                    - 处理连接的创建、获取、归还、销毁
+                2. 连接池配置参数
+                    - max_connections：最大连接数（池的容量）
+                    - min_idle_connections：最小空闲连接数
+                    - max_idle_connections：最大空闲连接数
+                    - connection_timeout：获取连接的超时时间
+                    - idle_timeout：空闲连接的超时时间
+                3. 连接状态管理
+                    - 创建状态：初始化连接参数
+                    - 空闲状态：连接可用，等待被获取
+                    - 使用状态：连接正在被使用
+                    - 销毁状态：连接被关闭或失效
+                4. 工作流程
+                    1.应用程序请求数据库连接
+                    2.连接池检查是否有空闲连接
+                        - 有空闲连接：直接返回
+                        - 无空闲连接：检查是否达到最大连接数
+                            未达上限：创建新连接
+                            已达上限：等待或抛出异常
+                    3.应用程序使用连接执行数据库操作
+                    4.操作完成后归还连接到池（标记为空闲）
+                    5.连接池定期清理失效连接和空闲超时连接
