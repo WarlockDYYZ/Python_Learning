@@ -760,3 +760,87 @@
                     3.应用程序使用连接执行数据库操作
                     4.操作完成后归还连接到池（标记为空闲）
                     5.连接池定期清理失效连接和空闲超时连接
+
+
+    3.2 连接池实现
+
+        3.2.1 DBUtils 连接池
+                DBUtils 是 Python 中最常用的数据库连接池实现，提供了线程安全的连接池机制。
+
+                使用 DBUtils 创建连接池：
+
+                    dbutils_pooleddb.py
+
+                    参数解释：
+                        creator：数据库驱动模块（如 pymysql、sqlite3）
+                        maxconnections：最大连接数（0 或 None 表示无限制）
+                        mincached：初始化时创建的空闲连接数
+                        maxcached：最多保持的空闲连接数
+                        blocking：当连接池耗尽时，是否阻塞等待新连接
+                        maxusage：单个连接的最大使用次数（0 或 None 表示不限制）
+                        setsession：连接创建后执行的 SQL 命令列表
+                        ping：连接检查机制（0 = 不检查，1 = 默认，2 = 空闲时检查，4 = 每次使用前检查）
+
+        3.2.2 SQLAlchemy 连接池
+            SQLAlchemy 是强大的 ORM 框架，内置了连接池功能：
+
+            使用 SQLAlchemy 创建连接池：
+
+                参数解释：
+                    pool_size: 连接池大小（默认5）
+                    max_overflow: 超过pool_size的连接数（默认10）
+                    pool_recycle: 连接回收时间（秒，0表示不回收）
+                    pool_pre_ping: 是否在使用前检查连接有效性
+                    echo: 是否打印SQL语句（调试用）
+
+
+    3.3 Python 连接池实战
+
+        3.3.1 DBUtils 连接池实战
+            1. 基本使用示例
+            2. 批量操作优化
+            3. 连接池监控
+
+                base_dbutils.py
+
+        3.3.2 SQLAlchemy 连接池实战
+            1. 基本使用示例
+
+                base_sqlalchemy.py
+
+            2. ORM 集成示例
+
+                sqlalchemy_ORM.py
+
+
+    3.4 连接池最佳实践
+
+        3.4.1 连接池配置建议
+            基于不同应用场景的连接池配置建议：
+                1. 通用配置原则
+                    - 连接池大小：通常设置为 CPU 核心数的 2-4 倍
+                    - 最小空闲连接：建议为最大连接数的 1/3 到 1/2
+                    - 连接超时：获取连接超时设置为 5-10 秒
+                    - 空闲超时：300-3600 秒（5 分钟到 1 小时）
+                2. Web 应用配置
+                    - 并发特点：短连接、高并发、快速释放
+                    - 配置建议：
+                        max_connections: 20-50（根据服务器性能）
+                        mincached: 5-10
+                        maxcached: 10-20
+                        maxusage: 100-500（避免连接泄漏）
+                3. 数据分析配置
+                    - 并发xcached: 3-5
+                    - 增特点：长连接、低并发、大量数据处理
+                    - 配置建议：
+                        max_connections: 5-10（避免内存溢出）
+                        mincached: 2-3
+                        maxcached: 3-5
+                        增大查询超时时间（300 秒以上）
+                4. 批处理任务配置
+                    - 并发特点：中等并发、批量操作、长时间运行
+                    - 配置建议：
+                        max_connections: 10-20
+                        mincached: 3-5
+                        maxcached: 5-10
+                        考虑使用连接复用（maxusage=0）
