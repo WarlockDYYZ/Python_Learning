@@ -88,3 +88,61 @@ print('*' * 100 + '\n')
 
 df_grouped = df.groupby(['季度', '产品品类'])
 print(df_grouped.head().to_string())
+
+
+# 聚合 agg
+# 多指标聚合
+result = df.groupby('季度').agg({
+'单价': ['mean', 'std'],
+'销量': ['sum', 'count']
+})
+print(result)
+
+
+# 自定义聚合函数
+
+
+# 自定义聚合函数
+def calculate_range(x):
+    return x.max() - x.min()
+
+
+# 使用自定义函数聚合
+df.groupby('季度')['价格'].agg({
+'平均价格': 'mean',
+'价格范围': calculate_range,
+'最高价格': lambda x: x[x > x.mean()].max()
+})
+# 使用字典指定不同列的聚合函数
+aggregation_dict = {
+'价格': ['mean', 'std'],
+'销量': ['sum', 'count'],
+'折扣': lambda x: x[x > 0.9].mean()
+}
+grouped_df = df.groupby('季度').agg(aggregation_dict)
+
+
+# GroupBy高级参数
+# 保持原始索引格式
+df_grouped = df.groupby('季度', as_index=False)
+# 禁用自动排序
+df_grouped = df.groupby('季度', sort=False)
+# 按值分组
+df_grouped = df.groupby(df['价格'] // 1000)
+# 按条件分组
+df_grouped = df.groupby(df['销量'] > 100)
+
+
+# 性能优化
+# 使用category类型优化分组键
+df['季度'] = df['季度'].astype('category')
+grouped_df = df.groupby('季度')
+# 避免不必要的列参与分组
+grouped_df = df[['季度', '价格']].groupby('季度')
+# 使用哈希分组而非排序分组
+grouped_df = df.groupby('季度', observed=True)
+# 避免使用apply函数，优先使用内置聚合函数
+# 低效方法
+df.groupby('季度').apply(lambda x: x['价格'].mean())
+# 高效方法
+df.groupby('季度')['价格'].mean()
