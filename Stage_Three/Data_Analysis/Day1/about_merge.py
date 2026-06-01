@@ -76,3 +76,22 @@ concatenated_df = pd.concat(
     keys=['2025年', '2026年'],
     names=['年份', 'None']
 )
+
+
+# join()
+# 基于索引的左连接（默认）
+df_joined = df1.join(df2)
+# 基于索引的右连接
+df_joined = df1.join(df2, how='right')
+# 指定连接键
+df_joined = df1.join(
+    df2,
+    on='客户ID',
+    how='left'
+)
+# 处理重名列
+df_joined = df1.join(
+    df2.add_suffix('_right'),
+    on='客户ID',
+    how='left'
+)
