@@ -1,12 +1,10 @@
 import pandas as pd
-import numpy as np
 
-from Stage_Three.Data_Analysis.Day1.about_merge import merged_df
 
 # 加载销售数据
 sales_df = pd.read_csv('sales_data.csv', encoding='utf-8-sig')
 # 检查数据质量
-print(sales_df.info())
+sales_df.info()
 print(sales_df.isnull().sum())
 
 
@@ -17,11 +15,10 @@ sales_df['折扣率'] = sales_df['折扣率'].fillna(1.0)
 # 处理重复值
 sales_df.drop_duplicates(subset=['订单ID', '产品ID'], inplace=True)
 # 创建新特征
-sales_df['销售额'] = sales_df['单价'] * sales_df['销量'] * sales_df
-['折扣率']
+sales_df['销售额'] = sales_df['单价'] * sales_df['销量'] * sales_df['折扣率']
 sales_df['年份'] = sales_df['订单日期'].dt.year
 sales_df['季度'] = sales_df['订单日期'].dt.quarter
-sales_df['月'] = sales_df['订单日期'].dt.month_name(lang='zh-tw')()
+sales_df['月'] = sales_df['订单日期'].dt.month_name(lang='zh-tw')
 # 转换数据类型
 sales_df['客户ID'] = sales_df['客户ID'].astype('category')
 sales_df['产品类别'] = sales_df['产品类别'].astype('category')
@@ -129,30 +126,30 @@ with pd.ExcelWriter('分析报告.xlsx', engine='xlsxwriter') as writer:
     # 导出合并数据
     merged_df.to_excel(writer, sheet_name='合并销售客户', index=False)
 
-# 设置条件格式
-workbook = writer.book
-format_red = workbook.add_format({'bg_color': '#FFC7CE', 'font_color': '#9C0006'})
-format_green = workbook.add_format({'bg_color': '#D8E4BC', 'font_color': '#226600'})
+    # 设置条件格式
+    workbook = writer.book
+    format_red = workbook.add_format({'bg_color': '#FFC7CE', 'font_color': '#9C0006'})
+    format_green = workbook.add_format({'bg_color': '#D8E4BC', 'font_color': '#226600'})
 
-# 获取透视表工作表
-ws_pivot = writer.sheets['地区季度销售']
-# 高亮最高销售额
-ws_pivot.conditional_format('C2:G7', {
-    'type': 'cell',
-    'criteria': '>=',
-    'value': 100000,
-    'format': format_red
-})
-# 获取交叉表工作表
-ws_cross = writer.sheets['产品季度交叉']
-# 高亮季度变化
-for col_num in range(2, ws_cross.ncols):
-    ws_cross.conditional_format(0, col_num, ws_cross.nrows, col_num, {
-    'type': 'cell',
-    'criteria': '>=',
-    'value': 100000,
-    'format': format_red
-})
+    # 获取透视表工作表
+    ws_pivot = writer.sheets['地区季度销售']
+    # 高亮最高销售额
+    ws_pivot.conditional_format('C2:G7', {
+        'type': 'cell',
+        'criteria': '>=',
+        'value': 100000,
+        'format': format_red
+    })
+    # 获取交叉表工作表
+    ws_cross = writer.sheets['产品季度交叉']
+    # 高亮季度变化
+    for col_num in range(2, ws_cross.ncols):
+        ws_cross.conditional_format(0, col_num, ws_cross.nrows, col_num, {
+        'type': 'cell',
+        'criteria': '>=',
+        'value': 100000,
+        'format': format_red
+    })
 
-# 导出为CSV文件
-sales_df.to_csv('清洗销售数据.csv', index=False)
+    # 导出为CSV文件
+    sales_df.to_csv('清洗销售数据.csv', index=False)

@@ -11,11 +11,10 @@ cleaned_df = sales_df.copy()
 # 使用向量化操作代替循环
 # 低效方法，循环遍历 + 索引不连续 + loc 动态赋值 = 必报错！
 for i in range(len(cleaned_df)):
-    if cleaned_df.loc[i, '销量'] > 0:
+    if cleaned_df.loc[i, '销量'] > 0:  # 获取第 i 行销量列的值
         cleaned_df.loc[i, '销售额'] = cleaned_df.loc[i, '销量'] * cleaned_df.loc[i, '单价']
 # 高效方法,向量化计算
-cleaned_df['销售额'] = np.where(cleaned_df['销量'] > 0, cleaned_df
-['销量'] * cleaned_df['单价'], 0)
+cleaned_df['销售额'] = np.where(cleaned_df['销量'] > 0, cleaned_df['销量'] * cleaned_df['单价'], 0)
 
 # 使用category类型优化内存
 categorical_cols = ['地区', '产品类别', '客户等级']
@@ -28,7 +27,7 @@ cleaned_df[categorical_cols] = cleaned_df[categorical_cols].astype('category')
 # 分块处理大数据
 def process_large_data(file_path, chunksize=10000):
     chunks = []
-    for chunk in pd.read_csv(file_path, chunksize=chunksize):
+    for chunk in pd.read_csv(file_path, chunksize=chunksize):  # 10000 一组
         # 数据清洗操作
         chunk['销售额'] = chunk['销量'] * chunk['单价']
         chunk['订单日期'] = pd.to_datetime(chunk['订单日期'])
@@ -38,6 +37,7 @@ def process_large_data(file_path, chunksize=10000):
         '销售额': 'sum'
         })
         chunks.append(chunk_grouped)
+
     return pd.concat(chunks).groupby(['地区', '产品类别']).sum()
 
 
@@ -46,7 +46,7 @@ grouped_df = pd.DataFrame()
 # 避免使用apply函数
 # 低效方法
 grouped_df['销售额占比'] = grouped_df.apply(
-lambda x: x['销售额'] / x['销售额'].sum()
+    lambda x: x['销售额'] / x['销售额'].sum()
 )
 # 高效方法
 total_sales = grouped_df['销售额'].sum()
@@ -62,19 +62,22 @@ sales_df['季度销售额均值'] = sales_df.groupby('季度')['销售额'].tran
 # 使用category类型优化分组键
 sales_df['季度'] = sales_df['季度'].astype('category')
 sales_df['地区'] = sales_df['地区'].astype('category')
+
 # 预先计算聚合值
 aggregated_df = sales_df.groupby(['季度', '地区'])['销售额'].sum().reset_index()
 # 使用透视表重塑结构
 pivot_table_optimized = pd.pivot_table(
-data=aggregated_df,
-values='销售额',
-index='季度',
-columns='地区',
-aggfunc='sum',
-fill_value=0
+    data=aggregated_df,
+    values='销售额',
+    index='季度',
+    columns='地区',
+    aggfunc='sum',
+    fill_value=0
 )
 # 处理透视表中的空值
 pivot_table_optimized.fillna(0, inplace=True)
+
+
 # 使用多线程处理
 from joblib import Parallel, delayed
 
@@ -89,7 +92,7 @@ def group_by_category(chunk):
 
 # 并行处理
 results = Parallel(n_jobs=-1, backend='threading')(
-delayed(group_by_category)(chunk) for chunk in pd.read_csv('large_sales_data.csv', chunksize=10000)
+    delayed(group_by_category)(chunk) for chunk in pd.read_csv('large_sales_data.csv', chunksize=10000)
 )
 # 合并结果
 final_result = pd.concat(results).groupby('产品类别').sum()
