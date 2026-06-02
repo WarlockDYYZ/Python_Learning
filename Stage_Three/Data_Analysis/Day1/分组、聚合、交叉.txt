@@ -539,9 +539,110 @@ Pandas的分组聚合、透视表和数据合并功能构成了数据分析的�
     5.6 结果导出与可视化
 
 
+六、最佳实践与性能优化
+    高效利用Pandas
+    进行数据分析需要遵循一些最佳实践，特别是在处理大规模数据时。
+
+    6.1 数据清洗最佳实践
+        在 pandas 里，永远不要用 for 循环遍历行！，很可能报错，因为：
+            1. 索引不匹配（最常见报错原因）
+                对数据进行操作，如筛选、分组、删除行、重置索引，导致索引不是连续的 0,1,2,3...
+                cleaned_df.loc[i] 找不到这一行 → 直接报错！
+            2. loc 逐行赋值会触发警告（SettingWithCopyWarning）
+                即使不报错，也会出现：
+                SettingWithCopyWarning: A value is trying to be set on a copy of a slice from a DataFrame
+                pandas 不推荐用循环 + .loc 逐行改数据。
+            3. 编辑器类型警告
+                Unresolved reference
+                Unexpected type
+                因为编辑器无法识别 .loc[i, '列名'] 这种动态取值的类型。
+            4. 如果列不存在，也会报错(这个应该就是代码报错的原因，什么时候验证一下)
+
+    6.2 分组聚合优化
+
+    6.3 透视表优化
 
 
+七、常见问题与解决方案
+
+    7.1 分组聚合问题
+        Q:分组聚合后索引处理不当导致的错误
+            # 错误示例
+            grouped_df = df.groupby('季度')
+            mean_price = grouped_df['价格'].mean()  # 产生季度索引的Series
+            # 错误：尝试直接访问索引列
+            # grouped_df['季度']  # 报错：KeyError: '季度'
+
+            # 正确方法：重置索引
+            grouped_df = df.groupby('季度', as_index=False)
+            mean_price = grouped_df['价格'].mean()  # 保持季度为普通列
+
+        Q: 分组后应用函数导致的维度不匹配
+            # 错误示例：apply返回标量，导致维度不匹配
+            # grouped_df['价格'].apply(lambda x: x.max() - x.min())
+
+            # 正确方法：使用transform保持维度一致
+            df['价格范围'] = df.groupby('产品类别')['价格'].transform(
+            lambda x: x.max() - x.min()
+            )
+
+    7.2 透视表问题
+        Q: 透视表多层索引处理不当
+            # 错误示例：直接使用多层索引列名
+            # pivot_table['地区', '季度']
+
+            # 正确方法：使用元组或层次化访问
+            # 访问第一层索引
+            pivot_table.index.get_level_values(0)
+            # 访问第二层索引
+            pivot_table.index.get_level_values(1)
+            # 使用unstack转换索引层次
+            flattened_pivot = pivot_table.unstack(level=0)
+
+        Q: 透视表合并单元格问题
+            # 错误示例：直接使用reset_index导致层次索引丢失
+            # pivot_table.reset_index()  # 可能产生重复索引
+
+            # 正确方法：使用reset_index的level参数
+            flattened_pivot = pivot_table.reset_index(level=[0, 1])
+            # 或者使用swaplevel调整层次顺序
+            reordered_pivot = pivot_table.swaplevel(0, 1, axis=1)
+
+    7.3 合并操作问题
+        Q: 合并键不匹配导致的错误
+            # 错误示例：合并键名称不一致
+            # pd.merge(df1, df2, on='客户ID')  # 如果df2中列名为'客户ID_2'则报错
+
+            # 正确方法：明确指定左右表的键
+            merged_df = pd.merge(
+                df1,
+                df2,
+                left_on='客户ID',
+                right_on='客户ID_2',
+                suffixes=('_左', '_右')
+            )
+
+        Q: 合并后数据维度不正确
+            # 错误示例：左表和右表的客户ID有重复值，导致笛卡尔积
+            # df1中有多个相同的客户ID，df2中也有相同的客户ID_2
+
+            # 正确方法：设置validate参数确保键唯一性
+            merged_df = pd.merge(
+                df1,
+                df2,
+                left_on='客户ID',
+                right_on='客户ID_2',
+                how='left',
+                validate='1:1'  # 确保左右表的客户ID都是唯一的
+            )
 
 
+八、总结与进阶方向
+    Pandas的分组聚合、透视表和数据合并功能构成了数据分析的三大支柱，掌握这些技术能够从多角度洞察数据价值。
 
-
+    进阶学习方向：
+        1.时间序列分析：结合resample()和groupby()进行时间维度的聚合分析
+        2.数据可视化：将聚合和透视结果与Matplotlib、Seaborn等可视化库结合
+        3.数据管道构建：使用pipe()方法构建可复用的数据处理管道
+        4.高级数据合并：探索join()、merge()和concat()的复杂应用场景
+        5.性能调优：深入学习Cython优化、Dask并行计算等大规模数据处理技术
