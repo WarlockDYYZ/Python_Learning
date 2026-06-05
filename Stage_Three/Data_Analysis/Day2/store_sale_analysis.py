@@ -38,20 +38,45 @@ sales_df['7d_avg_sales'] = sales_df.groupby('store')['sales'].transform(
     lambda x: x.rolling(window='7D', min_periods=1).mean()
 )
 print(sales_df.head().to_string())
-#
-# # 4. 分组扩展窗口计算：计算每个门店的逐日累计销售额
-# sales_df['cumulative_sales'] = sales_df.groupby('store')['sales'].expanding(min_periods=1).sum().reset_index(0, drop=True)
-#
-# # 5. 查看每个门店的核心统计结果
-# # 提取每个门店的最后一条记录，得到最终的累计销售额和7日滚动平均销售额
-# final_stats = sales_df.groupby('store')[['sales', '7d_avg_sales', 'cumulative_sales']].last()
-# print(final_stats.to_string())
-#
-# # 6. 可视化：对比不同门店的7日滚动平均销售额趋势
-# plt.figure(figsize=(12, 6))
-# for store in sales_df['store'].unique():
-#     store_data = sales_df[sales_df['store'] == store]
-#     plt.plot(store_data.index, store_data['7d_avg_sales'], label=store)
-# plt.title('各门店7日滚动平均销售额趋势对比')
-# plt.legend()
-# plt.show()
+
+# 4. 分组扩展窗口计算：计算每个门店的逐日累计销售额
+sales_df['cumulative_sales'] = sales_df.groupby('store')['sales'].transform(
+    lambda x: x.expanding(min_periods=1).sum()
+)
+
+# 5. 查看每个门店的核心统计结果
+# 提取每个门店的最后一条记录，得到最终的累计销售额和7日滚动平均销售额
+final_stats = sales_df.groupby('store')[['sales', '7d_avg_sales', 'cumulative_sales']].last()
+print(final_stats.to_string())
+
+# 6. 可视化：对比不同门店的7日滚动平均销售额趋势
+plt.figure(figsize=(12, 6))
+for store in sales_df['store'].unique():
+    store_data = sales_df[sales_df['store'] == store]
+    plt.plot(store_data.index, store_data['7d_avg_sales'], label=store)
+plt.title('各门店7日滚动平均销售额趋势对比')
+plt.legend()
+plt.show()
+
+
+# 计算周环比
+# 接上面的销售数据，按门店和周度分组，计算每周的汇总销售额
+# 1. 先按门店分组，再按周度重采样，计算每个门店的每周汇总销售额
+weekly_sales = sales_df.groupby('store')\
+   .resample('W')['sales']\
+   .sum()\
+   .reset_index()
+# 2. 分组窗口计算：计算每个门店的上周汇总销售额
+weekly_sales['last_week_sales'] = weekly_sales.groupby('store')['sales'].shift(1)
+# 3. 计算环比增长率：（本周销售额 - 上周销售额） / 上周销售额 * 100%
+weekly_sales['growth_rate'] = (weekly_sales['sales'] - weekly_sales['last_week_sales']) / weekly_sales['last_week_sales'] * 100
+# 4. 查看计算结果，重点验证环比增长率的计算是否正确
+print(weekly_sales.head(10))
+# 5. 可视化：对比不同门店的周度环比增长率
+plt.figure(figsize=(12, 6))
+for store in weekly_sales['store'].unique():
+   store_data = weekly_sales[weekly_sales['store'] == store]
+   plt.plot(store_data['date'], store_data['growth_rate'], label=store)
+plt.title('各门店周度销售额环比增长率对比')
+plt.legend()
+plt.show()
