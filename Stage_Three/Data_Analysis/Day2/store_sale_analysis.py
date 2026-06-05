@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 
 plt.rcParams['font.sans-serif'] = ['SimHei']
@@ -23,6 +24,7 @@ sales_df = pd.DataFrame({
     'region': regions,
     'sales': sales
 })
+# print(sales_df)
 
 # 2. 数据预处理：将日期列设为datetime类型并排序
 sales_df['date'] = pd.to_datetime(sales_df['date'])
@@ -50,10 +52,16 @@ final_stats = sales_df.groupby('store')[['sales', '7d_avg_sales', 'cumulative_sa
 print(final_stats.to_string())
 
 # 6. 可视化：对比不同门店的7日滚动平均销售额趋势
-plt.figure(figsize=(12, 6))
-for store in sales_df['store'].unique():
-    store_data = sales_df[sales_df['store'] == store]
-    plt.plot(store_data.index, store_data['7d_avg_sales'], label=store)
+fig, ax = plt.subplots(figsize=(12, 6))
+# for store in sorted(sales_df['store'].unique()):
+#     store_data = sales_df[sales_df['store'] == store]
+#     plt.plot(store_data.index, store_data['7d_avg_sales'], label=store)
+
+# 直接调用 plot 方法，Pandas 会自动按 'store' 列分组，并生成带有图例的折线图
+sales_df.groupby('store')['7d_avg_sales'].plot(ax=ax, legend=True)
+ax.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=0))
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%y-%m-%d'))
+
 plt.title('各门店7日滚动平均销售额趋势对比')
 plt.legend()
 plt.show()
@@ -62,17 +70,18 @@ plt.show()
 # 计算周环比
 # 接上面的销售数据，按门店和周度分组，计算每周的汇总销售额
 # 1. 先按门店分组，再按周度重采样，计算每个门店的每周汇总销售额
-weekly_sales = sales_df.groupby('store')\
-   .resample('W')['sales']\
-   .sum()\
-   .reset_index()
+weekly_sales = sales_df.groupby('store').resample('W-MON')['sales'].sum().reset_index()
+# print(weekly_sales.head(10))
 # 2. 分组窗口计算：计算每个门店的上周汇总销售额
 weekly_sales['last_week_sales'] = weekly_sales.groupby('store')['sales'].shift(1)
 # 3. 计算环比增长率：（本周销售额 - 上周销售额） / 上周销售额 * 100%
 weekly_sales['growth_rate'] = (weekly_sales['sales'] - weekly_sales['last_week_sales']) / weekly_sales['last_week_sales'] * 100
 # 4. 查看计算结果，重点验证环比增长率的计算是否正确
 print(weekly_sales.head(10))
+
 # 5. 可视化：对比不同门店的周度环比增长率
+weekly_sales = weekly_sales[weekly_sales['date'].between('2023-01-16', '2023-03-27')].reset_index(drop=True)
+print(weekly_sales.head(16))
 plt.figure(figsize=(12, 6))
 for store in weekly_sales['store'].unique():
    store_data = weekly_sales[weekly_sales['store'] == store]

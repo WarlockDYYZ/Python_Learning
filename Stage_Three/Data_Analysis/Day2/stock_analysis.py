@@ -8,7 +8,7 @@ plt.rcParams['axes.unicode_minus'] = False
 
 # 1. 模拟生成股票数据：生成一只股票的30个交易日的收盘价和成交量数据
 np.random.seed(42)
-dates = pd.date_range('2023-01-01', periods=30, freq='D')
+dates = pd.date_range('2023-01-01', periods=30, freq='D')  # 生成 30 天的时间，01~30，包括第一天
 # 生成收盘价数据：以100元为基准，添加一个随机游走的波动，模拟真实股价的变化趋势
 price = 100 + np.cumsum(np.random.normal(0.1, 1, 30))
 # 生成成交量数据：在100万股到500万股之间随机波动
@@ -21,6 +21,8 @@ stock_df = pd.DataFrame({
 
 # 2. 设时间索引，确保时间序列的语义正确
 stock_df = stock_df.set_index('date').sort_index()
+# 确保索引被识别为 DatetimeIndex（如果之前没有识别的话）
+stock_df.index = pd.to_datetime(stock_df.index)
 
 # 3. 计算技术指标（由于模拟数据只有一只股票，无需额外分组）
 # 3.1 计算5日简单移动平均线（SMA）
@@ -31,10 +33,11 @@ stock_df['EMA_5'] = stock_df['close'].ewm(span=5).mean()
 stock_df['rolling_std'] = stock_df['close'].rolling(window=5).std()
 stock_df['Upper_Band'] = stock_df['SMA_5'] + 2 * stock_df['rolling_std']
 stock_df['Lower_Band'] = stock_df['SMA_5'] - 2 * stock_df['rolling_std']
+# print(stock_df)
 
 # 4. 计算收益率指标
 # 4.1 计算每日收益率：当日收盘价相对于前一日收盘价的涨跌幅
-stock_df['daily_return'] = stock_df['close'].pct_change()
+stock_df['daily_return'] = stock_df['close'].pct_change().fillna(0)
 # 4.2 计算累计收益率：从第一个交易日到当日的总收益率
 stock_df['cumulative_return'] = (1 + stock_df['daily_return']).cumprod() - 1
 
