@@ -188,6 +188,71 @@
 
             request.get_json() 方法会自动将 JSON 字符串转换为 Python 字典，方便在视图函数中处理。
             下面是获取 JSON 数据的示例：
+                request_json.py
+
+            视图函数首先检查请求头的 Content-Type 字段是否为 application/json，再解析请求体中的 JSON 数据，
+                    最后返回 JSON 格式的响应，这也是 RESTful API 开发中常见的参数处理流程。
+
+            # 启动服务
+            flask --app request_json run
+            # 终端输入
+            Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5000/api/login" -ContentType "application/json" -Body '{"username":"admin","password":"secret"}'
+            返回：
+                message  username
+                -------  --------
+                登录成功  admin
+
+        3.2.4 上传文件参数
+            通过 HTML 表单上传的文件，会被封装在 request.files 对象中，该对象是一个类字典对象，键对应表单中 <input type="file"> 字段的 name 属性值。
+            获取文件时需要使用 secure_filename() 函数对上传的文件名进行处理，过滤掉可能包含恶意路径的字符，再调用 save() 方法将文件保存到服务器的指定目录中。
+            关于文件上传的完整注意事项和实战代码，会在后续的 7.2 章节中详细展开。
+
+
+4. 【基础篇】Jinja2 模板引擎与基础渲染
+    在 Web 应用中，直接在 Python 代码中拼接 HTML 字符串是非常低效的，而且会导致业务逻辑与视图展示逻辑耦合，难以维护。
+    Flask 内置了 Jinja2 模板引擎，可以将业务逻辑与视图展示逻辑分离：
+        视图函数负责处理业务逻辑、准备数据，模板文件负责将数据渲染成完整的 HTML 页面。
+
+
+    4.1 模板基本概念
+        模板本质是一个包含静态内容和动态内容占位符的文本文件，它可以生成任何类型的文本文件，包括 HTML、XML、Markdown 等。
+        在 Flask 中，默认的模板文件必须存放在应用目录下的 templates 文件夹中 ——Flask 会自动从该文件夹中加载模板文件，无需额外配置。
+
+        如果应用是一个单独的 Python 模块（比如 app.py），那么 templates 文件夹需要和该模块放在同一级目录下；
+        如果应用是一个包（比如 myapp/），那么 templates 文件夹需要放在包的内部，与包的 __init__.py 文件同级。
+
+
+    4.2 模板渲染逻辑
+        Flask 提供了 render_template() 函数来渲染模板，它会读取模板文件的内容，并且将其中的动态占位符替换为具体的变量值，最后返回渲染后的 HTML 字符串。
+        render_template() 函数的第一个参数是模板文件的名称（相对于 templates 目录的路径），
+                后续参数是需要传递到模板中的变量，参数的键就是模板中使用的变量名。
+
+        简单的模板渲染示例：
+            hello2.py
+
+        视图函数根据路由规则接收可选的 name 参数，随后调用 render_template() 函数，将 hello.html 模板和 person 变量的值一并传递给 Jinja2 引擎进行渲染。
+
+        hello.html，模板中 {{ person }} 是变量占位符，它会被视图函数传递的 person 变量值替换；
+                {% if person %} 和 {% endif %} 是 Jinja2 的控制结构，
+                用于根据 person 变量的值动态渲染不同的 HTML 内容。
+
+
+    4.3 Jinja2 模板语法
+        Jinja2 模板语法非常灵活，主要包含三类核心结构：变量、控制结构和注释。下面是对这些语法结构的详细介绍。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

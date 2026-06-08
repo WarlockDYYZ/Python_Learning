@@ -1,7 +1,9 @@
 from flask import Flask, request, jsonify
 app = Flask(__name__)
 
-@app.route('/api/login', methods=['POST'])
+app.config['JSON_AS_ASCII'] = False
+
+@app.route('/api/login', methods=['GET', 'POST'])
 def api_login():
     # 先判断请求体是否为JSON格式
     if not request.is_json:
