@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 定义标题块，子模板可以重写该块的内容 -->
+    <title>{% block title %}Flask应用{% endblock %}</title>
+    <!-- 加载公共CSS样式文件 -->
+<!--    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">-->
+    <!-- 定义样式块，子模板可以额外引入自己的CSS文件 -->
+    {% block styles %}{% endblock %}
+</head>
+<body>
+
+    <!-- 导航栏，所有页面公共的部分 -->
+    <nav>
+        <a href="{{ url_for('index') }}">首页</a>
+        <a href="{{ url_for('about') }}">关于</a>
+        {# {% if current_user.is_authenticated %} #}
+        <a href="{{ url_for('dashboard') }}">仪表板</a>
+        <a href="{{ url_for('logout') }}">登出</a>
+        {# {% else %} #}
+        <a href="{{ url_for('login') }}">登录</a>
+        {# {% endif %} #}
+    </nav>
+    <!-- 定义内容块，子模板必须重写该块来填充自己的特有内容 -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    <!-- 页脚，所有页面公共的部分 -->
+    <footer>
+        {% block footer %}© 2026 Flask应用{% endblock %}
+    </footer>
+    <!-- 加载公共JS脚本文件 -->
+<!--    <script src="{{ url_for('static', filename='js/script.js') }}"></script>-->
+    <!-- 定义脚本块，子模板可以额外引入自己的JS文件 -->
+    {% block scripts %}{% endblock %}
+</body>
+</html>

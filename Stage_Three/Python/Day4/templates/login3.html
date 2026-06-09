@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <form method="post">
+    <!-- 渲染CSRF令牌隐藏字段 -->
+    {{ form.hidden_tag() }}
+    <div>
+        <!-- 渲染邮箱字段的标签 -->
+        {{ form.email.label }}
+        <!-- 渲染邮箱字段的输入框 -->
+        {{ form.email }}
+        <!-- 如果邮箱字段有验证错误，显示错误信息 -->
+        {% if form.email.errors %}
+        <ul>
+            {% for error in form.email.errors %}
+            <li style="color: red;">{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    <div>
+        <!-- 渲染密码字段的标签 -->
+        {{ form.password.label }}
+        <!-- 渲染密码字段的输入框 -->
+        {{ form.password }}
+        <!-- 如果密码字段有验证错误，显示错误信息 -->
+        {% if form.password.errors %}
+        <ul>
+            {% for error in form.password.errors %}
+            <li style="color: red;">{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    <div>
+        <!-- 渲染记住我复选框 -->
+        {{ form.remember_me.label }}
+        {{ form.remember_me }}
+    </div>
+    <!-- 渲染提交按钮 -->
+    {{ form.submit }}
+</form> 
+</body>
+</html>
