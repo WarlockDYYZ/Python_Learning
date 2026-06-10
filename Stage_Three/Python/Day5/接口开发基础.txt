@@ -90,10 +90,188 @@
                     "msg": "success"
                 }
 
-        2.2.2 传参方式 2：查询参数（常用）
-            参数拼在 URL?后面，以key=value形式拼接，多个参数用&分隔，适合过滤、分页、搜索等场景（如分页查询用户列表）。
+            2.2.2 传参方式 2：查询参数（常用）
+                参数拼在 URL?后面，以key=value形式拼接，多个参数用&分隔，适合过滤、分页、搜索等场景（如分页查询用户列表）。
 
-            测试请求：http://127.0.0.1:5000/get/user/list?page=2&size=20&keyword=admin
+                测试请求：http://127.0.0.1:5000/get/user/list?page=2&size=20&keyword=admin
+
+            2.2.3 传参方式 3：请求头参数
+                参数放在 HTTP 请求头中，适合传输隐私信息（如鉴权 Token、接口签名），不会被浏览器缓存、不会暴露在 URL 中。
+
+                测试请求：web_test.py
+
+                补充：
+                    requests 第三方 HTTP 库，它充当了一个“客户端”（就像浏览器或 Postman 一样）来向你的 Flask 服务器发送请求。
+                    如何一步步实现功能：
+                        1. 导入库
+                            引入了 requests 库，它封装了底层的网络请求逻辑，可以用极其简单的代码发送各种 HTTP 请求（GET, POST 等）。
+                        2. 定义请求目标 (URL)
+                            要访问的 Flask 路由地址。127.0.0.1:5000 代表你本地运行的 Flask 服务器，/get/user/token 是具体的接口路径。
+                        3. 构造请求头 (Headers)
+                            在 HTTP 协议中，除了 URL 和请求体，还可以携带“请求头”。
+                            这里创建了一个 Python 字典，定义了要在请求头中携带的两个自定义字段：
+                                - Token 字段，值为 abc123
+                                - Version 字段，值为 2.0.0
+                        4. 发送 GET 请求
+                            最核心的一行。它做了以下几件事：
+                                - 向指定的 url 发起一个 HTTP GET 请求。
+                                - 将 headers 字典中的键值对，自动转换为标准的 HTTP 请求头格式附加在请求中。
+                                - 等待服务器处理完毕并返回结果。
+                                - 将服务器返回的响应（包含状态码、响应头、响应体等）打包成一个 Response 对象，并赋值给变量 response。
+                        5. 解析并打印响应结果
+                            Flask 后端返回的是 JSON 格式的字符串（如 {"code": 200, ...}）。
+                            response.json() 是 requests 库提供的一个便捷方法，它会自动将这段 JSON 字符串解析成 Python 的字典（dict）对象，
+                                    然后 print() 将其打印到控制台，方便查看结果。
+
+                    运行这段代码时，底层发生的事情是：
+                        1. 客户端 (Python) 组装了一个标准的 HTTP 报文，报文的头部包含了 Token: abc123 和 Version: 2.0.0。
+                        2. 报文通过网络发送给 127.0.0.1:5000。
+                        3. 服务端 (Flask) 收到报文，Flask 框架将其解析，把请求头放入 request.headers 对象中。
+                        4. Flask 路由函数执行 request.headers.get('Token')，成功提取出 abc123，然后返回 JSON。
+                        5. 客户端 (Python) 收到 JSON 响应，解析并打印出来。
+
+
+    2.3 Flask 实现 POST 接口与传参
+        POST 接口用于提交 / 写入数据，支持3 种传参方式，是前后端分离开发中最常用的接口类型。
+
+        2.3.1 传参方式 1：表单数据
+            传输application/x-www-form-urlencoded格式数据，兼容传统 HTML 表单提交，适合简单数据提交。
+
+            测试请求：添加参数username=lisi、age=25、email=lisi@qq.com
+
+            补充：
+                application/x-www-form-urlencoded
+                    这是 HTTP 协议中默认的表单数据提交格式（Content-Type）。
+                    当你在浏览器里点击一个普通的 <form> 提交按钮时，浏览器会自动把表单里的数据打包成这种格式发给服务器。
+                    它的长相非常像我们平时看到的网址参数：
+                        键=值&键=值
+                    假设有一个登录表单，输入了账号 admin，密码 123456。
+                    当以 application/x-www-form-urlencoded 格式提交时，发送给服务器的数据体（Body）长这样：
+                        username=admin&password=123456
+                        (注意：特殊字符会被 URL 编码，比如空格变成 %20)
+                    在早期的网页开发中，所有的数据交互都是靠 HTML 表单完成的。只要后端支持解析这种格式，它就完美兼容了所有传统的 HTML 表单。
+                    只要你的后端支持解析这种格式，它就完美兼容了所有传统的 HTML 表单。
+                    这是一种最古老、最基础的 HTTP 数据传输格式。它长得像 key=value&key=value，专门用来处理传统网页表单提交的简单文本数据。
+                    如果在后端使用 Flask，当使用 request.form.get('username') 来获取数据时，
+                            其实就是在解析这种 application/x-www-form-urlencoded 格式的数据。
+
+        2.3.2 传参方式 2：JSON 数据（最常用）
+            传输application/json格式数据，结构清晰，支持嵌套复杂结构，是现代前后端分离项目的主流传参方式。
+
+            补充：
+                - json= 参数要求你传入一个 Python 对象（dict/list），它会自动序列化为 JSON 字符串。
+                - data= 参数要求你传入一个字典或字符串，它会将其作为表单数据发送。
+
+        2.3.3 传参方式 3：文件上传
+            传输multipart/form-data格式数据，适合上传图片、文档、视频等二进制文件。
+
+            测试请求：添加键值对，类型选择File，选择本地文件上传。
+
+            补充：
+                - 关于 filename
+                    1. 底层源码机制：
+                        在 requests 库的底层源码中，当它发现 files 字典的值仅仅是一个文件对象时，
+                                它会自动调用类似 os.path.basename(f.name) 的函数，获取打开文件时的本地路径名（即 XXXXX.txt），
+                                并将其作为 filename 附加到 HTTP 请求的 Content-Disposition 头部中。
+                    2. HTTP 报文的真实长相：
+                        虽然在 Python 代码里没有显式指定 filename，但 requests 组装的 HTTP 请求体实际上长这样：
+                            --boundary
+                            Content-Disposition: form-data; name="file"; filename="XXXXX.txt"
+                            Content-Type: text/plain
+
+                            (文件二进制内容)
+                            --boundary--
+                        Flask 后端的 request.files.get('file') 正是读取了这个 filename="XXXXX.txt"，然后赋值给了 file.filename。
+
+                - 如何手动指定 filename？
+                    如果不想使用本地文件的真实名称，或者想自定义上传后的文件名，可以使用元组（tuple）的形式来显式指定：
+                        with open('test.txt', 'rb') as f:
+                            # 元组格式：(自定义文件名, 文件对象, 文件类型)
+                            files = {'file': ('custom_name.txt', f, 'text/plain')}
+                            response = requests.post(url, files=files)
+                    在这种情况下，即使本地文件叫 test.txt，Flask 后端接收到的 file.filename 也会变成 custom_name.txt。
+
+                总结：在简单的测试中，不需要手动指定，requests 库的“智能推断”机制会把本地文件名带上，这极大地简化了代码。
+
+                - ('custom_name.txt', f, 'text/plain')
+                    自定义文件名，文件对象，MIME 类型 / Content-Type
+
+
+    2.4 Flask 基础参数校验
+        参数校验是接口开发的核心环节，避免非法参数导致程序异常、数据混乱或安全漏洞。
+        Flask 没有自带校验功能，常用手动校验和第三方扩展校验两种方案。
+
+        2.4.1 方案 1：手动校验（基础核心）
+            逻辑简单，适合快速开发小接口，校验流程固定：
+                校验请求格式→校验必填参数→校验参数类型→校验参数格式。
+
+            简单、使用、有代表性，验证代码也是
+
+        2.4.2 方案 2：Marshmallow 扩展校验
+            手动校验代码冗余，复杂场景用marshmallow序列化校验库，封装校验规则，自动返回标准化错误信息。
+
+            安装扩展：
+                # 理论上，三方库版本间有相互依赖，我装的时候不想指定
+                pip install marshmallow==3.20.1
+
+            补充：
+                - 校验类 UserSchema
+                    使用了 Python 中非常流行的数据校验库 Marshmallow，定义了一个名为 UserSchema 的数据校验模型（Schema）。
+                    它的主要作用是：
+                        在接收到外部数据（比如前端传来的 JSON 或表单）时，自动检查数据是否符合预设的规则，避免在业务逻辑中写大量繁琐的 if-else 判断。
+                    1. 类定义
+                        继承自 Schema 的校验类。规定了合法的用户数据应该长什么样。
+                    2. 字段校验规则的部分解释
+                        - required=True 表示这是必填项，如果前端没传这个字段，会直接报错。
+                        - validate=[...] 用于附加自定义校验规则。这里使用了内置的 validate.Length，限制字符串的长度必须在 2 到 20 个字符之间。
+                          (validate vt. 使合法化、确认)
+                        - 使用 fields.Email() 而不是普通的 fields.Str()。
+                                Marshmallow 内置了邮箱正则表达式，会自动校验传入的字符串是否符合标准的邮箱格式（例如必须包含 @ 和域名）。
+                        fields.Str 表示该字段必须是字符串类型；fields.Email() 示必须是邮箱类型；fields.Int 示必须是整数类型
+                        validate.Length 和 validate.Range，默认都包含边界值
+                            - 排除最小边界值：validate.Range(min=0, min_inclusive=False, max=120) （即 0 < age <= 120）
+                            - 排除最大边界值：validate.Range(min=0, max=120, max_inclusive=False) （即 0 <= age < 120）
+
+                - 关于传参顺序
+                    Python 字典是无序的（在旧版本中）或基于哈希的。
+                    在 Python 中，字典（dict）是一种键值对（Key-Value）的映射结构，它的核心设计目标是快速查找，而不是保持插入顺序。
+                    现在输出顺序相反是一个巧合，虽然 3.7 后官方将字典改为保持插入顺序，但一些三方库并没有做此修改。
+                    对程序完全没有影响，前端在解析 JSON 时，也是通过 data.username 这种键名来获取数据的，不依赖顺序。
+
+
+    2.5 Flask 基础错误处理
+        接口开发中会遇到各种异常（如参数错误、资源不存在、服务器内部异常），需要统一处理，返回规范的 JSON 响应，避免返回默认的 HTML 错误页。
+
+        2.5.1 常用 HTTP 状态码回顾
+            状态码	含义	                    适用场景
+            200	    OK	                    请求成功，正常返回业务数据
+            400	    Bad Request	            客户端参数错误、格式错误
+            401	    Unauthorized	        未登录 / 登录过期，鉴权失败
+            403	    Forbidden	            权限不足，无法访问该资源
+            404	    Not Found	            请求的资源不存在
+            405	    Method Not Allowed	    请求方法不允许（如 POST 接口用 GET 请求）
+            500	    Internal Server Error	服务器内部异常（如数据库连接失败、代码 bug）
+
+        2.5.2 手动抛出 HTTP 异常
+            使用flask.abort()方法手动抛出异常，触发对应的错误处理器
+
+            测试代码返回的状态码可以在终端的服务信息中看到；具体的描述内容，可以直接访问对应网页，如：
+                http://127.0.0.1:5000/get/user/abort/10000
+
+        2.5.3 全局错误处理器（统一响应）
+            使用@app.errorhandler()装饰器定义全局异常处理器，将所有错误响应统一格式为 JSON
+
+            
+
+
+
+
+
+
+
+
+
+
 
 
 
