@@ -46,20 +46,54 @@
         两个主流 Web 框架，flask or fastapi，后面应该是主要学习 fastapi 代码，辅以 flask 相互借鉴加 flask 复习。
 
 
+二、Flask 实现接口开发（轻量基础款）
+    Flask 是 Python 轻量 Web 框架，贴近原生 HTTP 用法，适合理解接口开发的底层逻辑，中小型项目首选
+
+    2.1 Flask 最小服务模板
+        新建 flask_demo.py，添加基础启动代码：
+            from flask import Flask, request, jsonify, abort
+
+            # 初始化Flask应用，__name__指定当前模块路径
+            app = Flask(__name__)
+
+            # 后续所有接口定义都写在这里
+
+            # 统一入口：启动开发服务器
+            if __name__ == '__main__':
+                # debug=True 开启热重载，代码修改后自动生效，开发环境必备
+                app.run(debug=True, host='0.0.0.0', port=5000)
+
+        运行服务：python flask_demo.py，服务地址：http://127.0.0.1:5000
+
+        app = Flask(__name__):代码只启动了服务，但是没有定义任何接口路由，点击服务地址显示 404。
+
+        补充：
+            关于两种启动服务方法：
+                - python 脚本.py：代码启动服务器 → 输出简洁、无环境提示、配置写死在代码
+                - flask run：CLI 启动服务器 → 输出详细、有环境 /debug 提示、配置由命令行 / 环境变量控制
 
 
+    2.2 Flask 实现 GET 接口与传参
+        GET 接口用于查询数据，支持3 种传参方式，根据业务场景选择使用。
 
+        2.2.1 传参方式 1：路径参数（常用）
+            参数直接嵌入 URL 路径，语义清晰，适合唯一定位资源的场景（如根据用户 ID 查询用户详情）。
 
+            测试请求：http://127.0.0.1:5000/get/user/1001
+            网页显示：
+                {
+                    "code": 200,
+                    "data": {
+                        "user_id": 1001,
+                        "username": "zhangsan"
+                    },
+                    "msg": "success"
+                }
 
+        2.2.2 传参方式 2：查询参数（常用）
+            参数拼在 URL?后面，以key=value形式拼接，多个参数用&分隔，适合过滤、分页、搜索等场景（如分页查询用户列表）。
 
-
-
-
-
-
-
-
-
+            测试请求：http://127.0.0.1:5000/get/user/list?page=2&size=20&keyword=admin
 
 
 
