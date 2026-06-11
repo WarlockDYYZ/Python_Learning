@@ -261,48 +261,369 @@
         2.5.3 全局错误处理器（统一响应）
             使用@app.errorhandler()装饰器定义全局异常处理器，将所有错误响应统一格式为 JSON
 
-            
+
+三、FastAPI 实现接口开发（推荐高性能款）
+    FastAPI 是现代、高性能的 Python Web 框架，自带基于 Pydantic 的参数校验，自动生成交互式接口文档，开发效率远高于 Flask，
+            是目前 Python 后端开发的主流选择。
+
+    3.1 FastAPI 最小服务模板
+        fastapi_demo.py，基础启动代码
+
+        运行服务：python fastapi_demo.py，服务地址：http://127.0.0.1:8000
+
+        FastAPI 自带交互式接口文档，可直接测试接口：
+            - Swagger UI 文档：http://127.0.0.1:8000/docs
+            - ReDoc 文档：http://127.0.0.1:8000/redoc
+
+        保持：
+            - 关于那两个测试接口
+                1. Swagger UI (http://127.0.0.1:8000/docs)
+                    这是基于 Swagger UI 实现的。
+                    它提供了非常方便的交互式界面，可以直接在页面上展开每个 API，填写参数，然后点击“Try it out”来直接测试接口，
+                            无需借助 Postman 等外部工具。
+                    不用编写 web_test.py 了应该
+                2. ReDoc (http://127.0.0.1:8000/redoc)
+                    这是基于 ReDoc 实现的。
+                    它的界面更侧重于文档的可读性和美观性，非常适合用来生成静态的、易于阅读的 API 参考手册。
+
+                当前网页快照中，这两个页面的内容都是空的（只显示了标题和版本号），这是因为：
+                    - 自动生成：这些文档是根据代码自动生成的。
+                    - 内容来源：目前 FastAPI 应用中还没有定义任何路由（API 接口），或者定义的接口还没有添加详细的描述信息。
+                            （如 summary, description 等）
+                    - 效果：所以这两个页面目前只显示了应用的基本信息（标题、版本），而没有具体的接口列表和参数说明。
+                一旦在代码中定义了路由并添加了相关的 Pydantic 模型和文档字符串，这两个页面会自动更新，实时展示最新的 API 信息。
+
+            - Pydantic 模型就是“带类型与校验规则的数据类”。
+                它是 Python 中一个非常流行的数据验证和设置管理库。
+                通过继承 Pydantic 提供的 BaseModel，可以定义数据的结构，Pydantic 会在运行时自动解析、校验、转换输入数据。
+                Pydantic 模型主要解决以下几个核心问题：
+                    1. 自动校验与类型转换
+                        数据校验：如果传入的数据类型不对、格式错误或不符合约束条件，Pydantic 会直接抛出清晰的错误（ValidationError）。
+                        自动转换：它会自动将字符串类型的数字转换为 int 或 float，或将日期字符串转换为 datetime 对象。
+                    2. 结构化与序列化
+                        它能把散装的字典（dict）变成有明确字段和类型的对象，提高代码的可读性和可维护性。
+                        支持一键将对象导出为干净的字典或 JSON 字符串（如使用 model_dump() 或 model_dump_json()）。
+                    3. 自动生成接口文档
+                        在 FastAPI 等框架中，Pydantic 是请求体验证和响应序列化的“底座”。
+                        FastAPI 会利用 Pydantic 模型自动生成 JSON Schema，从而产出 /docs (Swagger UI) 等交互式接口文档。
+                在实际开发中，Pydantic 还支持嵌套模型、字段范围限制（如 ge, le）、自定义验证器（@validator）以及 ORM 模式等高级特性，
+                        是构建健壮 Python 应用的利器。
+
+                    simple_pydantic.py
 
 
+    3.2 FastAPI 实现 GET/POST 接口与传参
+        FastAPI 传参语法比 Flask 更简洁，自动识别参数类型，自动解析、校验参数，无需手动获取。
+
+        3.2.1 GET 接口传参
+            FastAPI 中处理请求参数的两种核心方式：
+                路径参数（Path）和查询参数（Query）。
+
+                它们不仅用于接收数据，还通过内置的校验机制保证了数据的安全
+                1. 路径参数：get_user
+                    - 作用：用于获取单个特定资源。{user_id} 是 URL 路径的一部分，例如访问 /get/user/1001 时，1001 就会被提取出来。
+                    - Path() 校验：
+                        gt=0：表示 user_id 必须大于 0（greater than）。如果传入 0 或负数，FastAPI 会自动拦截并返回 422 Unprocessable Entity 错误。
+                        description="用户ID，必须大于0"：这段文字会显示在 /docs (Swagger) 接口文档中，帮助前端开发者理解该参数的含义。
+                        example=1001：在接口文档中提供一个示例值，方便前端直接点击测试。
+                2. 查询参数：get_user_list
+                    - 作用：用于列表筛选、分页、排序等场景。参数附加在 URL 的 ? 之后，例如 /get/user/list?page=2&size=20&keyword=张三。
+                    - Query() 校验：
+                        page：默认值为 1，且必须大于等于 1（ge=1）。
+                        size：默认值为 10，且必须在 1 到 100 之间（ge=1, le=100）。这能有效防止前端传入过大的数字导致数据库查询崩溃。
+                        keyword：默认值为空字符串 ""，且字符串最大长度不能超过 50 个字符（max_length=50）。
+                总结:
+                    - Path vs Query：Path 用于定位唯一资源（必填，嵌在 URL 中）；Query 用于过滤和分页（通常可选，带默认值，拼接在 URL 后面）。
+                    - 自动校验与文档：无论是 Path() 还是 Query()，只要参数不满足 gt、le、max_length 等规则，FastAPI 都会自动返回详细的错误提示。
+                            同时，description 和 example 等元数据会自动渲染到 /docs 页面，实现了代码即文档，极大降低了前后端的沟通成本。
+            注意：
+                在 FastAPI 中，路由的定义顺序非常重要。
+                    - 优先定义静态路径（如 /get/user/list）。
+                    - 后定义路径参数（如 /get/user/{user_id}）。
+                这样可以确保请求能被正确地分发到对应的处理函数中。调整顺序后，访问 /get/user/list 就不会再报错了。
+
+        3.2.2 POST 接口传参
+            - 关于 /post/user/json
+                在路由函数中将参数声明为 user: UserCreate（即 Pydantic 模型）时，FastAPI 会在后台自动完成以下一系列操作：
+                1. 自动解析与创建对象
+                    FastAPI 会从 HTTP 请求体中提取 JSON 数据，并自动将其转换为 Python 字典。
+                    然后，它会在后台自动调用 UserCreate(**data)，创建一个 UserCreate 类的实例。
+                    所以，当代码执行到 create_user 函数内部时，user 就已经是一个完整的对象了。
+                2. 自动校验
+                    在创建这个对象的过程中，Pydantic 会严格按照 UserCreate 模型中定义的字段类型、默认值以及校验规则（如 max_length、ge 等）进行检查。
+                        - 如果数据合法，对象创建成功，继续执行函数。
+                        - 如果数据不合法（比如 age 传了字符串，或者缺少必填字段），FastAPI 会直接拦截，自动返回 422 Unprocessable Entity 错误，
+                                并详细说明哪个字段出了问题，根本不会执行到函数内部的代码。
+                3. 关于 model_dump()
+                    因为 user 是一个 Pydantic 模型实例，所以你可以随时调用它自带的方法：
+                    使用 user.model_dump() 可以将其转换回普通的 Python 字典（dict），方便存入数据库或进行其他处理。
+                需要在代码里手动写 user = UserCreate(...)。FastAPI 充当了一个“超级管家”，
+                        完成了接收 JSON -> 校验数据 -> 实例化对象的所有脏活累活，可以直接在函数里使用这个干净、安全的 user 对象。
+
+            - 关于两种传参方式
+                在 FastAPI 中，使用 Form() 接收参数和直接传入 Pydantic 模型（接收 JSON）是两种完全不同的数据交互方式。
+                它们的核心区别在于数据的传输格式、解析方式以及适用场景。
+                1. 数据格式与 Content-Type
+                    - JSON (Pydantic模型)：
+                        Content-Type：application/json
+                        格式：结构化的 JSON 字符串，例如 {"username": "张三", "age": 25}。
+                        解析方式：FastAPI 会读取整个请求体（Body），将其作为 JSON 解析，然后映射到 Pydantic 模型的字段上。
+                    - Form (Form())：
+                        Content-Type：通常是 application/x-www-form-urlencoded（普通表单）或 multipart/form-data（文件上传表单）。
+                        格式：键值对形式，类似于 URL 查询参数的拼接，例如 username=张三&age=25。
+                        解析方式：FastAPI 会将请求体按表单格式解析，提取出独立的字段值。
+                2. 接收方式与代码写法
+                    - JSON (Pydantic模型)：直接将模型作为参数类型声明。
+                        @app.post("/users/")
+                        def create_user(user: UserCreate): # FastAPI 自动从 Body 中提取并校验 JSON
+                            return user.model_dump()
+                    - Form (Form())：需要逐个使用 Form() 来声明参数。
+                        from fastapi import Form
+
+                        @app.post("/login/")
+                        def login(username: str = Form(...), password: str = Form(...)):
+                            return {"username": username}
+                3. 核心应用场景
+                    - JSON (Pydantic模型)：现代前后端分离架构的绝对主流。
+                        适用于绝大多数 RESTful API，特别是数据包含嵌套结构、列表等复杂数据类型时。
+                        前端通常使用 Axios/Fetch 发送。
+                    - Form (Form())：
+                        传统表单提交：HTML <form> 标签默认提交的数据格式就是 Form。
+                        OAuth2 密码模式登录：这是最常见的场景！OAuth2 规范要求获取 Token 时必须使用
+                                application/x-www-form-urlencoded 格式提交账号密码。
+                        文件上传：如果表单中包含文件，必须结合 File() 和 UploadFile() 一起使用，此时必须用 Form() 来接收其他非文件的文本字段。
+
+                不能混用，在一个接口中，只能选择一种方式接收主体数据：要么整体接收 JSON，要么整体接收 Form。
+                如果你尝试同时定义一个 Pydantic 模型参数和多个 Form() 参数，FastAPI 会抛出异常，因为 HTTP 请求体只能有一种编码格式。
+
+                总结：
+                    如果写纯后端 API 给 Vue/React/小程序 调用 -> 无脑选 JSON
+                    如果接口需要对接传统的 HTML 表单或者实现 OAuth2 密码登录 -> 选 Form()
+
+            - 关于文件长传
+                1. 接口定义与参数接收
+                    - UploadFile：这是 FastAPI 提供的专门用于处理文件上传的类。
+                        它比直接读取原始字节流要高效得多，因为它在底层使用了“临时文件（SpooledTemporaryFile）”。
+                        这意味着即使上传的是几个 GB 的大文件，它也不会一次性全部塞进内存导致内存溢出，而是会先写到磁盘的临时目录中。
+                    - File()：这个函数告诉 FastAPI，这个参数应该从 HTTP 请求的表单数据（multipart/form-data）中提取，
+                            而不是从 JSON Body 或 URL 查询参数中提取
+                2. 核心业务逻辑：读取与保存
+                    - file.file 是 Python 标准库中的一个真实文件对象（SpooledTemporaryFile）。
+                        通过调用 .read() 方法，我们将文件的内容以二进制字节流的形式读入内存。
+                    - file.filename：这是用户上传时携带的原始文件名。
+                    - "wb"：表示以二进制写入模式打开文件。因为图片、视频等文件不能按普通文本格式保存。
+                    - with ... as f:：使用了 Python 的上下文管理器。
+                        它的好处是无论写入过程是否发生异常，文件都会在执行完毕后自动安全关闭，防止内存泄漏或文件损坏。
+                3. 返回响应结果
+                    向客户端返回一个标准的 JSON 格式响应，告诉前端文件已经成功保存，并顺便把原始文件名返回去供前端展示。
+
+                如果要更加完善的话：
+                    同名文件覆盖风险：在文件名前面加上时间戳或 UUID（例如：1718092800_avatar.png）。
+                    恶意文件攻击风险：不要将文件保存在本地服务器，而是上传到专业的对象存储服务（如阿里云 OSS、腾讯云 COS、AWS S3），
+                            并在代码层校验文件的后缀名和真实的 MIME 类型。
+
+    补充(这一部分的补充)：
+        - 关于参数的格式
+            参数名: 类型 = 默认值/特殊类
+            Python 类型提示（Type Hints）与 FastAPI 底层数据解析机制完美结合的产物。
+            这种设计形态主要为了实现以下三大核心功能：
+                1. 自动的数据验证与类型转换 (类型)
+                    冒号后面的类型注解（如 int, str, EmailStr）不仅是为了给代码编辑器提供智能提示，更是 FastAPI 进行数据校验的“契约”。
+                    自动转换：当请求到达时，FastAPI 会自动将 URL 中的字符串参数转换为指定的类型。例如将 "123" 转换为整数 123。
+                    自动校验：如果传入的数据不符合声明的类型或格式（例如把非数字传给 int，或者传入格式错误的邮箱给 EmailStr），
+                            FastAPI 会直接拦截请求，并自动返回 422 Unprocessable Entity 错误及详细的校验失败信息，
+                            开发者无需手动编写 if-else 校验逻辑。
+                2. 区分参数的数据来源 (= 后面的值)
+                    等号后面的内容决定了 FastAPI 去哪里提取这个参数，以及该参数是否必填：
+                        无等号（必填）：如 page: int，表示这是一个必填参数，如果客户端没传，会直接报错。
+                        有默认值（可选）：如 keyword: str = None 或 page: int = 1，FastAPI 会将带有默认值的函数参数识别为“查询参数”
+                                （Query Parameters），如果客户端不传，就使用默认值。
+                        特殊类实例（复杂来源）：如 file: UploadFile = File(...)。
+                                这里的 File(...) 或 Form(...)、Path(...) 等类，相当于告诉 FastAPI：
+                                “请从 HTTP 请求的文件流/表单中提取这个参数，并且应用这些额外的约束规则”。
+                3. 自动生成 API 文档与 Pydantic 集成
+                    请求体解析：当等号后面是一个继承自 Pydantic 的模型时（如 user: UserCreate），FastAPI 知道需要从 JSON 请求体中提取数据，
+                            并自动完成 JSON 到 Python 对象的解析。
+                    交互式文档：因为所有的数据结构、类型、是否必填都清晰地声明在了函数签名里，FastAPI 能够直接读取这些信息，
+                            自动生成 Swagger UI (/docs) 和 ReDoc (/redoc) 接口文档，连测试表单都会自动生成好。
+
+        - 关于参数来源
+            在 FastAPI 中，参数的数据来源主要由 = 后面的特殊类（称为“依赖项”或“参数声明函数”）决定。
+            FastAPI 通过这些类来明确指示底层引擎去哪里提取数据。
+            常见的数据来源及其具体示例：
+                1. Query Parameters（查询参数）
+                    来源：URL 问号 ? 后面的键值对（如 /items?page=2&size=10）。
+                    触发方式：使用普通默认值，或者显式使用 Query(...)。
+
+                    from fastapi import Query
+                    # 方式一：普通默认值（隐式识别为查询参数）
+                    def read_items(page: int = 1, size: int = 10): ...
+                    # 方式二：显式使用 Query，可添加更多校验规则
+                    def read_items(keyword: str = Query(..., min_length=3)): ...
+
+                2. Path Parameters（路径参数）
+                    来源：URL 路径本身（如 /users/123 中的 123）。
+                    触发方式：路径模板 {param} 与函数签名中的 Path(...) 对应。
+
+                    from fastapi import Path
+                    @app.get("/users/{user_id}")
+                    def get_user(user_id: int = Path(..., ge=1)): ...
+
+                3. Body Parameters（请求体参数）
+                    来源：HTTP 请求的 Body，通常是 JSON 格式。
+                    触发方式：等号后面是一个 Pydantic 模型类，或者显式使用 Body(...)。
+
+                    from pydantic import BaseModel
+                    from fastapi import Body
+                    class UserCreate(BaseModel):
+                        username: str
+                    # 方式一：Pydantic 模型（自动解析 JSON Body）
+                    def create_user(user: UserCreate): ...
+                    # 方式二：多个独立的 Body 字段
+                    def update_item(name: str = Body(...), price: float = Body(...)): ...
+
+                4. Form Data（表单数据）
+                    来源：HTML 表单提交的数据（application/x-www-form-urlencoded）。
+                    触发方式：使用 Form(...)。
+
+                    from fastapi import Form
+                    @app.post("/login")
+                    def login(username: str = Form(...), password: str = Form(...)): ...
+
+                5. File Uploads（文件上传）
+                    来源：HTTP 请求中的多部分表单（multipart/form-data）上传的文件流。
+                    触发方式：使用 UploadFile 类型结合 File(...)。
+
+                    from fastapi import UploadFile, File
+                    @app.post("/upload")
+                    async def upload_file(file: UploadFile = File(...)): ...
+
+                6. Headers（请求头）
+                    来源：HTTP 请求头（如 Authorization, X-Token）。
+                    触发方式：使用 Header(...)。
+
+                    from fastapi import Header
+                    def read_items(x_token: str = Header(...)): ...
+
+                7. Cookies（Cookie）
+                    来源：客户端发送的 Cookie。
+                    触发方式：使用 Cookie(...)。
+
+                    from fastapi import Cookie
+                    def get_session(session_id: str = Cookie(...)): ...
+
+            一个比较特殊的同位置函数，Field() 也是 FastAPI 中用来声明参数和附加元数据的重要工具。
+                与之前提到的 Query()、Path()、Body() 等有一个非常关键的区别：
+                    - Query()、Path()、Body() 等是从 fastapi 模块导入的，用于告诉 FastAPI 路由引擎去哪里提取参数。
+                    - Field() 是从 pydantic 模块导入的，专门用于在 Pydantic 模型（BaseModel）内部，
+                            对请求体（Request Body）的具体字段进行精细化的校验和元数据配置。
+
+                Field() 的核心作用：
+                    当使用 Pydantic 模型来接收 JSON 请求体时，如果仅使用基础类型注解（如 name: str），只能做到最基础的类型校验。
+                    而 Field() 允许为字段添加更多高级约束，包括默认值、长度限制、数值范围、正则匹配以及接口文档的描述等。
+
+                Field() 的核心语法结构
+                    它的标准写法如下：
+                        字段名: 类型 = Field(default, 校验参数1=值1, 校验参数2=值2, ...)
+
+                    - default：字段的默认值。如果是必填字段，填 ...（Ellipsis）；如果是可选字段，填具体的默认值或 None。
+                    - 校验参数：如 min_length、max_length、ge、le、pattern、regex 等。
+                    - 文档元数据：如 title、description、example。
+                            这些参数会被 FastAPI 提取并展示在自动生成的 Swagger UI (/docs) 接口文档中，极大地方便前端联调。
+
+            总结对比:
+                如果要控制参数从哪里来（URL路径、查询字符串还是请求体），使用 fastapi 提供的 Path(), Query(), Body()。
+                如果要控制请求体 JSON 内部某个字段的具体规则（比如密码必须大于8位、年龄不能超过120岁），
+                        就在 Pydantic 模型中使用 pydantic 提供的 Field()。
 
 
+    3.3 FastAPI 参数校验（自带自动化）
+        FastAPI 结合Python 类型提示、Pydantic、内置校验函数实现全自动参数校验，代码比 Flask 简洁，错误信息更规范。
+
+        3.3.1 路径参数校验
+            用fastapi.Path()校验路径参数，支持的校验规则：
+                gt：大于、ge：大于等于、lt：小于、le：小于等于
+                min_length：最小长度、max_length：最大长度
+                regex：正则表达式匹配
+
+        3.3.2 查询参数校验
+            用fastapi.Query()校验查询参数，规则和Path()完全一致
+            3.2.1 中使用
+
+        3.3.3 JSON 请求体校验
+            用 Pydantic 的BaseModel结合Field()校验 JSON 参数，支持邮箱、URL、整数范围、字符串长度等校验，还支持自定义校验逻辑
+            3.2.2 中使用
+
+        3.3.4 请求头 / Cookie 参数校验
+            用fastapi.Header()、fastapi.Cookie()校验请求头、Cookie 参数
+            这个前面讲过
 
 
+    3.4 FastAPI 基础错误处理
+        FastAPI 默认返回 JSON 格式的错误响应，自带参数校验错误处理，可以自定义全局异常处理器，统一返回格式。
+
+        3.4.1 手动抛出 HTTP 异常
+            用fastapi.HTTPException手动抛出异常，传递status_code和detail错误信息
+
+        3.4.2 自定义全局异常处理器
+            捕获所有异常，统一返回{"code":xxx,"msg":xxx,"data":xxx}格式的 JSON 响应
 
 
+四、接口开发最佳实践
+
+    4.1 传参方式选型规范
+
+        传参场景	                推荐方式	        说明
+        获取单个资源详情	        GET 路径参数	    语义清晰，如/user/1001
+        条件查询 / 分页 / 过滤	    GET 查询参数	    适合动态过滤，如/user/list?page=1&size=10
+        提交隐私数据、复杂数据	    POST JSON 参数	前后端分离开发主流，支持嵌套结构
+        提交传统 HTML 表单数据	    POST 表单参数	    兼容旧版系统
+        上传文件 / 图片	        POST 文件传参	    必须用multipart/form-data格式
+        传输敏感鉴权信息	        请求头参数	    不会被缓存、不会暴露在 URL 中
 
 
+    4.2 参数校验最佳实践
+        1. 永远不要相信客户端数据：后端必须对所有参数进行校验，前端校验只是为了提升用户体验，攻击者可以直接绕过前端请求接口。
+        2. 明确校验规则优先级：先校验请求格式 → 再校验必填参数 → 再校验参数类型 → 最后校验业务规则（如密码长度、邮箱格式）。
+        3. 复用校验逻辑：多个接口需要相同校验规则时，封装为通用的校验函数、Schema 或依赖类，避免重复代码。
+        4. 错误信息要精准：参数校验失败时，返回具体的错误原因，比如 “邮箱格式不正确”、“密码长度必须在 6-16 位之间”，不要返回模糊的 “参数错误”。
+        5. 优先使用框架自带的校验工具：Flask 用marshmallow，FastAPI 用自带的Pydantic，避免手动编写大量冗余的校验逻辑。
+        6. 校验文件上传的合法性：
+            - 限制上传文件的大小
+            - 限制上传文件的扩展名（使用白名单，如['jpg', 'png', 'pdf']）
+            - 校验文件的真实格式（避免攻击者将恶意脚本伪装成图片上传）
+            - 将上传的文件重命名为随机字符串（如 UUID），避免文件名冲突和恶意覆盖
 
 
+    4.3 错误处理最佳实践
+        1. 统一响应格式：所有接口（无论成功还是失败）都返回统一的 JSON 格式，如{"code":200,"msg":"success","data":{}}，便于前端统一解析响应。
+        2. 合理使用 HTTP 状态码：尽量符合标准化语义，不要所有接口都返回 200，比如参数错误返回 400、未登录返回 401、权限不足返回 403、
+                资源不存在返回 404、服务器异常返回 500。
+        3. 生产环境关闭详细错误信息：避免将服务器的敏感错误信息（如文件路径、数据库语句、操作系统版本）返回给客户端，防止攻击者利用这些信息进行入侵。
+        4. 记录完整的异常日志：接口异常时，将错误堆栈、请求参数、请求 IP、请求头等信息记录到日志文件中，便于后续定位排查问题。
+        5. 区分业务异常和系统异常：业务异常（如用户不存在、密码错误）返回 200 状态码，在code字段中标记业务错误码；系统异常返回对应的 HTTP 状态码。
 
 
+    4.4 安全注意事项
+        1. 使用 HTTPS 传输数据：加密请求和响应数据，避免敏感信息（如密码、Token）在网络传输中被窃取或篡改。
+        2. 对用户输入进行转义：防止 XSS 跨站脚本攻击、SQL 注入攻击，不要直接将用户输入的参数拼接到 SQL 语句中，用 ORM 框架自带的参数绑定功能。
+        3. 限制接口请求频率：使用flask-limiter或slowapi等扩展限制接口的请求频率，防止被暴力破解、恶意爬虫调用。
+        4. 隐藏服务器的真实信息：修改 Flask/FastAPI 的默认响应头，隐藏框架类型、版本号、操作系统信息，降低被针对性攻击的风险。
+        5. 校验请求头的合法性：校验Origin、Referer等请求头，防止跨站请求伪造（CSRF）攻击；对敏感接口进行鉴权校验，验证 Token 的合法性。
 
 
+技术选型总结
 
+    维度	        Flask	                            FastAPI
+    框架类型	    轻量级 MV 框架，微内核	                高性能全功能 Web 框架，支持 ASGI
+    传参方式	    手动获取，支持所有传参方式	            自动识别解析，支持所有传参方式
+    参数校验	    第三方库marshmallow	                自带 Pydantic 校验，自动化程度高
+    错误处理	    手动配置全局错误处理器	                自带处理器，可自定义扩展
+    性能	        中等（基于 WSGI）	                    高（基于 Starlette+Pydantic）
+    生产环境	    需搭配 uWSGI/Gunicorn+Nginx	        需搭配 Uvicorn/Gunicorn+Nginx
+    适用场景	    小型工具接口、快速原型、灵活定制化开发	    中大型前后端分离项目、高性能服务
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    选型建议：
+        - 如果是开发小型工具类接口、需要高度灵活定制化，选 Flask；
+        - 如果是开发中大型前后端分离项目、需要高性能、自动化校验、自动接口文档，优先选 FastAPI；
+        - 两者的核心 HTTP 接口逻辑是完全相通的。

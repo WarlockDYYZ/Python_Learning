@@ -58,20 +58,20 @@ import requests
 # print(response.json())
 
 # marshmallow 校验
-# url = "http://127.0.0.1:5000/post/user/schema"
-# # 将数据放到 data 参数中
-# json_data = {
-#     "username": "赵六",
-#     "password": "asdfgh",
-#     "email": "zhaoliu@example.com",
-#     "age": 25
-# }
-# # response = requests.post(url, data=json_data)  # 传入非 json 格式数据，返回 400
-# response = requests.post(url, json=json_data)
-# print(response.json())
+url = "http://127.0.0.1:5000/post/user/schema"
+# 将数据放到 data 参数中
+json_data = {
+    "username": "赵六",
+    "password": "asdfgh",
+    "email": "zhaoliu@example.com",
+    "age": 25
+}
+# response = requests.post(url, data=json_data)  # 传入非 json 格式数据，返回 400
+response = requests.post(url, json=json_data)
+print(response.json())
 
 # 手动抛出异常
-url = "http://127.0.0.1:5000/get/user/abort/10000"
-
-response = requests.get(url)
-print(response.json())
+# url = "http://127.0.0.1:5000/get/user/abort/10000"
+#
+# response = requests.get(url)
+# print(response.json())
