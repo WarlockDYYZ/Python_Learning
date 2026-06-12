@@ -3,9 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-plt.rcParams["font.family"] = ["SimHei"]
-# 解决负号显示异常
-plt.rcParams["axes.unicode_minus"] = False
+plt.rcParams['font.sans-serif'] = ['SimHei']
+plt.rcParams['axes.unicode_minus'] = False
 
 # 加载官方经典数据集
 df = sns.load_dataset('titanic')
@@ -17,14 +16,22 @@ print("票价偏度：", df['fare'].skew())  # 验证票价分布右偏特征
 print("票价峰度：", df['fare'].kurt())  # 验证票价极端值分布特征
 
 # 可视化分布特征
-plt.figure(figsize=(12, 5))
+plt.figure(figsize=(18, 5))
+
 # 年龄分布直方图+核密度曲线
-plt.subplot(1, 2, 1)
+plt.subplot(1, 3, 1)
 sns.histplot(df['age'], kde=True, bins=20)
 plt.title('乘客年龄分布')
+
 # 舱位-票价箱线图
-plt.subplot(1, 2, 2)
+plt.subplot(1, 3, 2)
 sns.boxplot(x='class', y='fare', data=df)
 plt.title('不同舱位的票价分布')
+
+# 数值相关性热力图 (新增部分)
+plt.subplot(1, 3, 3)
+sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm', fmt=".2f")
+plt.title('数值特征相关性热力图')
+
 plt.tight_layout()
 plt.show()
