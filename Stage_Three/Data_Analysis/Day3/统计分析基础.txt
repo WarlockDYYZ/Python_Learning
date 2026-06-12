@@ -1,1 +1,67 @@
-_
+一、工具介绍与环境
+
+    核心工具栈选择
+    工具库	            核心用途	                                替代场景说明
+    NumPy	            数值计算、高维数组操作、矩阵运算	            为上层数据分析库提供底层计算支撑
+    Pandas	            数据清洗、结构化数据处理、描述统计	            处理绝大多数表格类业务数据
+    SciPy	            高级统计检验、概率分布计算、方差分析	        补充 Statsmodels 部分基础统计检验能力
+    Statsmodels	        经典统计建模（回归、ANOVA）、生成专业统计报告	优先选择它做业务解释类回归，比 Scikit-learn 输出更详尽的统计诊断结果
+    Scikit-learn	    聚类算法、回归模型训练、模型评估与预处理	    通用机器学习建模，覆盖无监督聚类与有监督回归任务
+    Yellowbrick	        模型诊断可视化、特征优化效果可视化	            直观呈现模型误差、特征贡献度，辅助人工诊断
+    Optuna	            自动化超参数调优	                        替代网格搜索，用贝叶斯优化提升调优效率
+    Seaborn/Matplotlib	统计图表可视化、分布关系呈现	                配套分析结果绘制，支撑业务结论的直观表达
+
+    环境安装命令，推荐使用 Conda 管理虚拟环境，避免依赖库版本冲突：
+        # Conda 安装（推荐）
+        conda create -n stats python=3.11 -y
+        conda activate stats
+        conda install pandas numpy scipy statsmodels matplotlib seaborn scikit-learn -y
+        # Pip 安装
+        pip install pandas numpy scipy statsmodels matplotlib seaborn scikit-learn optuna yellowbrick
+
+
+二、统计概念与基础函数进阶
+
+    2.1 描述性统计：量化数据整体特征
+        描述性统计是数据分析的第一步，用来掌握数据的集中趋势、离散程度、分布形状，建立对数据的直观认知。核心指标与 Pandas 实现方法如下：
+            指标类型	核心指标	            代码实现
+            集中趋势	均值、中位数、众数	    df['col'].mean()/df['col'].median()/df['col'].mode()
+            离散程度	标准差、方差、四分位距	df['col'].std()/df['col'].var()/df['col'].quantile(0.75)-df['col'].quantile(0.25)
+            分布形状	偏度、峰度	        df['col'].skew()/df['col'].kurt()
+            整体概览	全字段统计摘要	        df.describe(include='all')
+            业务含义：
+                均值易受极端值影响，中位数 / 众数更适合偏态分布数据
+                衡量数据波动幅度，四分位距对异常值更鲁棒
+                偏度判断分布对称性，峰度判断分布尾部权重
+                一键输出数值 / 分类变量的基础统计信息
+
+        实战案例：泰坦尼克号数据描述分析：
+            about_titanic.py
+            (我早就下好了)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
