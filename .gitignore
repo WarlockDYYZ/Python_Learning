@@ -1,0 +1,26 @@
+# 虚拟环境
+venv/
+ENV/
+env/
+.venv/
+env.bak/
+venv.bak/
+
+# Python编译缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.log
+
+# PyCharm配置
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VSCode
+.vscode/
