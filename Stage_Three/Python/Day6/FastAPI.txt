@@ -1,0 +1,205 @@
+前置准备与框架对比
+
+    1. 技术栈差异（Flask vs FastAPI）
+        结合之前的 Flask，可通过核心差异快速迁移理解：
+            维度	        Flask	                                    FastAPI
+            底层协议	    基于 WSGI 同步阻塞规范，高并发性能有限	        基于 ASGI 原生异步非阻塞规范，性能媲美 NodeJS/Go
+            路由定义	    统一使用@app.route()装饰器，通过methods参数指	显式使用@app.get()/@app.post()等 HTTP 方法专属
+                        定请求方法                                    装饰器，语义更清晰
+            参数校验	    需手动通过request.get_json()/request.args解	基于Pydantic 类型提示自动校验，路径 / 查询 / 请求体参数一体化解析，
+                        析，编写大量手动校验逻辑                         自动返回 422 校验错误
+            请求体处理	无内置结构化解析逻辑，需手动提取 JSON 并验证字段	直接通过 Pydantic 模型定义结构，自动完成解析、校验和类型转换
+            接口文档	    需集成flask-swagger-ui等第三方扩展，手动维护文	开箱即用的Swagger UI（/docs）和ReDoc（/redoc），基于代码声明自动
+                        档注释                                       生成
+            异步支持	    3.x 版本部分支持异步，需依赖 Gunicorn+gevent	原生支持async/await语法，I/O 密集型任务（如数据库 / 外部 API 调用）
+                        等工具模拟                                    并发性能提升 3-5 倍
+            生产级适用场景	小型原型、简单管理端、低并发接口	                高并发微服务、前后端分离 API、实时通信服务、AI 推理接口
+
+
+    2. 环境安装
+        FastAPI 依赖fastapi框架和uvicornASGI 服务器，一键安装核心依赖：
+            pip install "fastapi[standard]" uvicorn
+
+        fastapi[standard]：包含 FastAPI 核心库、Pydantic 数据校验库、Starlette ASGI 底层框架和 openapi 文档依赖
+        uvicorn：高性能 ASGI 服务器，用于 FastAPI 应用的本地调试与生产部署
+
+
+第一章 FastAPI 路由系统（实战核心）
+    路由是 API 的请求映射核心，FastAPI 采用装饰器声明 + 显式方法的路由范式，同时支持模块化拆分。
+
+    1.1 基础路由定义
+        FastAPI 使用与 Flask 对应的 HTTP 方法专属装饰器，语义更直观，无需额外指定请求方法：
+            flask_test.py
+
+        核心说明：FastAPI 的路由装饰器直接绑定 HTTP 方法，天然适配 RESTful 接口设计；所有路径参数通过 Python 类型提示声明类型，
+                框架自动完成校验和类型转换
+
+        补充：
+            - 又一种测试方法
+                之前学习的时候用的是本身自带的网页 Swagger UI
+                这个新的更快且无需启动服务
+
+                使用 FastAPI 内置的 TestClient 进行单元测试，不需要手动启动服务器，速度极快，非常适合日常开发中的自动化测试。
+                    fastapi_test.py
+
+                TestClient 底层依赖 httpx 库，同时需要 pytest 框架来运行测试。请在终端执行以下命令进行安装：
+                    pip install pytest httpx
+
+                在终端中直接运行 pytest 命令(运行前需进入文件所在文件夹)：
+                    pytest fastapi_test.py
+                    (这个测试代码都是可以通过测试的，后面再用这个测试，如果有问题的话再具体补充)
+
+            - 关于测试代码 fastapi_test.py
+                1. 初始化测试客户端
+                    client = TestClient(app)
+                    作用：创建一个模拟的 HTTP 客户端。
+                    原理：它不需要真正启动一个 Uvicorn 服务器。它通过底层的 WSGI/ASGI 协议，直接与 FastAPI 应用（app）进行通信。
+                            这就像在内存中搭建了一个虚拟的服务器，专门用来跑测试，速度极快。
+                2. 定义测试函数
+                    def test_get_user():
+                    作用：定义一个测试用例。
+                    规范：函数名必须以 test_ 开头。这样当你运行 pytest 时，测试框架才能自动识别并执行这个函数。
+                3. 模拟发送 GET 请求
+                        response = client.get("/users/123")
+                    作用：模拟客户端向 /users/123 这个路由发送了一个 HTTP GET 请求。
+                    返回值：response 是一个响应对象，包含了服务器返回的状态码、响应头、响应体（数据）等所有信息。
+                4. 验证状态码
+                        assert response.status_code == 200
+                    作用：断言（检查）返回的 HTTP 状态码是否为 200。
+                    意义：这是测试的第一道防线。如果路由不存在、参数类型错误或者服务器内部报错，状态码就会变成 404、422 或 500，
+                            断言就会失败，测试直接报错。
+                5. 验证返回的数据内容
+                        assert response.json()["user_id"] == 123
+                    作用：断言返回的 JSON 数据中，user_id 的值是否确实是 123。
+                    原理：response.json() 会自动将服务器返回的 JSON 字符串解析为 Python 字典，然后通过 ["user_id"] 提取对应的值进行比对。
+                        （即 {"user_id": 123, "username": "user_123"}）
+
+                先验证“门有没有开”（状态码是不是 200）。
+                再验证“里面的东西对不对”（返回的 JSON 数据内容是否符合预期）。
+
+            - 关于 assert
+                在软件测试中，断言就像是一个“自动对答案的考官”。它用来检查某个条件是否成立：
+                    - 如果条件为 True（对答案成功），程序继续往下执行。
+                    - 如果条件为 False（对答案失败），程序会立刻停止当前测试，并抛出 AssertionError（断言错误）。
+                assert 的语法非常简单：
+                    assert 条件表达式, "可选的自定义错误提示信息"
+
+            - 剩下的 POST PUT DELETE 意思一样
+
+
+    1.2 模块化路由（APIRouter）
+        当项目规模扩大、接口数量增多时，所有路由堆砌在main.py中会导致代码臃肿、难以维护。
+        FastAPI 的 APIRouter 对应 Flask 的 Blueprint，可按业务模块拆分路由，实现模块化解耦。
+
+        1.2.1 核心优势
+            - 按业务域（如用户、商品、订单）拆分路由文件，职责清晰
+            - 统一配置路由前缀、分组标签、依赖校验逻辑，减少重复代码
+            - 支持多层级路由嵌套，适配大型项目的版本化需求（如/api/v1、/api/v2）
+            - 独立维护各模块路由代码，支持团队并行开发
+
+        1.2.2 实战实现步骤
+            以用户管理和商品管理两个业务模块为例，演示模块化路由的标准实现：
+                步骤 1：创建路由目录结构
+                    fastapi_router_demo/
+                    ├── main.py          # 项目入口文件，挂载路由、配置全局中间件
+                    └── routers/         # 模块化路由层，按业务拆分文件
+                        ├── user.py      # 用户相关路由（增删改查）
+                        └── product.py   # 商品相关路由（增删改查）
+                步骤 2：编写业务模块路由
+                    通过APIRouter创建迷你路由实例，独立配置前缀和分组标签。
+                        routers/user.py（用户路由）
+                        routers/product.py（商品路由）
+                步骤 3：在主应用中挂载路由
+                    main.py
+                步骤 4：启动项目
+                    执行以下命令启动开发服务器，支持代码热重载：
+                        fastapi dev main.py
+                    或使用 uvicorn 命令启动：
+                        uvicorn main:app --reload
+
+        最佳实践：企业级项目必须采用模块化路由设计，按业务域拆分路由文件，避免单文件代码超过 500 行；
+                路由层仅负责接收请求、调用业务层逻辑，禁止直接编写数据库操作.
+
+        补充：
+            - user.py
+
+                一、顶部导入模块
+                    - APIRouter：路由分组工具
+                        把多个相关接口（用户增删改查）封装成独立路由模块，方便项目拆分（user、goods、order 分开写文件），不用全部堆在主 app 里。
+                    - HTTPException：主动抛出接口异常，返回自定义错误码 + 提示信息。
+                    - status：内置标准 HTTP 状态码常量，可读性更强，不用手写数字 201/404。
+                    - BaseModel：Pydantic 数据校验基类，用来定义请求体、返回体，自动校验参数类型、格式。
+                    - EmailStr：内置邮箱格式校验，传非法邮箱会直接返回 422 参数错误。
+
+                二、创建路由分组实例
+                    1. prefix="/api/users" 路由公共前缀
+                        当前路由下所有接口自动拼接前缀：
+                            @user_router.post("/") → 完整地址：POST /api/users
+                            @user_router.get("/{user_id}") → 完整地址：GET /api/users/{user_id}
+                        好处：统一管理路径，改接口前缀只改一处。
+                    2. tags=["用户管理"] 接口文档分组
+                        打开 FastAPI 自动生成的 Swagger 文档 /docs，所有该路由下接口会归类到「用户管理」标签，方便前端查看。
+                    3. responses={404: {"description": "用户不存在"}}
+                        统一给这个分组下所有接口补充文档说明：所有接口都可能返回 404，文档自动展示该错误描述，不用每个接口重复写。
+
+                三、Pydantic 请求体模型 UserCreate
+                    继承 BaseModel，用于接收 POST / PUT 的 JSON 请求体，自动完成三层校验：
+                        1. 类型校验：username、password 必须字符串
+                        2. 格式校验：EmailStr 强制合法邮箱，如 abc@xx.com，否则直接报错；
+                        3. 自动生成接口文档：/docs 里会展示这个模型的字段说明。
+                    调用时 user: UserCreate，FastAPI 会自动把前端传的 json 解析为 UserCreate 对象。
+                    补充：
+                        FastAPI 区分三类参数，互不干扰：
+                            - 路径参数：/users/{user_id} → 写在接口函数参数里标注类型 user_id: int 做校验
+                            - 查询参数：/users?name=xxx → 普通函数参数 name: str
+                            - 请求体参数：POST/PUT 传的 JSON 对象 → 用 Pydantic BaseModel 接收校验
+
+                四、接口拆解
+                    1. 创建用户 POST 接口
+
+第二章 路径参数与查询参数（自动校验核心）
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
