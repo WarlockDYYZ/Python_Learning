@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, status
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from fastapi import HTTPException
@@ -22,7 +22,7 @@ class ProductCreate(BaseModel):
 
 
 # -------------------- 商品接口 --------------------
-@product_router.post("/", summary="新增商品")
+@product_router.post("/", summary="新增商品", status_code=status.HTTP_201_CREATED)
 def create_product(product: ProductCreate):
     """添加新商品到商品库，需提交商品名称、价格、分类等核心信息"""
 
@@ -60,10 +60,12 @@ def update_product(product_id: int, product: ProductCreate):
 
     return {"id": product_id, **product.model_dump()}
 
-@product_router.delete("/{product_id}", summary="删除商品")
+@product_router.delete("/{product_id}", summary="删除商品", status_code=status.HTTP_204_NO_CONTENT)
 def delete_product(product_id: int):
     """根据商品ID删除对应商品，删除后数据不可恢复"""
     if product_id > 10000:
         raise HTTPException(status_code=404, detail="商品不存在")
 
-    return {"detail": f"商品{product_id}删除成功"}
+    # 204 状态码表示服务器成功处理了请求，但不需要返回任何消息体（Body）。
+    # 因此这里直接 return，不要返回字典或字符串。
+    return
