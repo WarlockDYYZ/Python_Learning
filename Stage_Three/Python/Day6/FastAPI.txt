@@ -156,6 +156,83 @@
 
                 四、接口拆解
                     1. 创建用户 POST 接口
+                        @user_router.post("/")：POST 请求，地址 /api/users
+                        summary：文档简短标题
+                        status_code=201：创建资源成功标准状态码，接口成功返回 201 而非 200
+                        函数参数 user: UserCreate：接收前端 JSON 请求体
+                        raise HTTPException(400, detail="xxx")：主动抛出业务错误，前端收到 {"detail": "用户名已被占用"}
+                        三引号内内容是接口文档详细描述，会渲染在 Swagger 页面
+                    2. 根据 ID 查询用户 GET
+                        / {user_id}：路径参数，自动转为 int 类型，传字母会直接参数校验失败
+                    3. 更新用户 PUT
+                        PUT 规范：全量更新资源，需要传入完整用户信息 UserCreate；
+                        参数分两部分：
+                            1. 路径参数 user_id：要修改的用户编号
+                            2. 请求体 user：新的用户全部信息
+                    4. 删除用户 DELETE
+                        标准删除接口，仅传路径 ID，无请求体。
+
+                总结：
+                    1. 实现用户模块独立路由分组，解耦项目代码；
+                    2. 使用 Pydantic 自动校验请求参数（字符串、邮箱格式）；
+                    3. 实现用户 CRUD 四大基础接口：新增、查询、更新、删除；
+                    4. 标准化 HTTP 状态码、统一异常抛出；
+                    5. 自动生成完整、带注释的在线接口文档（访问 http://127.0.0.1:8000/docs 查看）。
+
+                补充：
+                    - user_router 定义了 404 的错误描述，get_user update_user delete_user，中是否不用在 raise 中二次描述 404 的错误？
+                        1. APIRouter(responses={404: {"description": "用户不存在"}}) 只作用于接口文档
+                            这个配置仅仅填充 /docs 页面的接口说明，只会在 Swagger 文档里展示：
+                                该接口可能返回 404，含义：用户不存在
+                            它不会自动：
+                                - 捕获 user_id>100 的逻辑；
+                                - 抛出 detail="用户不存在"
+                        2. 业务抛异常必须自己写 raise HTTPException(status_code=404, detail="xxx")
+                            哪怕路由全局配置了 404 文档，只要你不手动抛出，接口永远不会返回 404。
+                            路由的 responses 只是给前端看文档，没有任何自动拦截、自动报错逻辑。
+                        3. 重复写 detail="用户不存在" 算不算多余？
+                            文档层面：不多余，全局 responses 已经写了 404 描述，文档不会重复渲染；
+                            代码运行层面：必须传 detail，HTTP 响应体需要这个提示文本返回给前端，路由配置只管文档，不负责返回响应内容。
+
+                        不存在配置 router 的 responses 就能省去 raise 的写法；
+                            只有参数自动校验、依赖、全局异常处理器这三种方式，才能做到不用手动写 raise HTTPException。
+
+                        responses={404: {"description": 常量}}：只作用于接口文档展示
+                        detail=常量：接口真实返回给前端的错误提示
+
+                    - status_code=status.HTTP_201_CREATED 返回的 201 状态码是约定吗?参数中的 CREATED 是什么意思？
+
+                    - PUT 规范：全量更新资源，传参示例是什么？
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 第二章 路径参数与查询参数（自动校验核心）
 

@@ -2,11 +2,14 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, EmailStr
 
 
+# 统一常量，一处修改全局生效
+USER_NOT_FOUND = "用户不存在"
+
 # 创建APIRouter实例：统一前缀为/api/users，文档标签为"用户管理"
 user_router = APIRouter(
     prefix="/api/users",  # 该模块所有路由的公共前缀
     tags=["用户管理"],      # 接口文档的分组标签
-    responses={404: {"description": "用户不存在"}},  # 统一响应文档配置
+    responses={404: {"description": USER_NOT_FOUND}},  # 统一响应文档配置
 )
 
 
@@ -36,7 +39,7 @@ def create_user(user: UserCreate):
 def get_user(user_id: int):
     """根据用户ID获取用户详情，ID为正整数"""
     if user_id > 100:
-        raise HTTPException(status_code=404, detail="用户不存在")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
 
     return {"user_id": user_id, "username": f"user_{user_id}", "role": "normal"}
 
@@ -44,7 +47,7 @@ def get_user(user_id: int):
 def update_user(user_id: int, user: UserCreate):
     """更新指定ID的用户完整信息，需提交全部必填字段"""
     if user_id > 100:
-        raise HTTPException(status_code=404, detail="用户不存在")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
 
     return {"user_id": user_id, "updated_username": user.username, "updated_email": user.email}
 
@@ -52,6 +55,6 @@ def update_user(user_id: int, user: UserCreate):
 def delete_user(user_id: int):
     """根据用户ID删除对应用户，删除后数据不可恢复"""
     if user_id > 100:
-        raise HTTPException(status_code=404, detail="用户不存在")
+        raise HTTPException(status_code=404, detail=USER_NOT_FOUND)
 
     return {"detail": f"用户{user_id}删除成功"}
