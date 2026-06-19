@@ -433,11 +433,16 @@
                         这就是 FastAPI 能够做到“零成本校验”和“零成本文档”的根本原因。
 
             - 路径转换器：接收包含斜杠的完整文件路径，用于定位资源路径（如/files/upload/images/photo.jpg）
+                    uvicorn about_path_param:app --reload
+                    http://127.0.0.1:8000/docs
 
 
-
-
-
+    2.2 查询参数（Query Parameters）
+        查询参数跟在 URL 问号后面（如/users?page=1&page_size=10），用于传递筛选 / 分页条件，通常为可选参数。
+        
+        2.2.1 基础用法
+            FastAPI 自动识别函数中未在路径中定义的参数，将其作为查询参数处理，自动解析类型、设置默认值：
+                uvicorn about_query_param:app --reload
 
 
 

@@ -1,5 +1,8 @@
 from fastapi import FastAPI, HTTPException, Path
-from typing import Annotated  # 推荐使用Annotated为参数添加元数据
+try:
+    from typing import Annotated
+except ImportError:
+    from typing_extensions import Annotated
 from enum import Enum
 
 
