@@ -577,19 +577,38 @@
 
     3.3 请求体处理对比（Flask vs FastAPI）
         以新增商品接口为例，FastAPI 完全省去手动解析和校验的代码：
-        Flask 手动校验写法
+        - Flask 手动校验写法:
+            post_flask.py
+
+            启动服务：
+                flask --app post_flask run
+            测试(PowerShell)：
+                curl -Uri http://127.0.0.1:5000/products `
+                -Method Post `
+                -ContentType "application/json" `
+                -Body '{"name":"机械键盘","price":129,"category":"外设","stock":20}'
+
+            补充：
+                - 关于 isinstance
+                    isinstance() 是 Python 内置函数，用来判断一个变量是不是指定类型。
+                    语法：
+                        isinstance(object, classinfo)
+                        object：要检测的变量 / 值
+                        classinfo：类型，可以写单个类型，也可以写元组代表「满足任意一种都返回 True」
+
+        - FastAPI 自动校验写法
+            post_fastapi.py
+
+            启动服务：
+                uvicorn post_fastapi:app --reload
 
 
+第四章 响应定制（统一规范响应）
+    API 的响应格式需要统一，便于前端全局处理；同时 FastAPI 支持定制响应格式、状态码、响应头，兼容不同业务场景的需求。
 
-
-
-
-
-
-
-
-
-
+    4.1 响应模型（Response Model）
+        通过response_model参数声明接口的响应数据模型，可过滤返回字段、规范响应数据格式、自动生成响应文档，同时避免返回敏感字段（如用户密码、数据库内部 ID）：
+            model_fastapi.py
 
 
 
