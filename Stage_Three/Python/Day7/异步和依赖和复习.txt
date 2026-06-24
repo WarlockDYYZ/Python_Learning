@@ -160,7 +160,61 @@
                 - return_exceptions=True 捕获下游异常，但必须额外做类型判断，否则会解析报错
                 - Limits、Timeout 是生产环境必备配置，防止下游服务雪崩拖垮自身服务
 
+            补充：
+                - async 和 yield 关键字(有印象)
+                    async /await：异步协程关键字（处理 IO 阻塞
+                        1. async 定义协程函数
+                            在函数前加 async，这个函数就不再是普通函数，而是协程函数。
+                                async def demo():
+                                    pass
+                            直接调用 demo() 不会执行函数内部代码，只会生成一个协程对象，必须用 await 或者 asyncio.run() 驱动运行。
+                            对比普通函数：
+                                # 普通函数，调用立刻执行
+                                def sync_func():
+                                    print("普通函数")
+                                sync_func()
 
+                                # 协程函数，调用仅生成对象，不运行
+                                async def async_func():
+                                    print("异步函数")
+                                async_func()  # 无打印，仅创建协程
+                                await async_func() # 真正执行
+
+                        2. await 等待可等待对象
+                            await 只能写在 async def 函数内部，作用：
+                                遇到 IO 阻塞（网络请求、文件读写、sleep）时，让出事件循环，CPU 去处理其他请求，不卡死服务。
+
+                            代码里两处 await：
+                                - await asyncio.gather(...) 等待所有并发请求完成
+                                - FastAPI 内部自动 await 接口函数
+
+                        3. 为什么 FastAPI 接口要用 async + httpx.AsyncClient
+                            如果用同步 requests：请求下游接口时，整个事件循环阻塞，其他用户请求排队等待，并发性能极差。
+                            await http_client.get() 等待网络响应时，服务可以同时处理别的请求，高并发性能强。
+
+                    yield：生成器关键字（分两种场景）
+                        场景 1：普通同步生成器（简单迭代）
+                            def num():
+                                yield 1
+                                yield 2
+                            for i in num():
+                                print(i)
+
+                            yield 暂停函数，返回值，下次迭代从暂停处继续执行。
+
+                        场景 2：async def + yield → 异步生成器
+                            async def get_http_client():
+                                async with httpx.AsyncClient() as client:
+                                    yield client
+
+                            这是 FastAPI 依赖注入专用写法，拆解生命周期：
+                                1. 接口执行前：进入 async with，创建 httpx 客户端
+                                2. 执行 yield client：把 client 交给接口函数使用
+                                3. 接口全部逻辑执行完毕后：回到 async with 代码块末尾，自动关闭客户端释放连接
+
+                        和 return 的核心区别：
+                            - return：函数直接结束，资源立刻销毁，无法事后清理
+                            - yield：先交出资源给上层使用，等上层逻辑跑完，再回来执行后续代码（关闭连接、释放资源）
 
 
 
