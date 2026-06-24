@@ -160,6 +160,9 @@
                 - return_exceptions=True 捕获下游异常，但必须额外做类型判断，否则会解析报错
                 - Limits、Timeout 是生产环境必备配置，防止下游服务雪崩拖垮自身服务
 
+            async/await：实现异步 IO 并发，解决网络请求阻塞，提升接口并发能力；
+            yield：分段输出资源，搭配 async with 实现资源自动创建 + 自动释放，是 FastAPI 管理 HTTP 客户端、数据库连接的标准写法。
+
             补充：
                 - async 和 yield 关键字(有印象)
                     async /await：异步协程关键字（处理 IO 阻塞
@@ -215,6 +218,213 @@
                         和 return 的核心区别：
                             - return：函数直接结束，资源立刻销毁，无法事后清理
                             - yield：先交出资源给上层使用，等上层逻辑跑完，再回来执行后续代码（关闭连接、释放资源）
+
+                    await 和 yield 作用完全不同
+                        - await
+                            只在 async def 内部使用
+                            作用：等待 IO 操作完成，释放 CPU 处理其他任务
+                            处理网络、数据库、sleep 等阻塞操作
+                        - yield
+                            同步 / 异步函数都能用（async 里叫异步生成器）
+                            作用：分段产出资源，实现「先提供资源，用完再清理」的生命周期
+                            FastAPI 依赖注入、上下文资源管理专用
+
+                    常见易错点
+                        1. 不能在普通 def 函数里写 await
+                        2. 不能在 async 函数里直接用普通 yield 做同步迭代（语法允许但极少用）
+                        3. return 和 yield 不能同时用于资源管理：
+                            用 return 无法在请求结束后自动关闭 httpx 客户端，会造成连接耗尽；
+                            yield 可以实现后置清理逻辑。
+
+
+    1.4 场景二：异步数据库交互（SQLAlchemy 2.0 + 异步）
+        数据库查询是 Web 服务中最常见的 I/O 密集型操作，也是异步性能优化的核心点；同步 ORM / 驱动会直接将 FastAPI 的异步事件循环拖回同步阻塞。
+        FastAPI 官方推荐配合SQLAlchemy 2.0 + 异步模式和原生异步数据库驱动，实现全链路异步数据库交互。
+
+        1.4.1 核心组件配置
+            异步数据库交互的核心是异步引擎、异步会话工厂与连接池的组合，通过连接池复用数据库连接，避免频繁建立 / 销毁连接的开销
+                app/core/db.py
+
+                安个 Docker 传说可以简化一些数据库操作。
+                1. 导入依赖与加载环境变量
+                    作用：读取 .env 文件中的 DATABASE_URL。如果没有配置，则使用默认的 PostgreSQL 异步连接字符串。
+                            （postgresql+asyncpg:// 表示使用异步驱动）
+                    意义：将数据库密码等敏感信息与代码分离，保证安全性。
+                    补充：
+                        load_dotenv()
+                            项目根目录下找一个叫 .env 的文件，把里面写的“键值对”（比如 DATABASE_URL=xxx）全部加载到当前程序的环境变量中。
+                            在开发中，数据库的账号、密码等敏感信息绝对不能直接写在代码里（否则代码一上传到 GitHub 密码就泄露了）。
+                                        所以我们会把它们单独放在一个 .env 文件里，这行代码就是负责把那个文件里的内容“读”进内存里，供后面的代码使用。
+                        下面那句
+                            尝试从环境变量中获取名为 DATABASE_URL 的值，并赋值给变量 DATABASE_URL。
+                            核心逻辑（带保底机制）：os.getenv() 接收两个参数：
+                                第一个参数 "DATABASE_URL"：这是要查找的配置项的名字。
+                                第二个参数 "postgresql+asyncpg://..."：这是默认值（兜底值）。
+                                        如果程序在环境变量里没有找到 DATABASE_URL（比如忘了创建 .env 文件，或者没配置这个变量），程序就不会报错崩溃，
+                                        而是会使用这个默认的字符串作为数据库连接地址。
+                            “先去 .env 文件里找数据库的连接地址。如果找到了，就用 .env 里的；如果没找到，就用写在代码里的这个默认地址”
+
+                2. 创建异步数据库引擎与连接池配置
+                    作用：engine 是整个应用与数据库通信的底层入口。它并不直接连接数据库，而是维护一个连接池（Connection Pool）。
+                    参数解析：
+                        pool_size=20：连接池中始终保持 20 个活跃的数据库连接。
+                        max_overflow=0：当 20 个连接都被占用时，不允许额外创建临时连接（最大连接数就是 20）。这能有效防止高并发时把数据库压垮。
+                        pool_pre_ping=True：极其重要的防坑配置。每次从池中取出连接时，先发送一个轻量级的 ping 测试，如果数据库已经断开（如网络闪断），
+                                会自动丢弃该连接并重新建立，避免抛出 InterfaceError。
+                        pool_recycle=3600：每隔 1 小时强制回收并重建连接，防止数据库服务端主动断开空闲连接导致客户端报错。
+
+                3. 创建异步会话工厂
+                    作用：AsyncSessionLocal 是一个工厂函数。在 FastAPI 的接口中，每次请求都会调用它来生成一个独立的数据库会话（Session）。
+                    参数解析：
+                        expire_on_commit=False：默认情况下，执行 session.commit() 后，模型对象的属性会“过期”，下次访问时会重新查库。
+                                设为 False 后，提交后依然可以直接读取内存中的属性，这在异步编程中非常关键，能避免大量不必要的隐式查询。
+                        autoflush=False：在执行查询前，不会自动把内存中未提交的修改刷新到数据库。
+                                这要求开发者明确控制事务（例如手动调用 await session.flush()），使数据流向更清晰、更安全。
+
+                4. 声明 ORM 模型基类
+                    作用：所有数据库表对应的 ORM 模型类都需要继承这个 Base。
+                    意义：SQLAlchemy 通过元数据（Metadata）追踪所有继承了 Base 的类。
+                            后续在执行 Base.metadata.create_all() 建表，或使用 Alembic 进行数据库迁移时，
+                            都是基于这个 Base 来识别有哪些表需要创建或更新。
+
+        1.4.2 依赖注入整合异步会话
+            通过 FastAPI 的依赖注入系统，为每个请求分配独立的异步数据库会话，并自动管理会话的生命周期：
+                请求开始时从连接池获取连接，请求结束时提交 / 回滚事务并将连接归还至连接池。
+                app/core/deps.py
+
+                FastAPI 项目中非常核心的“依赖注入（Dependency Injection）”模块。
+                它的主要作用是：为每一个 API 请求安全、高效地分配一个数据库会话，并在请求结束后自动清理现场。
+                在 FastAPI 中，我们不会手动去管理数据库连接的打开和关闭，而是通过 Depends() 让框架自动处理。
+
+                1. 函数的定义与类型提示
+                    这是一个异步生成器函数（使用了 yield）。
+                    类型提示 AsyncGenerator[AsyncSession, None] 告诉 FastAPI 和 IDE：
+                        这个函数会异步地产生（yield）一个 AsyncSession 对象，且不会返回其他值。这能让代码获得完美的类型检查和代码补全。
+                    补充：
+                        关于返回值类型提示
+                            在 Python 中，-> 确实是指返回值类型提示（Return Type Hint）。
+                            但在这里，情况稍微特殊一点。因为 get_session 这个函数内部使用了 yield 关键字，它在 Python 中不再是一个普通的函数，
+                                    而是一个生成器（Generator）。
+                            既然是生成器，它的“返回值”就不再是简单的 return xxx，而是通过 yield 产出数据。因此，-> 后面的类型提示也需要相应地改变。
+
+                            -> AsyncGenerator[AsyncSession, None]
+                                因为函数前面加了 async 且内部用了 yield，所以它是一个异步生成器。
+                                AsyncGenerator 是 Python 标准库 typing 中专门用来描述这种异步生成器的类型。
+                                AsyncGenerator 是一个泛型类型，它需要接收两个类型参数，用方括号括起来：AsyncGenerator[YieldType, SendType]。
+                                    - 第一个参数 AsyncSession（YieldType）：
+                                        代表这个生成器通过 yield 向外产出（发送）的数据类型。
+                                        在这段代码中，yield session 产出了一个 AsyncSession 对象，所以这里填 AsyncSession。
+                                    - 第二个参数 None（SendType）：
+                                        代表外部向这个生成器内部发送（传入）的数据类型。
+                                        在 FastAPI 的依赖注入机制中，我们只是单向地从 get_session 获取 session，并不会在外部通过
+                                                .send() 方法向生成器内部传值，所以这里填 None。
+
+                2. 核心：async with 上下文管理
+                    这里调用了在 db.py 中创建的会话工厂。
+                    async with 保证了无论发生什么，当代码块执行完毕时，底层的数据库连接都会被安全地归还给连接池，防止连接泄露。
+
+                3. try...except...finally
+                    try：
+                        yield 会将 session 暂时“交出”给具体的路由函数（比如 def create_user(db: AsyncSession = Depends(get_session))）。
+                        路由函数执行完毕后，控制权回到这里。如果一切顺利没有报错，就会执行 await session.commit()，自动提交事务。
+                                这意味着路由里写的增删改查，不需要每次都手动写 commit。
+                    except：
+                        如果在路由函数执行期间（即 yield 之后）发生了任何异常，代码会立刻跳到这里。
+                        await session.rollback() 会撤销本次请求中所有的数据库操作，防止产生脏数据。
+                        然后抛出一个标准的 HTTP 500 错误，将具体的报错信息返回给前端。
+                    finally：
+                        无论前面是成功提交还是异常回滚，最后都会执行这一步，彻底关闭这个会话，确保资源万无一失。
+
+            实现了请求级别的数据库事务隔离，并做到了自动提交、自动回滚、自动释放连接。
+
+        1.4.3 异步 CRUD 操作示例
+            在业务逻辑中，通过await执行 SQLAlchemy 的异步查询，实现非阻塞数据库操作：
+                app/crud/product.py
+
+            FastAPI 项目中典型的 CRUD（增删改查）层代码。它的主要作用是封装所有与数据库交互的底层逻辑。
+            在优秀的 FastAPI 架构中，路由层（Router）只负责接收请求和返回响应，而所有具体的数据库操作都被抽离到了 CRUD 层中。
+
+            1. 根据 ID 查询单个商品
+                select(Product).where(...)：这是 SQLAlchemy 2.0 风格的核心查询语法，它构建了一个 SELECT 语句。
+                await db.execute(...)：异步执行这条 SQL。await 会让出当前协程的控制权，等待数据库 I/O 完成，期间不会阻塞主线程。
+                result.scalar_one_or_none()：这是一个非常实用的结果提取方法。
+                        因为查询的是单个对象（而不是列表），这个方法会返回查到的唯一那条记录；如果没查到，则返回 None，而不是抛出异常。
+                补充：
+                    关于返回值的类型转换
+                        1. select(Product) 并不是普通的 SQL
+                            当写下 select(Product) 时，传入的不是表名，也不是字段名，而是 Product 这个类（Class）。
+                            SQLAlchemy 在底层接收到这个类之后，会自动生成类似 SELECT * FROM products 的 SQL 语句。
+                        2. 数据库返回的是原始数据（Row）
+                            当 await db.execute(...) 执行完毕后，数据库返回的其实是一行行的原始数据（类似于元组或字典）。
+                        3. ORM 的“魔法”：自动实例化
+                            这就是最关键的一步！因为在 select() 中明确指定了 Product 这个类，SQLAlchemy 在拿到数据库返回的原始数据后，
+                                    会自动在内存中调用 Product 类的构造函数，将原始数据映射并填充到这个类中，最终生成一个 Product 对象。
+                        4. scalar_one_or_none() 只是“提取器”
+                            result 对象里其实包含了查询到的所有结果（即使只有一条）。scalar_one_or_none() 这个方法的作用仅仅是：
+                            从结果集中提取出第一个元素。
+                            如果结果集为空，就返回 None。
+                            它提取出来的那个元素，已经是被 SQLAlchemy 转换好的 Product 对象了。
+
+            2. 创建新商品（核心重点）
+                异步 ORM 创建数据的标准范式：
+                    Product(**product.model_dump())：将 Pydantic 的请求数据（Schema）解包，实例化为一个数据库 ORM 对象。
+                    db.add(db_product)：将这个对象加入当前 Session 的内存追踪中，此时数据还没进数据库。
+                    await db.flush()（关键）：将内存中的变更“刷”到数据库，但不提交事务。这一步至关重要，因为数据库会在此时生成自增 ID 并赋给 db_product。
+                    await db.refresh(db_product)（关键）：从数据库重新拉取该对象的最新状态（包含数据库自动生成的 created_at 等字段），确保返回给前端的数据是完整且最新的。
+                    注：这里没有 commit()，是因为事务的提交交给了 deps.py 依赖注入自动处理。
+
+            3. 分页与动态条件查询
+                链式调用：offset(skip) 跳过指定数量的记录，limit(limit) 限制返回条数，order_by(...desc()) 按创建时间倒序排列。
+                        这种链式写法非常直观。
+                动态拼接查询条件：if category: query = query.where(...)。
+                        SQLAlchemy 的查询对象是不可变的，每次调用 .where() 都会返回一个新的查询对象。
+                        这种写法可以优雅地处理前端传来的可选筛选参数。
+                result.scalars().all()：因为这里查询的是多条记录，scalars() 会将结果集转换为一个标量（即 ORM 对象本身）的迭代器，
+                        .all() 则将其转化为一个 Python 列表返回。
+
+            补充：
+                1. 关于“仅定义类型与参数注入”
+                    db: AsyncSession 本质上只是一个类型提示（Type Hint）
+                    - 类型提示的作用：它告诉开发者（以及 IDE）这个参数是一个异步数据库会话，从而在写代码时能获得智能提示和语法检查。
+                    - 依赖注入的魔法：真正让 db 拥有真实数据库连接对象的，是 FastAPI 的依赖注入机制。
+                            在路由层（Router）中，通常会写成类似 db: AsyncSession = Depends(get_session) 的形式。
+                            FastAPI 会在请求进来时，自动调用 deps.py 里的 get_session 函数，生成一个真实的 AsyncSession 对象，
+                                    并把它“塞”进这个参数里传给 CRUD 函数。
+
+                2. 关于“没有涉及事务提交”
+                    在优秀的架构设计中，CRUD 层是不关心事务生命周期的。
+                    - CRUD 层的职责：只负责“做事”（比如 add、flush、execute），把数据准备好。
+                    - 事务的提交与回滚：完全交由 deps.py 中的 get_session 来兜底。
+
+                这种设计模式（通常被称为 Unit of Work 或 Request-scoped Session）的好处是：
+                        无论 CRUD 函数里调用了多少次 flush()，或者在一个请求中串联调用了多个 CRUD 函数，它们都会共享同一个 Session，
+                        并且要么全部成功提交，要么在出问题时一起回滚，保证了数据的绝对一致性。
+                这段代码确实只是定义了接口契约，把底层的脏活累活（连接管理、事务控制）优雅地交给了依赖注入去处理，这正是 FastAPI 架构的迷人之处！
+
+                3. 关于 AsyncSession 对象 和 AsyncSessionLocal()
+                    它们不仅是同一个类型，而且在内存中根本就是同一个对象。
+                    - 类型的完全一致
+                        AsyncSessionLocal() 是 SQLAlchemy 提供的一个工厂函数（通常通过 async_sessionmaker 创建）。
+                                调用它，就会实例化并返回一个 AsyncSession 对象。
+                        函数的返回类型提示是 AsyncGenerator[AsyncSession, None]，这意味着它“产出（yield）”的对象必须是 AsyncSession 类型。
+                        因此，session 变量和函数声明要返回的类型，在类型上是完全匹配的。
+
+                    - 对象的唯一性（同一个对象）
+                        在 Python 的异步生成器（async def + yield）中，yield 并不是像 return 那样返回一个全新的副本，
+                                而是直接把当前内存中的对象引用传递出去。
+                        当 FastAPI 处理请求时，流程是这样的：
+                            1. 执行到 async with AsyncSessionLocal() as session:，在内存中创建了一个真实的 AsyncSession 实例。
+                            2. 执行到 yield session，FastAPI 拿到了这个 session 的引用，并把它注入到路由函数中。
+                                    （如 db: AsyncSession = Depends(get_session)）
+                            3. 路由函数拿着这个 session 进行了增删改查（比如 db.add()）。
+                            4. 路由函数执行完毕后，控制权交还给 get_session，继续往下执行 await session.commit()。
+                        注意： 路由函数里用的 db 和依赖函数里的 session，指向的是内存中同一个 AsyncSession 对象。
+                                正因为是同一个对象，路由函数里产生的所有未提交的数据修改，才能在 get_session 里被 commit() 成功提交。
+
+                但在实际生产环境中，通常不建议在依赖注入（get_session）中直接捕获异常并抛出 HTTPException。
+                依赖注入层属于“数据访问层（Data Access Layer）”，它应该只关心数据库事务的提交和回滚。
+                如果在里面抛出 HTTPException，就把“数据层”和“HTTP 接口层”强耦合了。
+                如果以后 get_session 被用在非 HTTP 场景（比如后台定时任务、消息队列消费者），抛出 HTTPException 就会显得非常突兀甚至报错。
 
 
 
