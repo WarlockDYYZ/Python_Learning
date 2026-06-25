@@ -23,6 +23,17 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
             # 关闭会话，将连接归还至连接池，避免连接泄露
             await session.close()
 
+
+# app/core/deps.py
+from fastapi import Request
+import httpx
+
+async def get_http_client(request: Request) -> httpx.AsyncClient:
+    """
+    依赖注入函数：从应用状态中获取全局异步HTTP客户端，复用连接池
+    所有请求共享同一个客户端实例，避免频繁创建销毁TCP连接
+    """
+    return request.app.state.http_client
 """
     关于这段代码的意义
     使用前：
