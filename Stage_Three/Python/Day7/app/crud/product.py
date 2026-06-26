@@ -1,11 +1,13 @@
 # app/crud/product.py
+from typing import Optional, List
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.product import Product
 from app.schemas.product import ProductCreate
 
 
-async def get_product_by_id(db: AsyncSession, product_id: int) -> Product:
+async def get_product_by_id(db: AsyncSession, product_id: int) -> Optional[Product]:
     """根据ID异步查询商品详情"""
     # 异步执行SELECT查询，await挂起，等待数据库I/O完成
     result = await db.execute(select(Product).where(Product.id == product_id))
@@ -25,14 +27,16 @@ async def get_products_paginated(
     db: AsyncSession,
     skip: int = 0,
     limit: int = 10,
-    category: str | None = None
-) -> list[Product]:
+    category: Optional[str] = None
+) -> List[Product]:
     """异步分页查询商品列表，支持分类筛选"""
-    # 构建基础查询语句
-    query = select(Product).offset(skip).limit(limit).order_by(Product.created_at.desc())
-    # 动态添加分类筛选条件
+    stmt = select(Product).offset(skip).limit(limit).order_by(Product.created_at.desc())
+    filter_conditions = []
+    # 条件放入列表，不链式拼接where
     if category:
-        query = query.where(Product.category == category)
-    # 异步执行查询
-    result = await db.execute(query)
-    return result.scalars().all()
+        filter_conditions.append(Product.category == category)
+    # 一次性拼接所有条件
+    if filter_conditions:
+        stmt = stmt.where(*filter_conditions)
+    result = await db.execute(stmt)
+    return list(result.scalars().all())

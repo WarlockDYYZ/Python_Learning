@@ -1,5 +1,7 @@
 # app/core/deps.py
 from typing import AsyncGenerator
+
+import aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import AsyncSessionLocal
 
@@ -57,3 +59,37 @@ async def get_http_client(request: Request) -> httpx.AsyncClient:
             # 一切由 deps.py 自动接管！
             return {"id": user.id}
 """
+
+
+# 统一异步资源依赖
+from typing import Annotated
+from fastapi import Depends, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+import httpx
+from app.core.db import AsyncSessionLocal
+
+
+# 1. 数据库会话依赖：请求级，自动管理事务生命周期
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+# 2. HTTP客户端依赖：应用级，复用全局连接池
+async def get_http_client(request: Request) -> httpx.AsyncClient:
+    return request.app.state.http_client
+
+# 3. Redis客户端依赖：应用级，复用全局连接池
+async def get_redis_client(request: Request) -> aioredis.Redis:
+    return request.app.state.redis_client
+
+# 4. 类型别名：统一封装依赖注解，路由中直接复用
+AsyncSessionDep = Annotated[AsyncSession, Depends(get_session)]
+HttpClientDep = Annotated[httpx.AsyncClient, Depends(get_http_client)]
+RedisDep = Annotated[aioredis.Redis, Depends(get_redis_client)]
