@@ -15,8 +15,9 @@ if not current_stock then
 end
 
 current_stock = tonumber(current_stock)
-if current_stock < deduct_num then
-    return 0 -- 库存不足，无法扣减
+-- 确保扣减后不会出现负库存
+if current_stock - deduct_num < 0 then
+    return 0
 end
 -- 原子化扣减库存
 redis.call('DECRBY', stock_key, deduct_num)
