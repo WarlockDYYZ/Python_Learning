@@ -1434,4 +1434,84 @@
                 b. 配置 Celery 的 Broker 和 Backend 地址，复用 Redis 连接；
                 c. 定义异步任务，在 Flask 路由中投递任务到队列
 
+            核心代码示例：
+
+                celery_app.py
+
+                在 Flask 项目中集成 Celery 分布式任务队列，实现异步任务处理。
+                在 Web 开发中，像发送邮件、生成报表、处理大文件等操作非常耗时。
+                如果同步执行，用户必须等待这些操作完成才能收到响应，体验极差。
+                Celery 的作用就是将这些耗时任务“扔”到后台去执行，让 Web 接口能够“秒回”。
+
+                1. 导入依赖与初始化基础组件
+                    含义：导入 Flask 和 Celery 核心类，并初始化封装的 RedisClient。
+                    业务意义：虽然 Celery 也会自己创建 Redis 连接，但复用封装好的 RedisClient 可以在业务代码中继续方便地操作缓存，
+                            保持项目架构的一致性。
+                2. 初始化 Celery 实例
+                    含义：创建一个 Celery 实例，并指定消息代理（Broker）和结果后端（Backend）。
+                    核心参数解析：
+                        - app.import_name：使用 Flask 应用的名字作为 Celery 的命名空间，方便后续管理和日志追踪。
+                        - broker（消息代理）：这是 Celery 的“调度中心”或“传送带”。
+                            Flask 把任务丢到这里，后台的 Worker 从这里取任务。这里使用了 Redis 的 0 号库。
+                        -backend（结果后端）：用于存储异步任务的执行结果和状态（如成功、失败、进度）。这里使用了 Redis 的 1 号库。
+                    工程亮点：将 Broker 和 Backend 分库存储（0 和 1），是一个非常专业的做法。
+                        这能有效防止任务消息和结果数据在 Redis 中互相干扰，也方便后续清理过期数据。
+                3. 定义异步任务
+                    含义：定义一个普通的 Python 函数，并使用 @celery.task 装饰器将其注册为 Celery 任务。
+                    业务逻辑：
+                        - time.sleep(3)：模拟发送邮件等耗时操作（阻塞 3 秒）。
+                        - 返回值：任务执行完毕后，返回一个字典。这个结果会被 Celery 自动序列化并存储到前面配置的 backend（Redis 1号库）中。
+                4. Flask 路由：触发异步任务
+                    含义：在用户注册接口中，触发异步任务并立即返回。
+                    核心方法 .delay()：这是 Celery 提供的快捷调用方法。
+                        它不会真正执行 send_register_email 函数，而是将任务参数打包成一条消息，瞬间发送到 Broker（Redis 0号库）中，
+                                并立即返回一个包含 task_id 的对象。
+                    业务意义：因为 .delay() 是瞬间完成的，所以 /register 接口不需要等待那 3 秒钟的邮件发送过程，
+                            能够立刻向前端返回 {"status": "success", "message": "register success"}。
+                            这极大地提升了接口的响应速度和用户体验。
+                注意：
+                    1. 启动 Worker 进程：Flask 应用只负责“发任务”，真正“干活的工人”需要单独启动。
+                        需要在终端执行类似 celery -A app.celery worker --loglevel=info 的命令，
+                            Celery 才会去 Redis 里取任务并执行 send_register_email。
+                    2. Flask 应用上下文：如果在这个异步任务中，需要操作 Flask-SQLAlchemy 数据库，或者使用 current_app.config，
+                        必须在任务中手动推入应用上下文（使用 with app.app_context():），否则任务在后台执行时会报错。
+
+
+    5.3 FastAPI 集成 Redis 核心场景实战
+        FastAPI 基于异步 IO 模型，适配redis.asyncio异步客户端，通过依赖注入方式管理 Redis 连接，完全兼容高并发场景，性能比同步模式显著提升。
+
+        5.3.1 依赖注入管理异步连接
+            FastAPI 的依赖注入系统，可以在每个请求执行前，从连接池获取一个 Redis 连接，请求完成后自动将连接归还池中，避免连接泄露，
+                    保障并发场景下的连接复用。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
