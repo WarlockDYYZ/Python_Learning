@@ -1,7 +1,7 @@
 # utils/redis_decorator.py
 import time
 import functools
-from Stage_Three.Data_Analysis.Day8.log_config import redis_logger
+from utils.redis_logger import redis_logger
 from opentelemetry import trace
 
 def log_redis_operation(biz_type: str = "default"):
@@ -21,8 +21,8 @@ def log_redis_operation(biz_type: str = "default"):
             # 从Redis命令参数中提取核心命令、Key、用户ID
             redis_command = func.__name__  # 如get、set、hget、rpush
             redis_key = args[1] if len(args) > 1 else kwargs.get("key", "")
-            user_id = request.user.id if request and request.user.is_authenticated else ""
-            # user_id = request?.user?.id if request?.user?.is_authenticated else ""
+            user = getattr(request, "user", None)
+            user_id = getattr(user, "id", "") if user and getattr(user, "is_authenticated", False) else ""
             # 记录命令执行前的日志
             redis_logger.info(
                 "Redis operation start",
@@ -39,6 +39,7 @@ def log_redis_operation(biz_type: str = "default"):
 
             # 执行实际的Redis命令，计算执行耗时
             start_time = time.time()
+            cost_time = 0.0  # 初始化耗时变量
             try:
                 result = func(*args, **kwargs)
                 success = True
@@ -65,8 +66,7 @@ def log_redis_operation(biz_type: str = "default"):
                 )
                 raise e
             finally:
-                end_time = time.time()
-                cost_time = round((end_time - start_time) * 1000, 2)  # 转换为毫秒
+                cost_time = round((time.time() - start_time) * 1000, 2)
 
             # 记录命令执行成功后的完整日志
             redis_logger.info(

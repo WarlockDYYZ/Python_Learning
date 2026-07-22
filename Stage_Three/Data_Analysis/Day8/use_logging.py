@@ -1,5 +1,5 @@
 # 假设在某个操作Redis的函数中
-from Stage_Three.Data_Analysis.Day8.log_config import redis_logger
+from utils.redis_logger import redis_logger
 
 
 def get_user_info(user_id):

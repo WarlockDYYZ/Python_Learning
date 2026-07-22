@@ -451,7 +451,92 @@
         3.2.2 自定义 Redis 操作日志装饰器
             通过装饰器模式，在 Redis 命令执行的前后添加埋点，统一记录所有操作的日志，完全复用 Django 的请求链路 ID，实现日志联动。
 
-                
+                redis_decorator.py
+
+                企业级的 Redis 操作日志记录装饰器。在不侵入原有业务代码的前提下，自动为 Redis 操作添加全链路的监控和日志记录。
+                1. 装饰器带参数（高阶函数）
+                    这是一个三层嵌套的装饰器。
+                    最外层接收业务参数 biz_type（如 product_cache），中间层接收被装饰的函数 func，最内层 wrapper 负责实际的拦截逻辑。
+                    这种结构允许在使用时灵活指定业务场景，例如 @log_redis_operation(biz_type="order_queue")。
+                2. 上下文信息提取（全链路追踪）
+                    在函数执行前，代码从当前请求上下文中提取了丰富的信息：
+                        - Trace ID：通过 opentelemetry 获取当前链路追踪的 ID，这是微服务架构下排查跨服务问题的关键。
+                        - Request ID & Client IP：从 Django/Flask 的 request.META 中提取请求唯一标识和客户端 IP。
+                        - User ID：安全地提取当前登录用户的 ID（运用了 getattr 来防止未登录或对象缺失导致的报错）。
+                        - Redis 元数据：提取了即将执行的命令名称（如 get, set）和操作的 Key。
+                3. 执行拦截与耗时计算
+                    耗时统计：使用 time.time() 记录开始和结束时间，并转换为毫秒（ms）。
+                    异常捕获：try...except 块确保了即使 Redis 操作抛出异常，也能被捕获并记录。捕获后通过 raise e 将异常继续向上抛出，
+                            不影响原有的业务异常处理流程。
+                    Finally 块：无论成功还是失败，都会执行 finally 中的耗时计算，保证性能数据的准确性。
+                4. 结构化日志记录
+                    代码使用了 redis_logger 并在 extra 字典中传递数据。这是一种非常优秀的工程实践：
+                    成功日志：在操作成功后，记录完整的上下文、耗时以及截断后的返回结果（str(result)[:200] 防止超长数据撑爆日志文件）。
+                    失败日志：在 except 块中，使用 error 级别记录日志，并通过 exc_info=True 自动附加完整的异常堆栈信息，方便后续排查问题。
+                展示了如何将 Python 装饰器与 OpenTelemetry 结合，实现无侵入式的可观测性（Observability）。
+                它不仅能记录日志，还能将 Redis 操作与分布式链路追踪打通，是构建高可用后端服务的标准组件。
+
+        3.2.3 业务层使用示例
+            在 Django 的 View 层、Service 层中，通过装饰器或上下文管理器，调用 Redis 操作时自动记录日志，无需重复编写日志埋点代码，
+            实现业务逻辑与日志逻辑解耦：
+
+                product_view.py
+
+                电商商品详情页缓存读取逻辑，结合 Django 视图、Redis 缓存以及之前编写的日志追踪装饰器。
+                1. 核心业务逻辑 (get 方法)
+                    - 这是处理 GET 请求的入口，采用了经典的 Cache-Aside（旁路缓存）模式：
+                        优先读缓存：首先调用 get_product_cache 尝试从 Redis 中获取商品数据。如果命中缓存（if product_data:），
+                                直接将 JSON 字符串反序列化后返回，并在响应中标注 "source": "cache"。这极大减轻了数据库的压力。
+                        回源查库：如果缓存未命中，则通过 Django ORM (Product.objects.get) 去数据库中查询商品。
+                        回填缓存：查到数据后，组装成字典，调用 set_product_cache 写入 Redis 并设置 1 小时（3600秒）的过期时间，
+                                最后返回数据并标注 "source": "database"。
+                2. 封装的 Redis 操作与日志埋点
+                    - 将 Redis 的读写操作封装成了独立的类方法，并应用了 @log_redis_operation 装饰器：
+                        get_product_cache：使用 django_redis 获取连接，拼接规范的缓存 Key（如 product:info:1001），执行 get 命令。
+                        set_product_cache：使用 setex 命令实现写入数据与设置过期时间的原子操作，并将 Python 字典序列化为
+                                JSON 字符串存入 Redis。
+                        自动埋点：这两个方法都被装饰器包裹，意味着每次读写 Redis 时，都会自动记录包含 Trace ID、耗时、操作 Key 等全链路信息的日志，
+                                完全不需要在业务代码中手写 logger.info。
+
+        3.2.4 集群 / 事务场景下的日志适配
+            集群场景：使用django-redis的RedisCluster客户端，在日志中新增redis_node字段，记录操作路由到的分片节点 IP、端口，
+                    便于定位单个分片的慢查询、异常问题；
+            事务场景：在执行MULTI/EXEC事务、Lua 脚本时，在日志中新增transaction_id字段，将事务内的所有命令日志绑定到同一个事务 ID 下，
+                    便于回放整个事务的执行流程，排查回滚、执行失败的根因；
+            主从复制场景：在日志中记录读写分离的路由信息：写命令路由到主节点，读命令路由到从节点，记录主从节点的复制延迟时间，排查数据复制不一致的问题。
+
+
+    3.3 Flask/FastAPI 整合配置（简要适配）
+        Flask、FastAPI 的整合逻辑与 Django 完全一致，复用同一个日志装饰器、JSON 格式化规则，仅在连接池管理、依赖注入方式上存在细微差异。
+
+        3.3.1 Flask 整合方案
+            采用@app.before_request/@app.after_request中间件，在请求上下文中管理 Redis 连接，复用全局连接池，记录链路日志：
+
+                app.py
+
+        3.3.2 FastAPI 整合方案
+            采用依赖注入管理异步 Redis 连接池，复用aioredis的异步客户端，完美适配 FastAPI 的异步性能，日志埋点逻辑与同步场景完全一致：
+
+                main.py
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

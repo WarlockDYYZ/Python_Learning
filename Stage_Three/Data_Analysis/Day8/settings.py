@@ -1,6 +1,6 @@
 # settings.py
 # Redis集群/单实例连接配置，从环境变量中读取，避免硬编码
-from Stage_Three.Data_Analysis.Day8.log_config import LOG_FORMAT
+from utils.redis_logger import LOG_FORMAT
 
 REDIS = {
     "HOST": "redis-cluster.example.com",  # 集群节点地址，单实例则写单机IP
