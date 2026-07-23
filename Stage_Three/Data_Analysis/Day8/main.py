@@ -1,9 +1,18 @@
 # main.py
 from fastapi import FastAPI, Depends, Request
+from pydantic import BaseModel
 from redis import asyncio as aioredis
 from utils.redis_decorator import log_redis_operation  # 复用装饰器
 import json
 from contextlib import asynccontextmanager
+import redis
+
+
+class Product(BaseModel):  # 定义数据模型
+    id: int
+    name: str
+    price: float
+    stock: int
 
 
 app = FastAPI(title="FastAPI Redis Log Demo")
@@ -36,9 +45,13 @@ async def get_product(
 ):
     cache_key = f"product:info:{product_id}"
     # 读取缓存，自动记录日志
-    product_data = await get_product_cache(redis_conn, cache_key)
+    try:
+        product_data = await get_product_cache(redis_conn, cache_key)
+    except redis.RedisError:  # 捕获所有 Redis 异常
+        product_data = None  # 降级：跳过缓存
+    # 读取缓存时安全处理
     if product_data:
-        return {"data": json.loads(product_data), "source": "cache"}
+        return {"data": Product.model_validate_json(product_data), "source": "cache"}
 
     # 缓存未命中，查询数据库
     product = {"id": product_id, "name": "无线蓝牙耳机", "price": 299.99, "stock": 100}
