@@ -514,16 +514,47 @@
 
                 app.py
 
+                Flask + Redis 的缓存集成实现，核心目标是通过 Redis 加速商品查询接口，并自动记录 Redis 操作日志。
+                核心架构与工作流程
+                1. 全局连接池初始化（避免性能陷阱）
+                    Web 服务是多线程/多进程模型，若每次请求都新建 Redis 连接（redis.Redis()），会导致 TCP 握手开销剧增。
+                    连接池预先创建 20 个连接，请求时直接复用，将单次连接耗时从 1~2ms 降至 0.01ms 以下。
+                    关键配置说明
+                        - decode_responses=True：自动将 Redis 返回的 bytes 转为 str，避免后续手动 .decode("utf-8")
+                                （否则 json.loads() 会报错）。
+                2. 缓存读取标准流程（Cache-Aside 模式）
+                    缓存键设计
+                        - product:info:{product_id} 采用 业务域:数据类型:
+                            唯一标识 的命名规范，便于后续按前缀批量管理缓存（如 DEL product:info:*）。
+                    缓存回填逻辑
+                        - 未命中时写入缓存并设置 3600 秒过期时间（setex），防止缓存永久失效导致数据库雪崩
+                3. 日志装饰器复用
+                    跨框架复用原理
+                    该装饰器只需满足两个条件即可在 Flask 中工作：
+                        1. 被装饰函数的第一个参数是 Redis 连接对象（Django 的 get_redis_connection 和 Flask 的 redis.Redis 接口一致）
+                        2. 装饰器内部通过 func.__name__ 获取操作类型（如 get/setex），不依赖框架特定对象
+                    日志内容示例：
+                        [REDIS-LOG] biz=product_cache op=get key=product:info:1001 time=0.5ms trace_id=abc123
+
+                与 Django/FastAPI 实现的对比
+                    维度	        当前 Flask 代码	            Django 代码	                        FastAPI 代码
+                    连接管理	    手动创建全局连接池	            通过 django-redis 自动管理	        异步连接池 + Lifespan 生命周期
+                    请求上下文	无内置上下文，需手动传递连接对象	get_redis_connection() 自动绑定请求	依赖注入 (Depends) 自动提供
+                    并发模型	    同步阻塞（单线程处理请求）	    同步阻塞	                            原生异步非阻塞
+                    缓存异常处理	需手动添加 try/except	        可通过中间件统一处理	                异步异常处理更高效
+
+                基础可用的缓存服务，核心价值在于：
+                    1. 通过连接池避免了 Redis 连接性能瓶颈
+                    2. 用装饰器实现了业务与日志的完全解耦
+                    3.  采用标准的 Cache-Aside 模式保障数据一致性
+
         3.3.2 FastAPI 整合方案
             采用依赖注入管理异步 Redis 连接池，复用aioredis的异步客户端，完美适配 FastAPI 的异步性能，日志埋点逻辑与同步场景完全一致：
 
                 main.py
 
-
-
-
-
-
+                FastAPI 与异步 Redis 的高性能集成方案，通过 Lifespan 生命周期管理、依赖注入解耦、装饰器自动日志 三大核心设计，构建了高并发缓存服务。
+                
 
 
 

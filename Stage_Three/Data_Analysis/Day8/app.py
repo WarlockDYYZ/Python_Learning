@@ -4,6 +4,7 @@ from redis import ConnectionPool
 from utils.redis_decorator import log_redis_operation  # 复用Django的装饰器
 import json
 import redis
+from flask import jsonify
 
 
 app = Flask(__name__)
@@ -27,8 +28,9 @@ def get_product(product_id):
 
     # 读取缓存，自动记录日志
     product_data = get_product_cache(redis_conn, cache_key)
-    if product_data:
-        return {"data": json.loads(product_data), "source": "cache"}
+    if product_data is None:  # 显式检查空结果
+        redis_conn.setex(cache_key, 60, "")  # 空值缓存 60 秒
+        return jsonify({"error": "Not Found"}), 404
 
     # 缓存未命中，查询数据库
     product = {"id": product_id, "name": "无线蓝牙耳机", "price": 299.99, "stock": 100}
@@ -38,7 +40,11 @@ def get_product(product_id):
 # 复用日志装饰器
 @log_redis_operation(biz_type="product_cache")
 def get_product_cache(redis_conn, cache_key):
-    return redis_conn.get(cache_key)
+    try:
+        product_data = get_product_cache(redis_conn, cache_key)
+    except redis.RedisError:  # 捕获所有 Redis 异常
+        product_data = None  # 降级：跳过缓存直接查库
+    return product_data
 
 @log_redis_operation(biz_type="product_cache")
 def set_product_cache(redis_conn, cache_key, product_dict):
