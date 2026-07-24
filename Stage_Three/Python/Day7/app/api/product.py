@@ -1,11 +1,10 @@
 # app/api/product.py
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, status
 import httpx
 import asyncio
-from app.core.deps import AsyncSessionDep, HttpClientDep, RedisDep, PaginationDep, ProductFilterDep
+from app import AsyncSessionDep, HttpClientDep, RedisDep, PaginationDep, ProductFilterDep
 from app import crud, schemas
-from app.utils.cache import get_cache_key, set_cache_data
+from app import get_cache_key, set_cache_data
 
 router = APIRouter(prefix="/products", tags=["商品管理"])
 

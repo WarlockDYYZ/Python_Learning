@@ -2,9 +2,8 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from pydantic import BaseModel
 
-from app.core.db import AsyncSessionLocal
+from app import AsyncSessionLocal
 
 # 子依赖：提取请求头中的Bearer Token
 oauth2_scheme = OAuth2PasswordBearer(

@@ -2,9 +2,9 @@
 from typing import Optional, List
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from app.models.product import Product
-from app.schemas.product import ProductCreate
+from sqlalchemy import select
+from app import Product
+from app import ProductCreate
 
 
 async def get_product_by_id(db: AsyncSession, product_id: int) -> Optional[Product]:

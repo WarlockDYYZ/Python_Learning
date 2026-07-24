@@ -3,7 +3,7 @@ from typing import AsyncGenerator
 
 import aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.db import AsyncSessionLocal
+from app import AsyncSessionLocal
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
@@ -66,7 +66,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
-from app.core.db import AsyncSessionLocal
+from app import AsyncSessionLocal
 
 
 # 1. 数据库会话依赖：请求级，自动管理事务生命周期

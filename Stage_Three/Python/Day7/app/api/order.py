@@ -1,7 +1,7 @@
 # app/api/order.py
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 import httpx
-from app.core.deps import HttpClientDep
+from app import HttpClientDep
 import asyncio
 
 
