@@ -1,1 +1,55 @@
-_
+Streamlit
+
+第一部分：Streamlit 基础入门
+
+    1.1 Streamlit 核心理论
+        Streamlit 是一个专为数据科学家和机器学习工程师设计的 Python Web 应用框架。它的核心理念是：用纯 Python 脚本快速构建交互式数据应用，无需前端知识。
+
+        核心优势（理论）
+            1. 零前端门槛：不需要 HTML/CSS/JS，全部用 Python 函数调用生成 UI 组件
+            2. 脚本式运行：每次用户交互都会重新运行整个脚本，数据流自上而下单向流动，心智模型极其简单
+            3. 声明式 API：写"我要显示什么"而非"怎么渲染"，例如 st.write(df) 直接展示 DataFrame
+            4. 热重载：修改代码后浏览器自动刷新，开发效率极高
+            5. 原生支持数据科学栈：无缝集成 Pandas、Matplotlib、Plotly、PyTorch 等主流库
+
+        适用场景
+            - 数据探索与可视化看板（Dashboard）
+            - 机器学习模型演示与调参工具
+            - 交互式数据分析报告
+            - 内部数据工具快速原型
+
+        运行原理（重渲染机制）
+            核心机制：脚本全量重跑。
+                    每当用户与组件交互（如拖动滑块、点击按钮），Streamlit 会从头到尾重新执行整个 Python 脚本，组件的当前值作为变量注入，
+                    最后将新结果渲染到页面。
+            这意味着：普通变量在每次交互后都会重置。
+                    需要跨交互保留状态 → 使用 st.session_state；需要避免重复计算 → 使用缓存装饰器。
+
+        第一个 Streamlit 应用：
+
+            app.py
+
+            集成了其他的三方库，语法上我还是都看得懂
+
+            运行应用：
+                streamlit run app.py
+
+        常用运行参数
+            参数	                说明	                示例
+            --server.port	    指定端口	            streamlit run app.py --server.port 8080
+            --server.headless	不自动打开浏览器	    streamlit run app.py --server.headless true
+            --theme.base	    主题（light/dark）	streamlit run app.py --theme.base dark
+
+
+    1.2 页面基础元素
+        表格数据展示
+
+            table_show.py
+
+            见名知意啊，重要
+
+
+
+
+
+
