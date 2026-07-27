@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 
 
 df = pd.DataFrame({
@@ -33,3 +32,18 @@ def calculate_gmv(sales_df):
     return (sales_df["销量"] * sales_df["单价"]).sum()
 """
 st.code(code, language="python")
+
+
+# 数据下载
+@st.cache_data
+def convert_df(df):
+    return df.to_csv(index=False).encode("utf-8")
+
+csv_data = convert_df(df)
+
+st.download_button(
+    label="下载销售数据 CSV",
+    data=csv_data,
+    file_name="sales_data.csv",
+    mime="text/csv"
+)
