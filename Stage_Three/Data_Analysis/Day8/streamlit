@@ -135,6 +135,58 @@ Streamlit
             @st.cache_data	    数据（DataFrame、数值、字符串）	数据加载、数据处理、计算函数
             @st.cache_resource	资源对象（连接、模型）	        数据库连接、ML 模型、大文件句柄
 
+            cache_data.py
+
+            - 关于“刷新数据”
+                点击按钮后数据确实会被删除，但以为 Streamlit 的特性，点击后运行到 st.rerun() 时，脚本会从头执行一次，再次加载数据。
+                所以显示网页上数据并没有在点击 “刷新数据” 时消失。
+
+        缓存参数详解
+            参数	            说明	                        默认值
+            ttl	            缓存存活时间（秒），过期自动失效	None（永久）
+            max_entries	    最大缓存条目数，超出后淘汰最旧的	None（不限制）
+            show_spinner	计算时是否显示加载提示	        True
+            persist	        是否持久化到磁盘（重启不丢失）	False
+
+        缓存原理（理论）
+            缓存命中逻辑：函数名 + 参数值 → 计算哈希 → 查找缓存 → 命中则返回，未命中则执行函数并存入缓存。
+            注意事项：
+                - 参数必须是可哈希的（列表、字典不能直接作为参数，需转为 tuple / frozenset）
+                - 函数内部修改全局变量会导致缓存结果不准确
+                - mutable 返回值会被自动深拷贝，防止外部修改污染缓存
+            补充：
+                字典类型，键、字典中的元素(item)，都是可哈希的，字典本身不是可以哈希的。
+
+
+第三部分：可视化集成
+
+    3.1 Matplotlib / Seaborn 集成
+        集成原理
+            Streamlit 通过 st.pyplot() 渲染 Matplotlib 图表。核心是获取 matplotlib 的 Figure 对象传给 Streamlit。
+
+        Matplotlib 基础集成：
+
+            st_matplotlib.py
+
+        Seaborn 统计图表集成：
+
+            st_seaborn.py
+
+        交互式筛选联动图表：
+
+            select_chart.py
+
+        注意：
+            - 显式创建 Figure：推荐用 fig, ax = plt.subplots() 而不是 plt.plot() 全局方式，避免重跑时图表叠加
+            - 及时关闭：渲染后调用 plt.close(fig) 释放内存，大数据量看板尤其重要
+            - 中文字体：部署环境需安装中文字体，否则中文显示为方框
+
+
+    3.2 Plotly 交互式可视化
+        为什么选 Plotly
+            Plotly 生成的是交互式 HTML 图表，支持鼠标悬停查看数值、缩放、平移、下载图片，比 Matplotlib 静态图更适合数据分析看板。
+            Streamlit 原生支持 st.plotly_chart()。
+
 
 
 
