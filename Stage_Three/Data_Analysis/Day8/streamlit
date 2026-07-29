@@ -187,6 +187,35 @@ Streamlit
             Plotly 生成的是交互式 HTML 图表，支持鼠标悬停查看数值、缩放、平移、下载图片，比 Matplotlib 静态图更适合数据分析看板。
             Streamlit 原生支持 st.plotly_chart()。
 
+        基础折线图：
+
+            base_line.py
+
+        常用图表类型：
+
+            usual_chart.py
+
+        交互式筛选联动：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
