@@ -26,7 +26,6 @@ Streamlit
                     需要跨交互保留状态 → 使用 st.session_state；需要避免重复计算 → 使用缓存装饰器。
 
         第一个 Streamlit 应用：
-
             app.py
 
             集成了其他的三方库，语法上我还是都看得懂
@@ -43,7 +42,6 @@ Streamlit
 
     1.2 页面基础元素
         表格数据展示；JSON 与代码展示；媒体元素；数据下载
-
             table_show.py
 
             见名知意啊，重要
@@ -94,7 +92,6 @@ Streamlit
 
     2.2 输入组件大全
         数值型输入；选择型输入；文本型输入；日期与时间；按钮与触发类
-
             stools.py
 
     2.3 布局与容器组件
@@ -107,7 +104,6 @@ Streamlit
         折叠面板（Expander）
             默认收起，点击展开，适合放置高级筛选或辅助信息。
         容器（Container）与占位符
-
             layout_and_container.py
 
 
@@ -116,7 +112,6 @@ Streamlit
         st.session_state 是一个跨脚本重跑持久化的字典，数据保存在用户会话中，刷新页面才会重置。
 
         基本用法；与组件双向绑定；回调函数（on_change / on_click）；
-
             session_state.py
 
         典型应用场景
@@ -165,15 +160,12 @@ Streamlit
             Streamlit 通过 st.pyplot() 渲染 Matplotlib 图表。核心是获取 matplotlib 的 Figure 对象传给 Streamlit。
 
         Matplotlib 基础集成：
-
             st_matplotlib.py
 
         Seaborn 统计图表集成：
-
             st_seaborn.py
 
         交互式筛选联动图表：
-
             select_chart.py
 
         注意：
@@ -188,34 +180,137 @@ Streamlit
             Streamlit 原生支持 st.plotly_chart()。
 
         基础折线图：
-
             base_line.py
 
         常用图表类型：
-
             usual_chart.py
 
         交互式筛选联动：
+            interactive_chart.py
 
 
+    3.3 Streamlit 原生图表
+        原生图表简介
+            Streamlit 内置了一组基于 Vega-Lite 的轻量图表 API，无需导入额外库，适合快速展示数据。
+            优点是写法极简，缺点是自定义程度不如 Plotly。
+
+            base_chart.py
+
+            为什么这里绘图时不用设置中文显示呐？
 
 
+第四部分：实战项目 — 电商销售分析面板
+
+    4.1 项目需求与设计
+        项目背景
+        某电商平台运营团队需要一个交互式销售分析面板，用于日常监控销售表现、多维度下钻分析、快速生成数据结论。
+        替代传统的静态 Excel 报表，实现数据实时交互探索。
+
+        - 核心功能需求
+            1. KPI 指标卡：总销售额、订单数、客单价、同比增长率
+            2. 多维度筛选：日期范围、产品品类、销售渠道、地区
+            3. 趋势分析：日/周/月销售趋势折线图
+            4. 结构分析：品类占比饼图、渠道分布柱状图
+            5. 地区分析：各省份销售额排行 + 地图可视化
+            6. TOP 商品：热销/滞销商品排行榜
+            7. 数据导出：筛选结果一键导出 CSV
+
+        - 页面布局设计
+
+        - 技术选型
+            - UI 框架：Streamlit（侧边栏 + 列布局 + Tabs）
+            - 图表库：Plotly（交互式，悬停查看详情）
+            - 数据处理：Pandas + NumPy
+            - 缓存策略：@st.cache_data 缓存数据加载
+            - 状态管理：session_state 保存筛选条件
 
 
+    4.2 数据层设计
+        数据模型设计
+            模拟电商销售明细表，包含以下字段：
+                字段名	        类型	    说明
+                order_id	    字符串	订单唯一编号
+                order_date	    日期	    下单日期
+                category	    字符串	产品品类（电子/服装/食品/家居/美妆）
+                product_name	字符串	商品名称
+                channel	        字符串	销售渠道（天猫/京东/抖音/拼多多/线下）
+                region	        字符串	省份地区
+                quantity	    整数	    购买数量
+                unit_price	    浮点数	单价
+                sales_amount	浮点数	销售额 = 数量 × 单价
+                customer_type	字符串	客户类型（新客/老客）
 
 
+    4.3 完整实现代码
+        sales_dashboard.py
+
+        运行效果
+            1. 左侧筛选栏：日期、品类、渠道、地区四维筛选，修改后图表自动更新
+            2. 顶部 KPI 卡：四个核心指标一目了然
+            3. 趋势图：双 Y 轴柱状+折线组合，支持日/周切换
+            4. 中部两列：品类环形图 + 渠道横向柱状图
+            5. 下部两列：地区排行 + TOP10 热销商品
+            6. 底部数据明细：支持展开查看和 CSV 导出
 
 
+    4.4 功能模块拆解
+        模块一：页面配置层
+            st.set_page_config(
+                page_title="电商销售分析面板",  # 浏览器标签页标题
+                page_icon="📊",                 # 标签页图标
+                layout="wide",                  # 宽屏模式（默认 centered）
+                initial_sidebar_state="expanded"  # 侧边栏默认展开
+            )
+            数据分析看板推荐 layout="wide"，充分利用屏幕宽度展示多列图表。
 
+        模块二：数据层（缓存设计）
+            使用 @st.cache_data(ttl=3600) 装饰数据加载函数：
+                - 首次运行生成数据，后续 1 小时内直接返回缓存
+                - 避免每次交互都重新生成 5000 条数据，提升响应速度
+                - 生产环境替换为读取数据库 / CSV / API
 
+        模块三：筛选交互层
+            侧边栏统一放置所有筛选器，形成「左侧筛选 + 右侧结果」的经典看板布局：
+                筛选维度	组件类型	    设计原因
+                日期范围	date_input	时间是最常用的筛选维度
+                产品品类	multiselect	支持多选对比分析
+                销售渠道	multiselect	多渠道组合分析
+                销售地区	multiselect	区域维度下钻
+            交互机制：任一筛选条件变化 → 脚本重跑 → filter_data() 重新过滤 → 所有图表基于新数据重绘。
 
+        模块四：KPI 指标卡层
+            使用 st.columns(4) 四列等宽布局，配合 st.metric() 组件：
+                - 第一屏就能看到核心结论，符合管理层「先看总数再看明细」的阅读习惯
+                - delta 参数展示同比/环比变化，红绿箭头自动标识涨跌
+                - 生产环境中 delta 值应通过对比上一周期计算得出
 
+        模块五：图表可视化层
+            采用「趋势 + 结构 + 排行」三层分析结构：
+                1. 趋势层：时间维度折线/柱状图，看整体走势和波动
+                2. 结构层：饼图 + 横向柱状图，分析品类和渠道构成
+                3. 排行层：地区排行 + 商品 TOP10，定位重点区域和爆品
+            全部使用 Plotly，支持悬停查看具体数值、缩放聚焦、一键下载图片
 
+        模块六：数据导出层
+            csv_data = df_filtered.to_csv(index=False).encode("utf-8-sig")
+            st.download_button(
+                label="📥 导出筛选结果 CSV",
+                data=csv_data,
+                file_name=f"销售数据_{date_range[0]}_{date_range[1]}.csv",
+                mime="text/csv"
+            )
+            使用 utf-8-sig 编码，确保 Excel 打开中文不乱码。
 
+        优化建议
+            1. 数据缓存：原始数据加载加 @st.cache_data，只加载一次
+            2. 增量过滤：筛选在 Pandas 内存中完成，避免重复 IO
+            3. 图表数据预聚合：绘图前先 groupby 聚合，不要传明细数据给图表库
+            4. 大数据量分页：数据明细表只展示前 N 条，全量数据走导出
+            5. 组件状态绑定：复杂筛选条件存入 session_state，支持 Tab 切换不丢失
 
-
-
-
-
-
-
+进阶练习
+    - 接入真实数据库：替换 generate_mock_data 为 SQL 查询
+    - 增加用户登录：st.experimental_user 或自定义鉴权
+    - 多页面应用：使用 Streamlit Pages 拆分为总览、商品、用户等多个子页面
+    - 定时刷新：st_autorefresh 组件实现实时大屏
+    - 下载 PDF 报告：结合 pdfkit 生成静态报告
