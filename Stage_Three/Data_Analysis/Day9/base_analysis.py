@@ -40,14 +40,17 @@ pie_fig = px.pie(
 )
 
 # 4. 热力图：展示矩阵类数据相关性
-heatmap_fig = go.Figure(data=go.Heatmap(
-    x=df["月份"], y=df["渠道"], z=df["销售额"],
-    colorscale="Blues",
-    text=df["销售额"],  # 修正：使用 text 参数显示单元格数值
-    texttemplate="%{text}",
-    zmin=0,
-    zmax=df["销售额"].max()
-))
+# 第一步：长格式 → 矩阵格式（必须步骤）
+# 透视
+heatmap_data = df.pivot_table(index="渠道", columns="月份", values="销售额", aggfunc="sum")
+
+# 绘图（直接传入 DataFrame）
+heatmap_fig = px.imshow(
+    heatmap_data,
+    text_auto=True,
+    color_continuous_scale="Blues",
+    title="各渠道月度销售额热力图"
+)
 
 # 5. 桑基图：展示用户行为流向
 sankey_fig = go.Figure(data=[go.Sankey(
