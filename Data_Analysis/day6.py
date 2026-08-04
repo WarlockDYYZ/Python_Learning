@@ -540,7 +540,7 @@ df_cleaned = df.dropna(how='all')
 print(df_cleaned)
 print_dot()
 # 只删除特定列有缺失值的行
-df_cleaned = df.dropna(subset=['name', 'tel', '交通补贴'])
+df_cleaned = df.dropna(subset=['name', 'etl', '交通补贴'])
 print(df_cleaned)
 print_dot()
 # 保留至少有3个非缺失值的行, 要将测试数据删除到3个一下，才会删除，暂时不删了，了解函数功能即可
