@@ -2,8 +2,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, Session
-from app.config import settings
 from typing import Dict
+from Stage_Three.Python.Day9.app.config import settings
 
 
 # 同步连接池字典
@@ -13,6 +13,8 @@ async_pools: Dict[str, sessionmaker] = {}
 
 def init_sync_pool(source_name: str, db_url: str):
     """初始化同步数据库连接池"""
+
+
     engine = create_engine(
         db_url,
         pool_pre_ping=True,  # 心跳检测，避免断连
