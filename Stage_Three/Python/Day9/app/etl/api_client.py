@@ -1,6 +1,8 @@
 # app/etl/api_client.py
+from asyncio.log import logger
+
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log, asyncio
 from typing import Dict, Optional, List
 from Stage_Three.Python.Day9.app.config import settings
 import hashlib
@@ -49,18 +51,11 @@ class ETLApiClient:
         all_data = []
         page = 1
         while True:
-            resp = await self.request(
-                "GET",
-                endpoint,
-                params={"page": page, "page_size": page_size}
-            )
-            if not resp["data"]:
-                break
-            all_data.extend(resp["data"])
-            # 接口限流：每次请求后休眠100ms，避免触发第三方限流规则
+            resp = await self.request("GET", endpoint, params={"page": page, "page_size": page_size})
+            if not resp["data"]: break
+            yield resp["data"]  # 每次只吐出一页数据，边拉取边写入数据库
             await asyncio.sleep(0.1)
             page += 1
-        return all_data
 
     async def close(self):
         """关闭HTTP客户端"""
