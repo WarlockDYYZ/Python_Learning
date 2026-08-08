@@ -392,17 +392,286 @@ Python 程序设计工程化进阶
                             加上 before_sleep 后，每次重试都会在控制台或日志文件中留下一条 Warning 级别的记录，便于排查生产环境的网络抖动问题。
                             （例如：Retrying request in 2.0 seconds as it raised NetworkError...）
 
+                - 关于 wait=wait_exponential(multiplier=1, min=2, max=10)：指数退避等待策略
+                    1. multiplier 单词的含义是倍数的意思，为什么是指数级增长？
+                        因为在数学公式中，这个“乘数”是作为指数（Exponent）的乘数因子存在的，而不是作为底数的倍数。
+                    2. 底层数学公式
+                        tenacity 的指数退避（Exponential Backoff）计算公式大致如下：
+                            等待时间=multiplier×(2^重试次数)
+                    3. 为什么叫 multiplier 而不是 exponent？
+                        因为在数学表达式 a×2^n 中，multiplier 控制的是整个指数函数的缩放比例（Scaling Factor）。
+                            - 如果 multiplier = 1，等待时间就是标准的 2, 4, 8, 16...
+                            - 如果 multiplier = 2，等待时间就会变成 4, 8, 16, 32...（整体变慢）
+                            - 如果 multiplier = 0.5，等待时间就会变成 1, 2, 4, 8...（整体变快）
+                    总结：
+                        multiplier 本身不是指数，它是乘在指数结果上的那个系数。
+                        但因为整个公式的核心是 2^n 这个指数函数，所以这种等待策略在计算机科学中被统称为“指数级增长”或“指数退避”。
 
+                - 异步请求 request
+                    整个 ETLApiClient 的核心调度中枢。
+                    它不仅是一个简单的 HTTP 请求发送器，更是一个集成了鉴权、安全、容错和异常处理的标准化请求网关。
+                    1. URL 拼接与防御性处理
+                        作用：将基础 URL 和具体接口路径拼接。
+                        工程细节：endpoint.lstrip('/') 去掉了 endpoint 开头可能存在的斜杠。
+                                防御性编程习惯，防止拼接出类似 https://api.com//v1/users 这样带有双斜杠的错误 URL。
+                    2. 参数安全初始化
+                        作用：如果调用方没有传入 params（即 params=None），则将其初始化为空字典。
+                        工程细节：防止后续代码向 None 中写入键值对时抛出异常
+                                TypeError: 'NoneType' object does not support item assignment
+                    3. 动态注入公共鉴权参数
+                        作用：自动为每次请求注入安全凭证。
+                        执行顺序(关键)：
+                            a. 先注入 ak 和 timestamp。
+                            b. 最后调用 _generate_signature(params)。
+                                因为签名算法需要将当前请求的所有参数（包括刚注入的 ak 和 timestamp）进行排序和哈希计算。
+                                如果顺序反了，签名就会失效
+                    4. 异步发送请求
+                        作用：通过底层的 httpx.AsyncClient 真正发起网络请求。
+                        ETL 场景意义：await 关键字使得这个请求变为非阻塞。
+                                在 ETL 任务中，这意味着 Python 可以在等待第三方 API 响应的这几十毫秒到几秒内，挂起当前任务，
+                                    去处理其他并发请求，极大提升了数据抽取的吞吐量。
+                    5. 强制状态码校验
+                        作用：检查 HTTP 状态码。如果状态码 >= 400（如 400, 403, 404, 500 等），会主动抛出 httpx.HTTPStatusError 异常。
+                        与重试机制配合：@retry 装饰器配置了 retry_if_exception_type((httpx.NetworkError, httpx.TimeoutException))。
+                            - 如果是网络断开或超时，抛出的是 NetworkError/TimeoutException，会触发重试。
+                            - 如果是 403 鉴权失败或 400 参数错误，抛出 HTTPStatusError，不会触发重试，而是直接将异常抛给上层业务代码。
+                                这避免了无意义的重试。
+                    6. 解析并返回 JSON
+                        作用：将 HTTP 响应体解析为 Python 字典（Dict）并返回。
+                        工程细节：httpx.Response.json() 是异步友好的，且会自动处理字符编码（如 UTF-8），省去了手动调用
+                                json.loads(response.text) 的繁琐步骤。
+                        优化方案：代码中假设第三方返回的永远是 JSON，但如果第三方服务器宕机返回纯文本时会掩盖真实的 HTTP 错误。
+                                在解析前可以先检查 Content-Type，或者用 try...except 捕获解析异常，将原始文本记录到日志中。
+                    修改：
+                        防止直接修改导致字典引用污染原数据：
+                            params = dict(params) if params else {}
+
+                - 关于 response.json()
+                    将 HTTP 响应体（通常是 JSON 格式的字符串）自动解析为 Python 的字典（Dict）或列表（List）对象。
+                    假设第三方 API 返回的原始文本（字符串）是：
+                        '{"user_id": 1001, "name": "Alice", "status": "active"}'
+                    调用 response.json() 后，它会被转换成可以直接操作的 Python 字典：
+                        {
+                            "user_id": 1001,
+                            "name": "Alice",
+                            "status": "active"
+                        }
+                    转换后，可以直接使用 resp["name"] 或 resp.get("user_id") 提取数据，不需要再手动导入 json 模块去调用 json.loads()。
+
+                - 异步分页拉取数据
+                    在 ETL 工程中，处理大数据的标准做法是“边拉取，边处理，边写入”。将函数改造为异步生成器（Async Generator）：
+                        async def fetch_paginated_data(self, endpoint: str, page_size: int = 500):
+                            """流式分页拉取API数据，避免内存溢出"""
+                            page = 1
+                            while True:
+                                # 发起异步网络请求（挂起，等待API响应）
+                                resp = await self.request("GET", endpoint, params={"page": page, "page_size": page_size})
+
+                                # 如果当前页没数据，说明拉完了，彻底结束生成器
+                                if not resp["data"]:
+                                    break
+
+                                # 将当前页数据抛出给调用方，并冻结当前函数状态
+                                yield resp["data"]
+
+                                # 调用方处理完数据后，函数从这里恢复执行
+                                # 主动休眠100ms，给第三方API喘息时间，防止触发限流（429错误）
+                                await asyncio.sleep(0.1)
+
+                                # 5. 页码加1，进入下一次循环拉取下一页
+                                page += 1
+                    调用：
+                        # 边拉取边写入数据库，内存占用始终保持在极低水平
+                        async for page_data in client.fetch_paginated_data("/v1/users"):
+                            await db.bulk_insert(page_data)  # 每次只处理 500 条
+
+                    Python 异步编程与 ETL 架构结合的最高级形态。
+                    将普通的异步函数改造为异步生成器（Async Generator），彻底解决了海量数据抽取时的内存溢出（OOM）问题。
+
+                    核心改动点：从 return 到 yield
+                        普通函数中，all_data = [] 收集数据，最后 return all_data。这意味着必须等所有页都拉取完，才会把数据交给调用方。
+                        而在改造后的代码中，核心变成了：
+                            yield resp["data"]
+                        作用：yield 关键字将这个函数变成了一个异步生成器。
+                                它不再一次性返回所有数据，而是每次只“吐”出当前页的数据。
+                        状态挂起：当执行到 yield 时，整个函数的状态（包括 page 变量的值、当前执行到哪一行）会被冻结并保存。
+                                控制权会交还给调用方（即 async for 循环）。
+                        状态恢复：当调用方处理完这一页数据，进入下一次循环时，函数会从 yield 的下一行（即 await asyncio.sleep(0.1)）继续执行，
+                                直到遇到下一个 yield。
+
+                    异步生成器模式（流式处理优势）
+                        - 内存恒定（O(1)）：无论 API 有 1000 页还是 100 万页，Python 进程在任意时刻的内存中，只保留当前正在处理的 500 条数据。
+                                处理完这 500 条，内存就会被垃圾回收器（GC）释放，内存占用曲线是一条极其平稳的直线。
+                        - 流水线作业（Pipeline）：数据“拉取 -> 清洗 -> 写入数据库”是并行流水线。
+                                拉取第 2 页数据的同时，第 1 页的数据可能正在写入数据库。极大地缩短了 ETL 任务的总耗时。
+                        - 断点续传能力：如果在拉取第 500 页时程序崩溃，前 499 页的数据已经安全落库，不需要从头再来。
+
+                    生成器必须配合 async for 使用：
+                        # 边拉取边写入数据库，内存占用始终保持在极低水平
+                        async for page_data in client.fetch_paginated_data("/v1/users"):
+                            # page_data 就是当前页的 500 条数据列表
+                            await db.bulk_insert(page_data)
+                        - async for 会在底层不断调用生成器的 __anext__() 方法。
+                        - 每次拿到 page_data，执行 bulk_insert。
+                        - 写入完成后，async for 再次向生成器索要下一页数据，触发 yield 之后的代码继续执行。
+
+                - 关闭客户端及异步函数的上下文管理
+                    1. 异步函数有自己的上下文管理，为什么还要显式关闭？
+                        普通的 async def 函数并没有内置的上下文管理（自动清理）机制。
+                            - 普通异步函数的局限：async def 仅仅定义了一个协程（Coroutine）。当你调用它时，它只负责执行里面的逻辑。
+                                    当函数执行完毕或抛出异常时，Python 的垃圾回收器（GC）可能会在某个不确定的时间点回收内存，
+                                    但它不会自动触发底层网络连接的断开。
+                            - 上下文管理器 (async with)：只有实现了 __aenter__ 和 __aexit__ 协议的对象，才能配合 async with 使用，
+                                    从而在退出代码块时自动执行清理逻辑。
+                            - httpx.AsyncClient 的特殊性：httpx.AsyncClient 内部维护了一个连接池（Connection Pool）。
+                                    如果不显式关闭，底层的 TCP 连接、DNS 缓存和 Socket 文件描述符就会一直挂起，
+                                    导致严重的资源泄漏（Resource Leak）。
+                    2. aclose() 与 close() 有什么区别？
+                        在 httpx 库中，这两者的核心区别在于是否阻塞事件循环（Event Loop）。
+                        - close()：同步关闭方法
+                            适用对象：httpx.Client（同步客户端）。
+                            行为：它是阻塞的。当调用 client.close() 时，它会立刻执行清理操作，直到连接彻底断开才会返回控制权。
+                            绝对不能在 async def 异步函数中调用同步的 close()。这会阻塞整个异步事件循环，导致所有其他并发任务全部卡死。
+                        - aclose()：异步关闭方法
+                            适用对象：httpx.AsyncClient（异步客户端）。
+                            行为：它是协程（Coroutine）。
+                                调用 await client.aclose() 时，它会向事件循环提交一个“关闭连接”的任务，然后挂起当前协程。
+                                在等待底层 Socket 优雅断开（发送 FIN 包、等待服务端确认）的过程中，事件循环可以去执行其他任务。
+                            在 Python 异步编程规范中，所有的异步资源释放方法通常都以 a 开头（如 aclose, aread, aiter_bytes），
+                                以明确告诉开发者“这是一个需要 await 的异步操作”。
+                        因为 self.client 是 httpx.AsyncClient，必须使用 await 配合 aclose() 来异步、优雅地释放底层的网络连接池，
+                                既避免了资源泄漏，又不会阻塞整个异步 ETL 系统的运行。
 
         1.3.2 API 数据抽取示例
             调用内部用户行为上报 API，拉取增量行为数据：
                 app/etl/extract/api_extract.py
+
+                ETL 系统中 Extract（抽取） 阶段的具体业务实现。
+                扮演“调度员”的角色，将底层封装好的通用网络客户端（ETLApiClient）与具体的业务需求（拉取用户行为数据）结合。
+                1. 业务参数与配置分离
+                    作用：定义了一个异步的业务抽取函数，接收时间范围作为参数。
+                    ETL 场景意义：这通常用于增量同步（Incremental Sync）。
+                        每次 ETL 任务触发时，只拉取上一次同步到当前时间之间的新增数据，极大地减少了网络传输和数据库写入的压力。
+                2. 客户端的实例化与配置注入
+                    作用：在每次抽取任务开始时，创建一个全新的 API 客户端实例。
+                    工程细节：所有的敏感凭证（AK/SK）和接口地址都从 settings 中读取，实现了业务逻辑与环境配置的彻底解耦。
+                3. 资源释放（生命周期管理）
+                    无论 fetch_paginated_data 是成功返回了数据，还是因为网络断开、API 鉴权失败抛出了异常，finally 块都会确保执行
+                        await client.close()。
+                    ETL 场景意义：闭环 aclose() 机制。
+                        在 ETL 这种需要长时间运行或高频调度的系统中，这种写法能绝对防止 HTTP 连接池泄漏和底层 Socket 资源耗尽。
+                修改：
+                    ETLApiClient 中的 fetch_paginated_data 方法，让它支持接收并合并额外的查询参数：
+                        async def fetch_paginated_data(self, endpoint: str, page_size: int = 500, extra_params: dict = None):
+                            page = 1
+                            while True:
+                                # 合并分页参数和额外的业务参数
+                                params = {"page": page, "page_size": page_size}
+                                if extra_params:
+                                    params.update(extra_params)
+
+                                resp = await self.request("GET", endpoint, params=params)
+                                # ... 后续逻辑不变
+
+                调用：
+                    behavior_data = await client.fetch_paginated_data(
+                        endpoint="/api/v1/behaviors/export",
+                        extra_params={"start_time": start_time, "end_time": end_time}
+                    )
+
+                异步生成器（Async Generator）不能直接作为列表返回，对业务逻辑做修改：
+                    async def extract_user_behavior_from_api(start_time: str, end_time: str):
+                        """流式抽取用户行为数据，直接对接数据库写入"""
+                        client = ETLApiClient(
+                            base_url=settings.BEHAVIOR_API_BASE,
+                            ak=settings.ETL_API_AK,
+                            sk=settings.ETL_API_SK
+                        )
+                        try:
+                            # 使用 async for 逐页消费数据
+                            async for page_data in client.fetch_paginated_data(
+                                endpoint="/api/v1/behaviors/export",
+                                extra_params={"start_time": start_time, "end_time": end_time}
+                            ):
+                                # 拿到一页数据，立刻写入数据库（这里可以调用你之前写的 get_async_session）
+                                await save_to_database(page_data)
+                        finally:
+                            await client.close()
+
+                补充：
+                    - 关于 async 和 await
+                        async 和 await 在代码中不同位置出现，是因为它们分别承担了“定义规则”和“执行规则”两个不同的任务。
+                        1. async 永远出现在函数声明（定义）或控制流结构中，它的作用是打标签。
+                            - async def（异步函数）：相当于告诉 Python 编译器：
+                                “这个函数内部可能会有耗时的操作（比如等网络、等数据库），把它包装成一个协程（Coroutine），不要让它阻塞主线程。”
+                            - async for（异步迭代器）：相当于告诉 Python：
+                                “循环里的数据不是一次性准备好的，而是异步生成器（Async Generator）边拉取边吐出来的。
+                                    每次循环都需要等待数据准备好才能进行下一步。”
+                            总结：async 是声明性的，它只负责定义“这里需要异步机制”，它本身不执行任何耗时操作。
+                        2. await 永远出现在函数体内部（执行流程中），它的作用是真正触发等待。
+                            - await save_to_database(page_data)：当程序执行到这里时，它会向数据库发送写入请求。
+                                因为数据库写入需要时间，await 就会挂起（Suspend）当前协程，把控制权交还给事件循环（Event Loop）。
+                                在等待数据库响应期间，程序可以去处理其他任务。
+                                等数据库返回结果后，再恢复执行。
+                            总结：await 是执行性的，它只负责在具体的耗时操作处“暂停并等待”。
+                        3. 为什么 await 会出现在“返回值部分”？
+                            await 出现的地方不固定如：
+                                return await client.fetch_paginated_data(...)
+                                resp = await self.request("GET", endpoint)
+                            本质原因：在 Python 中，不能直接返回一个协程对象，必须等待它执行完毕拿到结果。
+                                    当调用一个 async def 定义的函数时，它不会立刻执行，而是返回一个“协程对象（Coroutine Object）”。
+                                    如果直接 return client.fetch_paginated_data()，返回的只是一个“未执行的空壳”。
+                                    加上 await，意思是：“请立刻执行这个协程，等它彻底运行完、拿到最终结果后，再把结果返回出去。”
+
+                            Python 异步编程中，有一条铁律：
+                                只要 await 出现了，它的“祖先”函数声明上必须带有 async。
+                                    - 因为 await 只能在 async def 函数内部使用。
+                                    - 如果函数 A 内部用了 await，那么 A 就是 async def。
+                                    - 如果函数 B 调用了函数 A，那么 B 内部也必须用 await，且 B 也必须是 async def。
+                                    - 这就像“病毒传染”一样，异步机制会沿着调用链一路向上传递，直到最顶层的入口（比如 FastAPI 的路由，
+                                        或者 asyncio.run()）。
 
 
     1.4 数据清洗与转换
         编写通用清洗逻辑，保证多源数据入库的一致性、合规性，针对用户行为数据做典型处理：
             app/etl/transform/cleaner.py
 
+            ETL 系统中 Transform（转换/清洗） 阶段的核心实现。
+            它的作用是将上游 API 抽取来的“脏乱差”原始数据，加工成干净、安全、格式统一的“标准件”，并强制拦截不合规的数据。
+            1. 数据脱敏（隐私合规）
+                使用正则表达式将 IP 地址的最后一段替换为 0（例如 192.168.1.100 变成 192.168.1.0）。
+                意义：这是数据安全与隐私合规（如 GDPR）的强制要求。
+                        在将用户行为数据存入分析库之前，必须抹除精确的 IP 信息，防止用户隐私泄露。
+            2. 业务规则过滤（白名单机制）
+                只允许预设的 5 种行为类型通过，遇到未知的类型（如爬虫产生的异常行为）直接跳过。
+                意义：防止下游分析报表或算法模型被脏数据污染。
+                        同时，通过 logger.warning 记录异常数据，方便后续排查上游接口是否发生了变更。
+            3. 完整性校验（必填字段检查）
+                拦截缺少核心标识（用户ID或行为类型）的残缺数据。
+                意义：在数据仓库中，没有 user_id 的行为数据是毫无价值的，强行入库只会浪费存储空间并导致 SQL 查询报错。
+            4. 格式标准化（时间戳转换）
+                将上游 API 返回的 Unix 时间戳（整数）转换为 MySQL 兼容的 YYYY-MM-DD HH:MM:SS 字符串格式。
+                意义：上游数据源可能使用毫秒级时间戳或 ISO 格式，而目标数据库通常要求特定的时间格式。
+                        这一步确保了异构数据源在目标库中的统一性。
+            5. 强类型校验（Pydantic 兜底）
+                将清洗后的字典实例化为 BehaviorCreate 模型。
+                意义：Pydantic 不仅会校验数据类型（比如确保 user_id 是字符串而不是列表），还会自动拦截多余的未知字段。
+                        如果数据有任何问题，Pydantic 会抛出异常，被外层的 try...except 捕获。
+
+            隔离故障：在 ETL 中，绝对不能因为一条脏数据导致整个批次任务崩溃。
+                    try...except 配合 continue，确保了即使某条数据引发异常（如时间戳转换时格式错误），程序也会记录日志并跳过它，
+                    继续处理下一条。
+            可追溯性：日志中不仅打印了异常信息，还打印了 idx（行号）和 原始数据。为运维人员排查问题提供了完美的“案发现场”。
+
+            修改：
+                同步生成器（Generator），实现边清洗边返回：
+                    def clean_behavior_data(raw_data: List[Dict]):  # 去掉返回类型提示
+                        for idx, item in enumerate(raw_data):
+                            try:
+                                # ... 清洗逻辑
+                                yield BehaviorCreate(**item)  # 用 yield 替代 append
+                            except Exception as e:
+                                logger.error(...)
 
     1.5 批量入库与增量更新
         1.5.1 批量入库工具类
@@ -410,6 +679,98 @@ Python 程序设计工程化进阶
             保障数据平滑落地：
                 app/etl/load/bulk_loader.py
 
+                ETL 系统中 Load（加载） 阶段的核心组件。
+                承接异步 API 抽取和 Pydantic 数据清洗，将处理好的“标准件”高效地写入目标数据库。
+                这段代码展示了 SQLAlchemy 在 ETL 场景下的最佳实践：抛弃 ORM 的逐条插入，全面拥抱 Core 层的批量操作。
+                1. 性能基石：Pydantic 到字典的转换
+                    insert_data = [item.model_dump(exclude_unset=True) for item in data]
+                    作用：将 Pydantic 模型对象转换为纯 Python 字典。
+                    意义：SQLAlchemy 的 ORM 插入（session.add_all()）需要构建大量 ORM 实例，内存开销极大。
+                        通过 model_dump() 转换为字典后，可以直接使用 SQLAlchemy Core 层的 insert().values() 方法。
+                        这种方式绕过了 ORM 实例化过程，直接构造底层 SQL，吞吐量可提升数4。
+                    细节：exclude_unset=True
+                        确保只序列化在清洗阶段被显式赋值的字段，忽略模型中带有默认值但未被赋值的字段，防止无意义的默认值覆盖掉数据库中已有的数据。
+                2. 全量加载：bulk_insert_behavior
+                    stmt = insert(UserBehavior).values(insert_data)
+                    result = await self.db.execute(stmt)
+                    作用：将一批数据（如 1000 条）合并为单条多行的 INSERT INTO ... VALUES (...), (...) 语句一次性发送给数据库。
+                    意义：极大地减少了 Python 与数据库之间的网络往返（Round-trip）通信开销。
+                        配合之前设置的 batch_size = 1000，在内存占用和写入性能之间取得了完美的平衡。
+                3. 增量同步：upsert_behavior
+                    stmt = stmt.on_duplicate_key_update(
+                        action_type=stmt.inserted.action_type,
+                        # ... 其他字段
+                    )
+                    作用：这是 MySQL 特有的 INSERT ... ON DUPLICATE KEY UPDATE 语法在 SQLAlchemy 中的实现。
+                    意义：这是实现增量同步（Incremental Sync）和断点续传的神器。
+                        如果这批数据中包含已经存在于目标表中的记录（即主键或唯一索引冲突），数据库不会报错，而是自动执行 UPDATE 操作，
+                        将最新的数据覆盖旧数据。
+                    细节：stmt.inserted.action_type 代表“本次尝试插入的新值”。
+                        这种写法避免了硬编码，确保了 SQL 的健壮性。
+                4. 事务安全与容错
+                    try:
+                        await self.db.execute(stmt)
+                        await self.db.commit()
+                    except Exception as e:
+                        await self.db.rollback()
+                        raise
+                    作用：确保批量操作的原子性。
+                    意义：在批量写入 1000 条数据时，如果第 999 条因为格式错误导致插入失败，rollback() 会回滚整个批次，
+                            避免数据库中产生“只写了一半”的脏数据。
+                        logger.error 记录了异常，raise 则将异常抛给上层的 ETL 调度器，以便触发告警或重试机制。
+                优化：
+                    1. 引入 SQLAlchemy 的 bulk_insert_mappings：
+                        对于全量插入，除了使用 Core 层的 insert().values()，还可以考虑使用 SQLAlchemy 提供的
+                            session.bulk_insert_mappings(UserBehavior, insert_data)。
+                        它的底层机制更加激进，不仅绕过 ORM 实例化，还跳过了部分生命周期事件钩子，在 ETL 纯数据导入场景下性能更高。
+                    2. 分批提交（Batch Commit）防止长事务。
+
+                补充：
+                    - 关于 continue 和 break 在 try ... except ... 中的作用
+                        1. 遇到 continue 后，序会报错时，程序会直接跳过 try 块中剩余的所有代码，进入外层循环的下一次迭代。
+                        2. 可以用 break 控制流程，在 except 块中使用 break 会直接终止整个外层循环。
+
+                        try...except 本身不是循环结构，它只是一个“异常监控与处理块”。
+                        continue 和 break 的作用对象永远是包裹着 try...except 的外层循环。
+
+                        continue 在 except 中的真实作用：
+                            for idx, item in enumerate(raw_data):  # 【外层循环】
+                                try:
+                                    # 步骤1: 脱敏IP
+                                    # 步骤2: 过滤无效行为
+                                    # 步骤3: 校验必填字段
+                                    # 步骤4: 统一时间格式
+                                    # 步骤5: Pydantic校验
+                                    cleaned.append(BehaviorCreate(**item))
+                                except Exception as e:
+                                    logger.error(f"清洗第{idx}条数据失败：{str(e)}，原始数据：{item}")
+                                    continue  # 【关键控制点】
+                            当 try 块中发生异常时：
+                                假设程序在执行“步骤2：过滤无效行为”时抛出了异常。
+                                    1. 立即中断：try 块中步骤2之后的所有代码（步骤3、4、5）会被瞬间跳过，绝不执行。
+                                    2. 进入 except：控制权跳转到 except 块，执行日志记录。
+                                    3. 遇到 continue：continue 指令直接作用于最外层的 for 循环。
+                                        它会立即结束当前这一轮循环，将 idx 加 1，拿到 raw_data 中的下一条数据，重新从头开始执行 try 块。
+
+                        如果在 except 中使用 break
+                            一旦遇到第一条脏数据，程序会记录日志，然后直接摧毁整个 for 循环。raw_data 中哪怕还有 9999 条合法数据，
+                                程序也不会再处理了，直接跳到 for 循环之后的代码。
+                            适用场景：这通常用于“遇到致命错误，必须立即停止整个 ETL 任务”的场景（例如数据库连接断开、核心配置缺失）。
+
+                        总结：
+                            Python 官方文档和底层设计明确指出：try-except 并非循环结构，因此 continue 和 break 关键字仅对 for/while 循环有效，
+                                    它们可以毫无障碍地穿透 except 块去控制外层循环。
+                            在 ETL 的数据清洗（Transform）阶段，except + continue 是最经典的黄金搭档。
+                                    它确保了清洗流水线具有极强的鲁棒性：
+                                        哪怕上游传过来的数据格式千奇百怪，清洗程序也能做到“遇到坏数据就跳过并报警，遇到好数据就继续清洗”，
+                                            绝不会因为单条数据的异常而导致整个批处理任务崩溃。
+
+                    - 关于循环结构中的 finally
+                        在 Python 中，finally 可以出现在循环结构中，是一种非常强大但容易被忽视的语法特性。
+                        finally 是 try...except 异常处理块的专属后缀。
+                        finally 不属于循环，它属于 try 块。
+                        当 try 在循环里，finally 跟着循环逐次执行（适合单条数据的资源清理）。
+                        当循环在 try 里，finally 跟着循环整体执行（适合整个 ETL 任务的全局收尾）。
 
     1.6 完整 ETL 脚本模板
         实现全量同步与增量同步两种执行模式，支持传入任务参数、记录同步断点、接入企业微信告警机器人：

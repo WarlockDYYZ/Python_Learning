@@ -7,6 +7,12 @@ from typing import Dict, Optional, List
 from Stage_Three.Python.Day9.app.config import settings
 import hashlib
 import time
+import logging
+
+
+# 创建一个专属的官方 logger
+logger = logging.getLogger(__name__)
+before_sleep=before_sleep_log(logger, logging.WARNING)
 
 class ETLApiClient:
     def __init__(self, base_url: str, ak: str, sk: str):
@@ -31,7 +37,8 @@ class ETLApiClient:
     @retry(
         stop=stop_after_attempt(3),  # 最多重试3次
         wait=wait_exponential(multiplier=1, min=2, max=10),  # 指数退避等待
-        retry=retry_if_exception_type((httpx.NetworkError, httpx.TimeoutException))
+        retry=retry_if_exception_type((httpx.NetworkError, httpx.TimeoutException)),
+        before_sleep = before_sleep_log(logger, logging.WARNING)  # 新增：重试前打印警告日志
     )
     async def request(self, method: str, endpoint: str, params: Optional[Dict] = None) -> Dict:
         """通用请求方法，自动添加鉴权参数、处理重试逻辑"""
