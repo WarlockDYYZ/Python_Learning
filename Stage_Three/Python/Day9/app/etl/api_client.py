@@ -3,7 +3,7 @@ from asyncio.log import logger
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log, asyncio
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, AsyncGenerator
 from Stage_Three.Python.Day9.app.config import settings
 import hashlib
 import time
@@ -53,15 +53,32 @@ class ETLApiClient:
         response.raise_for_status()  # 抛出HTTP状态码异常
         return response.json()
 
-    async def fetch_paginated_data(self, endpoint: str, page_size: int = 500) -> List[Dict]:
-        """分页拉取API数据，适配大规模行为数据抽取"""
-        all_data = []
+    async def fetch_paginated_data(self, endpoint: str, page_size: int = 500) -> AsyncGenerator[List[Dict], None]:
+        """
+        流式分页拉取API数据，适配大规模行为数据抽取
+        使用生成器机制，边拉取边返回，避免全量加载导致内存溢出(OOM)
+        """
         page = 1
         while True:
-            resp = await self.request("GET", endpoint, params={"page": page, "page_size": page_size})
-            if not resp["data"]: break
-            yield resp["data"]  # 每次只吐出一页数据，边拉取边写入数据库
+            # 1. 发起异步请求拉取当前页数据
+            resp = await self.request(
+                "GET",
+                endpoint,
+                params={"page": page, "page_size": page_size}
+            )
+
+            # 2. 探底判断：如果返回的数据为空，说明已到最后一页，终止拉取
+            if not resp.get("data"):
+                break
+
+            # 3. 【核心改动】使用 yield 将当前页数据“吐”给调用方，而不是追加到本地列表
+            # 此时函数会暂停执行，等待调用方处理完这批数据后再继续
+            yield resp["data"]
+
+            # 4. 主动限流：休眠100ms，避免触发第三方API的限流规则
             await asyncio.sleep(0.1)
+
+            # 5. 页码递增
             page += 1
 
     async def close(self):

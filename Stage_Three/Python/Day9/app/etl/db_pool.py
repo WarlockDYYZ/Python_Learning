@@ -5,7 +5,6 @@ from contextlib import contextmanager, asynccontextmanager
 from typing import Dict
 import logging
 
-
 logger = logging.getLogger(__name__)
 
 # 全局连接池字典，以数据源名称为 Key
@@ -15,6 +14,7 @@ async_pools: Dict[str, sessionmaker] = {}
 # 保存引擎实例，用于优雅退出时释放连接
 sync_engines = {}
 async_engines = {}
+
 
 def init_sync_pool(source_name: str, db_url: str, pool_size: int = 10, max_overflow: int = 20):
     """初始化同步数据库连接池"""
@@ -28,6 +28,7 @@ def init_sync_pool(source_name: str, db_url: str, pool_size: int = 10, max_overf
     sync_engines[source_name] = engine
     sync_pools[source_name] = sessionmaker(bind=engine, class_=Session)
     logger.info(f"同步连接池 [{source_name}] 初始化成功")
+
 
 def init_async_pool(source_name: str, db_url: str, pool_size: int = 10, max_overflow: int = 20):
     """初始化异步数据库连接池"""
@@ -44,6 +45,7 @@ def init_async_pool(source_name: str, db_url: str, pool_size: int = 10, max_over
 
 
 # 上下文管理器封装
+
 @contextmanager
 def get_sync_session_ctx(source_name: str):
     """
@@ -63,6 +65,7 @@ def get_sync_session_ctx(source_name: str):
         raise
     finally:
         session.close()  # 无论成功失败，必须关闭会话，归还连接到连接池
+
 
 @asynccontextmanager
 async def get_async_session_ctx(source_name: str):
@@ -86,6 +89,7 @@ async def get_async_session_ctx(source_name: str):
 
 
 # 生命周期管理
+
 async def close_all_pools():
     """
     优雅关闭所有连接池（在应用退出或热重载时调用）
