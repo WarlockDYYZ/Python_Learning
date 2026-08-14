@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from Stage_Three.Python.Day9.app.api.error_handlers import register_exception_handlers
+from app.api import register_exception_handlers
 
 def create_app() -> FastAPI:
     app = FastAPI(...)

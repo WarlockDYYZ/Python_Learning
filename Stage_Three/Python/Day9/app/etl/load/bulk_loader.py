@@ -5,6 +5,8 @@ from Stage_Three.Python.Day9.app.schemas.behavior import BehaviorCreate
 from typing import List
 from loguru import logger
 
+from Stage_Three.Python.Day9.app.api.exceptions.base import ETLTaskException
+
 
 class BulkLoader:
     def __init__(self, db: AsyncSession):
@@ -12,24 +14,20 @@ class BulkLoader:
         self.batch_size = 1000  # 每批次入库数据量
 
     async def bulk_insert_behavior(self, data: List[BehaviorCreate]) -> int:
-        """批量插入用户行为数据，返回成功入库的条数"""
         if not data:
             return 0
 
-        # 转换为数据库字典列表，过滤模型中多余的字段
         insert_data = [item.model_dump(exclude_unset=True) for item in data]
-
         try:
-            # 采用SQLAlchemy Core的批量插入方式，性能远高于ORM单条插入
             stmt = insert(UserBehavior).values(insert_data)
             result = await self.db.execute(stmt)
             await self.db.commit()
-            logger.info(f"成功批量插入{result.rowcount}条行为数据")
             return result.rowcount
         except Exception as e:
-            await self.db.rollback()
-            logger.error(f"批量插入行为数据失败：{str(e)}")
-            raise
+            await self.db.rollback()  # 事务回滚，避免脏数据残留在库中
+            logger.error(f"批量插入数据失败，事务已回滚，异常信息：{str(e)}", exc_info=True)
+            # 抛出自定义ETL业务异常，触发告警
+            raise ETLTaskException(message="ETL批量入库失败", detail=str(e)) from e
 
     async def upsert_behavior(self, data: List[BehaviorCreate]) -> int:
         """增量写入：如果主键冲突或唯一索引冲突则执行更新逻辑，支持断点续传"""

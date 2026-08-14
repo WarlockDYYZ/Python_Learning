@@ -1,23 +1,43 @@
-# app/exceptions/base.py
+from enum import Enum
+
+
+class ErrorCode(Enum):
+    # 通用/数据校验错误 (400)
+    DATA_INVALID = (400, 40001, "数据格式非法")
+
+    # 权限相关错误 (403)
+    PERMISSION_DENIED = (403, 40301, "权限不足")
+
+    # 系统/ETL任务错误 (500)
+    ETL_TASK_FAILED = (500, 50001, "ETL任务执行失败")
+    INTERNAL_SERVER_ERROR = (500, 50000, "服务器内部错误")
+
+    def __init__(self, http_status: int, code: int, message: str):
+        self.http_status = http_status  # HTTP 状态码
+        self.code = code  # 业务错误码
+        self.message = message  # 默认错误描述
+
+
 class BusinessException(Exception):
-    """业务异常基类，所有自定义业务异常均继承该类"""
-    def __init__(self, code: int, message: str, detail: str = None):
-        self.code = code
-        self.message = message
+    """业务异常基类"""
+    def __init__(self, error_code: ErrorCode, detail: str = None):
+        self.http_status = error_code.http_status
+        self.code = error_code.code
+        self.message = error_code.message
         self.detail = detail
         super().__init__(self.message)
 
 class PermissionDeniedException(BusinessException):
     """权限不足异常"""
-    def __init__(self, message: str = "权限不足", detail: str = None):
-        super().__init__(code=403, message=message, detail=detail)
+    def __init__(self, detail: str = None):
+        super().__init__(ErrorCode.PERMISSION_DENIED, detail)
 
 class DataInvalidException(BusinessException):
     """数据校验失败异常"""
-    def __init__(self, message: str = "数据格式非法", detail: str = None):
-        super().__init__(code=400, message=message, detail=detail)
+    def __init__(self, detail: str = None):
+        super().__init__(ErrorCode.DATA_INVALID, detail)
 
 class ETLTaskException(BusinessException):
     """ETL任务执行异常"""
-    def __init__(self, message: str = "ETL任务执行失败", detail: str = None):
-        super().__init__(code=500, message=message, detail=detail)
+    def __init__(self, detail: str = None):
+        super().__init__(ErrorCode.ETL_TASK_FAILED, detail)

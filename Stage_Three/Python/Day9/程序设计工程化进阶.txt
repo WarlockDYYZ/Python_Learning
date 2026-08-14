@@ -1150,6 +1150,22 @@ Python 程序设计工程化进阶
                             虽然白名单机制已经自动排除了 password_hash，但加上这行注释是非常好的工程习惯。
                             它向未来的维护者明确传达了安全意图：“这个 Schema 是对外暴露的，绝对不能包含密码字段”。
 
+                - 架构视角：在三层架构中的位置
+                    路由层（Router）
+
+                    假设路由层代码：
+                        @router.get("/me", response_model=UserResponse) # 1. 声明响应模型
+                        async def get_my_profile(current_user: User = Depends(get_current_user)):
+                            return current_user # 2. 直接返回 ORM 对象
+
+                    当 FastAPI 处理这个响应时，它会在后台自动执行 UserResponse.model_validate(current_user)。
+                        - 如果没有这个 Schema：FastAPI 会尝试把 current_user 的所有属性（包括致命的 password_hash）全部序列化成 JSON 返回给前端，
+                                造成严重的数据泄露。
+                        - 有了这个 Schema：FastAPI 就像一个严格的“安检员”，只放行 id, username, email 等字段，把密码永远锁在了后端。
+
+                    代码虽然简短，但它是整个系统安全架构中不可或缺的一环。
+                    利用 Pydantic 的白名单特性，在数据离开后端之前，完成了一次自动化的敏感数据脱敏。
+
             2.1.3 数据源级权限（ETL 脚本专属）
                 ETL 脚本访问数据库和 API 时，遵循最小权限原则，严格管控数据源凭证：
                     1. 数据库权限：ETL 使用专属数据库账号，仅赋予源库SELECT权限、目标库INSERT/UPDATE权限，禁止使用高权限账号
@@ -1165,14 +1181,126 @@ Python 程序设计工程化进阶
                 统一业务异常结构，区分系统异常、业务异常、权限异常、数据异常，便于日志分类和告警：
                     app/exceptions/base.py
 
+                    结构化的自定义异常处理机制，通常用于 Python Web 框架（如 FastAPI、Flask）或后端服务中。
+                    它通过面向对象的方式，将业务逻辑中的错误与系统底层的异常区分开来，便于统一捕获和处理。
+
+                    1. 核心基类：BusinessException
+                        继承自 Exception：这是所有自定义异常的根节点。
+                        标准化属性：强制要求每个业务异常必须包含三个要素：
+                            - code：业务状态码（如 400, 403, 500 等），用于前端或调用方判断错误类型。
+                            - message：面向用户的简短提示信息。
+                            - detail：可选的详细信息，通常用于开发调试或记录日志。
+                        调用 super().__init__(self.message)：将 message 传递给 Python 内置的 Exception，这样当异常未被捕获直接打印时，
+                        也能看到可读的报错信息。
+                    2. 具体业务异常子类
+                        代码定义了三个具体的异常，分别对应不同的业务场景：
+                            - PermissionDeniedException (权限不足)
+                                默认 code=403。
+                                适用场景：用户尝试访问没有权限的资源或执行越权操作。
+                            - DataInvalidException (数据校验失败)
+                                默认 code=400。
+                                适用场景：前端传入的参数缺失、格式错误，或数据库约束校验失败。
+                            - ETLTaskException (ETL任务执行异常)
+                                默认 code=500。
+                                适用场景：数据处理、抽取、转换、加载等后台任务发生不可恢复的错误。
+                    3. 代码设计的亮点与优势
+                        1. 解耦业务与框架：框架抛出的异常（如 ValueError, KeyError）通常是系统级的，而 BusinessException 是业务级的。
+                            两者分开处理，逻辑更清晰。
+                        2. 默认值机制：子类通过设置默认参数（如 message="权限不足"），在业务代码中抛出异常时可以极简调用，
+                            例如 raise PermissionDeniedException()，无需每次都传参；同时也支持自定义覆盖，
+                            如 raise PermissionDeniedException("您无权删除此文章")。
+                        3. 便于全局异常处理器拦截：在 Web 框架中，通常只需注册一个针对 BusinessException 的全局拦截器，
+                            就能自动将 code、message 和 detail 转换为标准的 JSON 响应格式返回给前端，避免在业务代码中到处写 return jsonify(...)。
+                    优化：
+                        添加枚举体系
+                            将状态码（code）用 Enum（枚举）管理，是后端开发中非常推荐的工程化实践。
+                            能彻底消除代码中的“魔法数字”，让错误码集中维护，且支持 IDE 自动补全和类型检查。
+                        优势：
+                            1. 告别魔法数字：业务代码中不再出现 raise BusinessException(code=40001, ...) 这种容易写错且难以理解的代码，
+                                    而是变成语义清晰的 raise DataInvalidException(detail="缺少必填字段")。
+                            2. 集中管理：如果未来需要修改某个错误的默认提示文案，只需在 ErrorCode 枚举中修改一处，全局生效。
+                            3. HTTP 状态码与业务码解耦：枚举中同时包含了 http_status（如 400）和 code（如 40001）。
+                                    全局异常处理器返回响应时，可使用 http_status 作 HTTP 响应码，将 code 放在 JSON Body 中供前端做业务逻辑判断。
+                            4. IDE 友好：在编写代码时，输入 ErrorCode. 即可看到所有可用的错误类型，极大降低出错率。
+
+                    应用(其实下面马上就会用到)：
+                        from fastapi import Request
+                        from fastapi.responses import JSONResponse
+
+                        @app.exception_handler(BusinessException)
+                        async def business_exception_handler(request: Request, exc: BusinessException):
+                            return JSONResponse(
+                                status_code=exc.http_status,
+                                content={
+                                    "code": exc.code,
+                                    "message": exc.message,
+                                    "detail": exc.detail
+                                }
+                            )
+
                     在main.py中注册全局异常处理器：
                         main.py
+
+            2.2.2 FastAPI 全局异常处理器
+                拦截所有异常，统一返回标准错误响应，同时记录全链路日志，方便问题追踪：
+                    app/api/error_handlers.py
+
+                    构建了一个企业级的三层异常防护网。
+                    1. 整体架构设计
+                        代码封装在 register_exception_handlers(app: FastAPI) 函数中。
+                        这种工厂函数模式非常优雅，主程序（main.py）只需调用这一行代码，就能把复杂的异常处理逻辑全部注入到 FastAPI 应用中，
+                        保持了主程序的整洁。
+                    2. 第一层防线：业务异常处理器
+                        business_exception_handler
+                        - 拦截目标：专门捕获自定义的 BusinessException 及其所有子类（如 PermissionDeniedException 等）。
+                        - 核心优化（HTTP 状态码与业务码解耦）：
+                            以前直接用 exc.code 作为 HTTP 响应码，但自定义的业务码（如 40001）不是合法的 HTTP 状态码，会导致网关或前端报错。
+                            现在改为使用 status_code=exc.http_status（如 400, 403, 500），确保 HTTP 协议层绝对标准。
+                            真正的业务码 exc.code 被放到了 JSON 响应的 Body 中，供前端做具体的业务逻辑判断。
+                        - 日志记录：使用 logger.error 记录请求地址和异常详情，方便排查业务逻辑问题。
+                    3. 第二层防线：参数校验异常处理器
+                        validation_exception_handler
+                        - 拦截目标：这是新增的处理器，专门捕获 FastAPI + Pydantic 校验失败时抛出的 RequestValidationError
+                            （比如前端少传了必填字段，或者类型传错了）。
+                        - 统一响应格式：如果不拦截它，FastAPI 会返回它自己默认的错误格式。
+                            拦截后，我们将其转换为与 BusinessException 完全一致的 JSON 结构（包含 code, message, detail）。
+                        - 优势：前端只需要写一套统一的错误提示逻辑（Toast 弹窗等），不需要针对参数校验失败做特殊的兼容处理。
+                            HTTP 状态码使用了标准的 422 Unprocessable Entity。
+                    4. 第三层防线：全局兜底异常处理器
+                        - 拦截目标：这是整个应用的“最后防线”。
+                            所有没有被前两层捕获的、意料之外的系统级异常（如数据库断连、空指针、第三方接口超时等）都会被它兜住。
+                        - 安全脱敏机制：
+                            is_production = os.getenv("APP_ENV") == "production"
+                            detail_msg = "系统繁忙，请稍后重试" if is_production else str(exc)
+                        - 完整堆栈记录：使用 traceback.format_exc() 将完整的错误调用栈记录到日志中，这对于排查复杂的系统级 Bug 至关重要。
+
+                    实现了三个关键目标：
+                        1. 协议合规：HTTP 状态码绝对标准，业务码独立在 Body 中。
+                        2. 格式统一：无论是业务报错、参数校验报错，还是系统崩溃，前端收到的 JSON 结构永远是一致的。
+                        3. 安全与可维护性：生产环境自动隐藏敏感信息，开发环境保留调试细节；同时通过 loguru 留下了完整的排查线索。
 
             2.2.3 典型场景异常处理
                 （1）ETL 脚本异常处理
                     在 ETL 的抽取、清洗、加载各步骤添加专属异常处理逻辑，支持重试、跳过脏数据、任务失败告警、数据库事务回滚：
                         app/etl/load/bulk_loader.py
-                        (前面讲解过)
+
+                        数据库批量写入（Bulk Insert）异常处理范式。
+                        在 ETL（抽取、转换、加载）流程中，数据入库是最后也是最关键的一环。这段代码不仅处理了数据，还妥善地管理了数据库事务和系统级异常。
+
+                        1. 防御性编程：空数据快速返回
+                            作用：在执行任何数据库操作之前，先检查传入的数据列表是否为空。
+                            优势：避免了向数据库发送无意义的空 SQL 语句，减少了网络开销和数据库解析压力，提升了 ETL 任务的整体性能。
+                        2. 数据清洗：exclude_unset=True
+                            作用：这是 Pydantic V2 的一个非常实用的特性。它只导出在实例化时显式赋值过的字段。
+                            优势：在批量插入时，如果前端或上游系统没有传入某个可选字段，exclude_unset=True 会将其从字典中剔除。
+                                这样数据库在执行 INSERT 时，就会自动使用表结构中定义的 DEFAULT 默认值，而不是被强制覆盖为 None，
+                                有效防止默认值失效问题。
+                        3. 核心机制：事务回滚 (rollback)
+                            作用：批量插入通常在一个数据库事务中进行，如果中途发生任何错误（如主键冲突、字段超长、数据库断连等），事务会处于失败状态。
+                            优势：如果不执行 rollback()，数据库连接可能会一直处于“挂起”或“脏事务”状态，导致后续所有的 SQL 操作都会失败。
+                                主动回滚确保了数据库的原子性（ACID 特性），保证了数据的一致性。
+                        4. 异常转换：从系统异常到业务异常
+
                 （2）接口权限异常处理
                     在权限校验逻辑中捕获权限异常，返回标准的 403 错误响应，同时记录非法访问日志，便于后续安全审计：
                         app/api/deps.py
