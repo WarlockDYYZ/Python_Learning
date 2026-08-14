@@ -992,72 +992,72 @@ Python 程序设计工程化进阶
                         如果业务需要控制“用户只能修改自己创建的文章”，还需要在路由函数内部结合 current_user.id 与数据记录的 owner_id 进行二次校验，
                         防止越权访问（IDOR漏洞）。
 
-            补充：
-                FastAPI 的依赖注入机制
-                FastAPI 的依赖注入（Dependency Injection, DI）系统是其最核心、最强大的特性之一。
-                简单来说，它的核心思想是：只需声明代码运行需要什么，框架会自动负责执行逻辑并提供这些资源。
+                补充：
+                    FastAPI 的依赖注入机制
+                    FastAPI 的依赖注入（Dependency Injection, DI）系统是其最核心、最强大的特性之一。
+                    简单来说，它的核心思想是：只需声明代码运行需要什么，框架会自动负责执行逻辑并提供这些资源。
 
-                1. 核心组件：Depends()
-                    在 FastAPI 中，依赖注入是通过 Depends() 函数来实现的。它通常被放在路由处理函数的参数默认值中。
-                        - 声明式编程：当写下 current_user: User = Depends(get_current_user) 时，并没有主动去“调用” get_current_user 函数，
-                                而是向 FastAPI “声明”了这个依赖关系。
-                        - 自动参数解析：FastAPI 会自动扫描依赖函数的参数。
-                                例如， get_current_user 需要 token 和 db，FastAPI 会自动从 HTTP 请求（Header、Query、Form 等）中提取 token，
-                                    并从它的依赖树中获取 db，然后自动传入。
-                2. 底层执行流程：构建依赖树
-                    当客户端发起一个 HTTP 请求时，FastAPI 并不是按照代码从上到下的顺序执行的，而是按照依赖树（Dependency Tree）的拓扑顺序来解析。
-                        - 解析阶段：框架首先扫描路由函数的参数，识别出所有的 Depends() 声明。
-                        - 递归实例化：如果依赖项本身还有依赖（比如 check_user_permission 依赖 get_current_user，
-                                而 get_current_user 又依赖 oauth2_scheme 和 get_db），FastAPI 会递归地构建一棵完整的依赖树。
-                        - 注入阶段：从最底层的依赖开始执行，逐层向上，最终将结果注入到目标路由函数的参数中。
-                3. 请求级缓存机制（性能优化）
-                    FastAPI 的依赖注入系统在同一个请求的生命周期内具有缓存特性。
-                        - 默认情况下，对于同一个请求，如果某个依赖项被多次声明（例如在嵌套依赖中），FastAPI 只会执行一次该依赖函数，
-                                并将结果缓存起来供后续使用。
-                        - 即使被多次引用，系统也不会重复去解码 JWT 或查询数据库，极大地提升了高并发场景下的性能。
-                4. 依赖注入的核心优势
-                    为什么顶级团队和现代框架都推崇依赖注入？主要有以下三个技术真相：
-                        - 极致的代码解耦与复用（DRY原则）：将横切关注点（如鉴权、日志、限流、数据库连接）从业务逻辑中完全剥离。
-                            只需要写一次 get_current_user，成百上千个接口都可以直接复用。
-                        - 提升测试效率与模拟能力：在编写单元测试时，你可以非常容易地替换真实的依赖为模拟对象（Mock）。
-                            例如，可以使用 FastAPI 提供的 app.dependency_overrides 机制，在不改动主逻辑的前提下注入测试数据库会话，实现真正的隔离测试。
-                        - 自动文档与类型安全：因为依赖项也是通过 Python 类型提示声明的，FastAPI 能够自动将依赖中的参数（如查询参数、请求头）整合到
-                            Swagger/OpenAPI 文档中，同时提供严格的数据验证和错误处理。
-                (朦朦胧胧的)
+                    1. 核心组件：Depends()
+                        在 FastAPI 中，依赖注入是通过 Depends() 函数来实现的。它通常被放在路由处理函数的参数默认值中。
+                            - 声明式编程：当写下 current_user: User = Depends(get_current_user) 时，并没有主动去“调用” get_current_user 函数，
+                                    而是向 FastAPI “声明”了这个依赖关系。
+                            - 自动参数解析：FastAPI 会自动扫描依赖函数的参数。
+                                    例如， get_current_user 需要 token 和 db，FastAPI 会自动从 HTTP 请求（Header、Query、Form 等）中提取 token，
+                                        并从它的依赖树中获取 db，然后自动传入。
+                    2. 底层执行流程：构建依赖树
+                        当客户端发起一个 HTTP 请求时，FastAPI 并不是按照代码从上到下的顺序执行的，而是按照依赖树（Dependency Tree）的拓扑顺序来解析。
+                            - 解析阶段：框架首先扫描路由函数的参数，识别出所有的 Depends() 声明。
+                            - 递归实例化：如果依赖项本身还有依赖（比如 check_user_permission 依赖 get_current_user，
+                                    而 get_current_user 又依赖 oauth2_scheme 和 get_db），FastAPI 会递归地构建一棵完整的依赖树。
+                            - 注入阶段：从最底层的依赖开始执行，逐层向上，最终将结果注入到目标路由函数的参数中。
+                    3. 请求级缓存机制（性能优化）
+                        FastAPI 的依赖注入系统在同一个请求的生命周期内具有缓存特性。
+                            - 默认情况下，对于同一个请求，如果某个依赖项被多次声明（例如在嵌套依赖中），FastAPI 只会执行一次该依赖函数，
+                                    并将结果缓存起来供后续使用。
+                            - 即使被多次引用，系统也不会重复去解码 JWT 或查询数据库，极大地提升了高并发场景下的性能。
+                    4. 依赖注入的核心优势
+                        为什么顶级团队和现代框架都推崇依赖注入？主要有以下三个技术真相：
+                            - 极致的代码解耦与复用（DRY原则）：将横切关注点（如鉴权、日志、限流、数据库连接）从业务逻辑中完全剥离。
+                                只需要写一次 get_current_user，成百上千个接口都可以直接复用。
+                            - 提升测试效率与模拟能力：在编写单元测试时，你可以非常容易地替换真实的依赖为模拟对象（Mock）。
+                                例如，可以使用 FastAPI 提供的 app.dependency_overrides 机制，在不改动主逻辑的前提下注入测试数据库会话，实现真正的隔离测试。
+                            - 自动文档与类型安全：因为依赖项也是通过 Python 类型提示声明的，FastAPI 能够自动将依赖中的参数（如查询参数、请求头）整合到
+                                Swagger/OpenAPI 文档中，同时提供严格的数据验证和错误处理。
+                    (朦朦胧胧的)
 
 
-            2.2.2 FastAPI 全局异常处理器
-                拦截所有异常，统一返回标准错误响应，同时记录全链路日志，方便问题追踪：
-                    app/api/error_handlers.py
+                接口权限应用示例：
+                    app/api/v1/behaviors.py
 
-                    # app/api/v1/behaviors.py
+                        展示 FastAPI 在实际业务中应用基于角色的访问控制（RBAC）。
+                        定义了两个关于“用户行为数据”的接口，并通过依赖注入实现了不同级别的权限拦截。
 
-                    展示 FastAPI 在实际业务中应用基于角色的访问控制（RBAC）。
-                    定义了两个关于“用户行为数据”的接口，并通过依赖注入实现了不同级别的权限拦截。
+                        1. 路由模块化设计
+                            没有直接使用 app，而是实例化了一个 APIRouter。生产级 FastAPI 项目的标准做法。
+                            通过将路由拆分到不同的模块（如 behaviors.py），然后在主入口文件中通过 app.include_router(router) 进行挂载，
+                                可以保持项目结构的清晰和解耦。
+                        2. 接口一：高敏感的全局操作（严格权限）
+                            业务场景：这是一个批量导出接口，涉及全量数据，通常属于高敏感操作。
+                            权限控制：Depends(check_user_permission(["admin"]))。
+                                    列表中只有 "admin"，这意味着只有管理员才能调用此接口。
+                                    如果普通用户（user）尝试访问，FastAPI 会在依赖阶段直接抛出 403 Forbidden 异常，根本不会进入函数体内部。
+                        3. 接口二：常规的个人操作（宽泛权限）
+                            业务场景：这是用户查看自己行为记录的接口，属于常规业务。
+                            权限控制：Depends(check_user_permission(["admin", "user"]))。
+                                    列表中包含了 "admin" 和 "user"，这意味着管理员和普通用户都可以访问。
+                            设计意图：管理员可能需要排查问题或查看特定用户的状态，因此也需要拥有访问 /mine 数据的权限。
+                        4. current_user 的无缝透传
+                            虽然 check_user_permission 的主要作用是“拦截非法请求”，但它的内部函数 permission_checker 最终 return current_user。
+                            这意味着，当请求成功通过权限校验后，FastAPI 会自动将解析出的 User 对象注入到 current_user 参数中。
+                            因此，在函数体内，不仅拥有了安全的环境，还直接拿到了当前登录用户的完整信息，后续如果需要结合 current_user.id
+                                去数据库查询具体的行为记录，可以直接使用，无需再次查询用户表。
+                        完善：
+                            实际开发中，如果这个接口支持传入 user_id 参数，有水平越权（IDOR漏洞）。
 
-                    1. 路由模块化设计
-                        没有直接使用 app，而是实例化了一个 APIRouter。生产级 FastAPI 项目的标准做法。
-                        通过将路由拆分到不同的模块（如 behaviors.py），然后在主入口文件中通过 app.include_router(router) 进行挂载，
-                            可以保持项目结构的清晰和解耦。
-                    2. 接口一：高敏感的全局操作（严格权限）
-                        业务场景：这是一个批量导出接口，涉及全量数据，通常属于高敏感操作。
-                        权限控制：Depends(check_user_permission(["admin"]))。
-                                列表中只有 "admin"，这意味着只有管理员才能调用此接口。
-                                如果普通用户（user）尝试访问，FastAPI 会在依赖阶段直接抛出 403 Forbidden 异常，根本不会进入函数体内部。
-                    3. 接口二：常规的个人操作（宽泛权限）
-                        业务场景：这是用户查看自己行为记录的接口，属于常规业务。
-                        权限控制：Depends(check_user_permission(["admin", "user"]))。
-                                列表中包含了 "admin" 和 "user"，这意味着管理员和普通用户都可以访问。
-                        设计意图：管理员可能需要排查问题或查看特定用户的状态，因此也需要拥有访问 /mine 数据的权限。
-                    4. current_user 的无缝透传
-                        虽然 check_user_permission 的主要作用是“拦截非法请求”，但它的内部函数 permission_checker 最终 return current_user。
-                        这意味着，当请求成功通过权限校验后，FastAPI 会自动将解析出的 User 对象注入到 current_user 参数中。
-                        因此，在函数体内，不仅拥有了安全的环境，还直接拿到了当前登录用户的完整信息，后续如果需要结合 current_user.id
-                            去数据库查询具体的行为记录，可以直接使用，无需再次查询用户表。
-                    完善：
-                        实际开发中，如果这个接口支持传入 user_id 参数，有水平越权（IDOR漏洞）。
+            2.1.2 数据级权限（行级 + 列级控制）
+                - 行级权限：限制用户只能操作自己的业务数据，管理员无限制，在业务层拼接数据过滤条件，避免越权访问：
+                    app/crud/behavior.py
 
-                    # app/crud/behavior.py
                     防范水平越权漏洞（IDOR），在 CRUD（数据访问）层实现行级权限控制（Row-Level Security / Data-Level Permissions）。
                     确保你只能打开属于自己的那个柜子。
 
@@ -1083,7 +1083,7 @@ Python 程序设计工程化进阶
                         职责单一：路由层（Router）只负责处理 HTTP 请求和响应，CRUD 层负责数据安全和数据库操作。
                                 即使有人绕过了路由直接调用这个 CRUD 函数，数据依然会受到保护。
 
-                    关于分层架构（Layered Architecture）
+                    - 关于分层架构（Layered Architecture）
                     在 FastAPI 等现代 Python Web 框架的实战中，这通常演变为一种三层架构（3-Tier Architecture）。
                     这种架构的核心思想是“关注点分离（Separation of Concerns）”：
                         让每一层只负责自己最擅长的事情，互不干扰。
@@ -1129,8 +1129,9 @@ Python 程序设计工程化进阶
                         易于维护：如果以后要把 MySQL 换成 PostgreSQL，你只需要改 CRUD 层，路由层和业务层一行代码都不用动。
                         代码复用：如果后台管理系统和面向用户的 App 都需要“创建订单”的功能，它们可以调用同一个 Service 层，而不用把业务逻辑写两遍。
 
+                - 列级权限：通过 Pydantic 响应模型排除敏感字段，避免返回用户隐私、数据库密钥等敏感信息，例如在用户响应模型中排除password_hash字段：
+                    app/schemas/user.py
 
-                # app/schemas/user.py
                     数据序列化过滤（Data Serialization Filtering）或响应模型过滤。
                         列级权限：通常指在数据库层面（如 PostgreSQL 的 GRANT SELECT (col1, col2)）控制某个用户能不能查询某列。
                         响应模型过滤：指在后端代码中，主动决定“哪些字段允许返回给前端，哪些字段必须被拦截”。
@@ -1149,9 +1150,23 @@ Python 程序设计工程化进阶
                             虽然白名单机制已经自动排除了 password_hash，但加上这行注释是非常好的工程习惯。
                             它向未来的维护者明确传达了安全意图：“这个 Schema 是对外暴露的，绝对不能包含密码字段”。
 
+            2.1.3 数据源级权限（ETL 脚本专属）
+                ETL 脚本访问数据库和 API 时，遵循最小权限原则，严格管控数据源凭证：
+                    1. 数据库权限：ETL 使用专属数据库账号，仅赋予源库SELECT权限、目标库INSERT/UPDATE权限，禁止使用高权限账号
+                    2. API 权限：ETL 调用第三方 API 时，使用 AK/SK 签名认证，避免明文传输密钥，SK 使用环境变量加密存储，不硬编码在代码中
+                    3. 凭证管理：生产环境使用 HashiCorp Vault 配置中心存储所有数据源凭证，脚本动态拉取，避免明文存放在.env文件或代码仓库中
 
-                在main.py中注册全局异常处理器：
-                    main.py
+
+        2.2 分层异常捕获与处理
+            搭建全局异常拦截 + 业务场景专项异常处理机制，保证系统出现异常时能精准定位、正常回滚、及时告警，覆盖 ETL 脚本、Web 接口、数据库访问、
+            外部 API 调用四大场景。
+
+            2.2.1 自定义业务异常类
+                统一业务异常结构，区分系统异常、业务异常、权限异常、数据异常，便于日志分类和告警：
+                    app/exceptions/base.py
+
+                    在main.py中注册全局异常处理器：
+                        main.py
 
             2.2.3 典型场景异常处理
                 （1）ETL 脚本异常处理
