@@ -42,7 +42,343 @@
         漏斗图绘制：通常使用横向柱状图展示各阶段的用户数量，柱状图从左到右依次降低，直观呈现用户流失情况。也可以使用面积图展示各阶段的转化率百分比。
 
 
-二、pandas数据清洗常用方法
+⼆、pandas数据清洗常⽤⽅法
+    数据清洗是数据分析的关键步骤，直接影响后续分析结果的准确性。
+    pandas提供了丰富的数据清洗⽅法，帮助处理缺失值、重复值、异常值等问题。
+
+    1. 缺失值处理
+        【检测缺失值】
+            # 检测单列是否存在缺失值
+            df['column_name'].isnull().sum()
+            # 检测多列缺失值情况
+            df.isnull().sum()
+            # 检测整个DataFrame是否存在缺失值
+            df.isnull().values.any()
+
+        讲解：
+            语句1（列） 功能：统计某一特定列中缺失值的数量。
+            执行逻辑：
+                df['column_name']：选中指定的这一列（返回一个 Series）。
+                .isnull()：对这一列的每个元素进行判断，如果是缺失值则返回 True，否则返回 False。
+                .sum()：在 Pandas 中，True 会被当作 1，False 当作 0。所以求和就是计算 True 的个数，即缺失值的总数。
+            返回值：一个整数（int）。
+
+            语句2（全局） 功能：统计 DataFrame 中每一列的缺失值数量。
+            执行逻辑：
+                df.isnull()：对整个表格进行判断，返回一个和原表形状相同的布尔值矩阵（True/False）。
+                .sum()：默认沿着列方向（axis=0）求和。
+            返回值：一个 Series，索引（index）是列名，值是每一列对应的缺失值个数。
+
+            语句3（条件判断） 功能：快速判断整个 DataFrame 中是否至少存在一个缺失值（返回布尔值）。
+            执行逻辑：
+            df.isnull()：生成布尔值矩阵。
+            .values：将 Pandas 的布尔矩阵转换为底层的 NumPy 数组（ndarray）。这一步是为了提高后续计算的效率，避免 Pandas 的索引对齐开销。
+            .any()：NumPy 的方法。只要数组中有任何一个元素是 True，就返回 True；如果全是 False，才返回 False。
+            返回值：布尔值（True 或 False）。
+
+        【处理缺失值】
+            # 删除包含缺失值的⾏
+            df.dropna(subset=['column_name'], inplace=True)
+            # 填充缺失值
+            # 填充固定值
+            df['column_name'].fillna('missing', inplace=True)
+            # 填充均值
+            df['column_name'].fillna(df['column_name'].mean(), inplace=True)
+            # 前向填充
+            df['column_name'].ffill(inplace=True)
+            # 后向填充
+            df['column_name'].bfill(inplace=True)
+
+        讲解：
+            1. .fillna("missing", inplace=True) 的含义
+                功能：它会将该列中所有的空值（NaN）替换为字符串 "missing"；inplace=True：这个参数的意思是“就地修改”。
+                    inplace=True：直接在原始的 DataFrame 或 Series 上进行修改，不会产生新的对象，函数的返回值是 None。
+                    inplace=False（默认值）：不会修改原数据，而是返回一个填充好新值的全新对象。
+                如果不使用 inplace=True，需要将结果赋值给一个变量，否则修改后的数据会丢失
+                （例如 df['column_name'] = df['column_name'].fillna("missing")）。
+
+            2. 填充均值时，mean() 会忽略空值吗？
+                Pandas 在计算均值时会自动忽略空值（NaN）。
+                底层逻辑：当调用 df['column_name'].mean() 时，Pandas 默认参数 skipna=True。
+                        这意味着它在求和与计数时，会直接跳过那些缺失的数据，只使用有效数据进行计算。
+
+
+    2. 重复值处理
+        【检测重复值】
+            # 检测DataFrame中所有列完全相同的重复⾏
+            df.duplicated().sum()
+            # 检测指定列的重复值
+            df.duplicated(subset=['user_id', 'order_id']).sum(
+
+        讲解：
+            1. 关于第一行代码
+                标记规则：df.duplicated() 会逐行检查，发现某一行与它前面的某一行所有列的值都完全相同，把这一行标记为 True（即记为 1）。
+                它只标记重复行中的“后续行”。
+                也就是说，第一次出现的那一行会被标记为 False（保留为原始行），只有第二次、第三次及以后出现的相同行才会被标记为 True。
+                求和：最后用 .sum() 对这些 True/False 求和，得出的结果就是“多出来的、完全重复的行数”。
+
+            2. 关于第二行代码 df.duplicated(subset=[...]).sum()
+                指定了 subset 参数时，Pandas 就不再看所有的列了，而是只比较指定的几列（比如 user_id 和 order_id）。
+                只要这两列的值与前面的行相同，哪怕其他列的值不一样，它也会被判定为重复并标记为 True。
+                同样地，.sum() 算出的是基于这两列判断出的多余重复行数。
+
+        补充：
+            判断重复的代码的时间复杂度不是 n*n，而是接近 n。
+            1. 底层真相：哈希表（Hash Table）
+                Pandas 的 duplicated() 方法底层并没有使用嵌套循环去逐行比对，而是使用了哈希表（Hash Table）机制。
+                （类似于 Python 中的 set 或字典）
+                它的实际执行逻辑是这样的：
+                    1. Pandas 在内存中创建一个空的哈希表。
+                    2. 它从上到下遍历 DataFrame 的每一行。
+                    3. 对于当前行，它计算出一个哈希值（Hash），然后去哈希表里“查字典”：
+                        - 如果哈希表里没有这个哈希值，说明是第一次出现，标记为 False，并把这个哈希值存入哈希表。
+                        - 如果哈希表里已经存在这个哈希值，说明前面已经出现过一模一样的行，标记为 True。
+                    4. 继续处理下一行。
+                因为哈希表的“查找”和“插入”操作的平均时间复杂度都是 O(1) ，所以遍历 n 行数据的总时间复杂度就是 O(n)。
+
+            2. 为什么感觉还是有点慢？
+                虽然时间复杂度是线性的 O(n) ，但在数据量极大（比如几千万行）时，你依然会感觉到耗时，这主要是因为：
+                    - 哈希计算开销：对于包含多列的 DataFrame，Pandas 需要把每一行的多个值组合起来计算哈希值，这个计算本身是有 CPU 开销的。
+                    - 内存与缓存：当哈希表变得极其庞大时，可能会超出 CPU 的缓存（Cache）大小，导致频繁的内存交换，从而拖慢速度。
+
+            3. 优化建议
+                - 只检查关键列（使用 subset）：
+                    千万不要对整个大表做 df.duplicated()。
+                    如果只关心某几个 ID 是否重复，一定要加上 subset 参数。
+                    参与哈希计算的列越少，速度越快：
+                        # 比 df.duplicated() 快得多
+                        df.duplicated(subset=['user_id']).sum()
+
+        【删除重复值】
+            # 删除所有列完全相同的重复⾏
+            df.drop_duplicates inplace=True)
+            # 仅根据指定列删除重复⾏
+            df.drop_duplicates(subset=['user_id', 'order_id'], keep='last', inplace=True)
+            # 重置索引
+            df.reset_index(drop=True, inplace=True
+
+        讲解：
+            1. keep 参数除了 'last' 还有哪些？
+                除了 'last'，keep 参数还有两个常用的值：
+                'first'（默认值）：保留重复项中第一次出现的行，删除其后所有重复的行。
+                False：删除所有的重复项，一个都不保留。也就是说，只要存在重复，这些行会被全部剔除
+
+            2. 重置索引时的 drop=True 是什么意思？
+                在 Pandas 中，当删除了某些行（比如去重后），索引（index）通常会变得不连续（例如从 0, 1, 3, 4 变成了这样）。
+                使用 reset_index() 可以重新生成连续的整数索引（0, 1, 2, 3）。
+                此时，drop 参数决定了如何处理旧的索引：
+                    - drop=True（丢弃旧索引）：
+                        直接生成新的默认整数索引，彻底丢弃原来的索引信息26。这是最常用的做法，因为旧的索引通常已经没有业务意义了。
+                    - drop=False（默认值，保留旧索引）：
+                        如果不加 drop=True（即默认 drop=False），Pandas 不会直接丢弃旧索引，而是会把旧索引变成 DataFrame 中的一列，
+                        默认列名叫 'index'。
+
+            总结来说：df.reset_index(drop=True) 的语义非常明确，就是“丢掉旧索引、换新编号”。
+
+        在实际的数据清洗工作中，我们通常只关心数据本身，旧的索引往往没有实际意义。
+        因此，强烈建议每次重置索引时都加上 drop=True，这样可以避免表格中意外多出无用的 index 列，防止在后续合并（merge）或导出（to_csv）
+        时引发莫名其妙的报错。
+
+
+    3. 异常值处理
+        【统计⽅法检测异常值】
+            # Z-score⽅法
+            from scipy import stats
+            z = np.abs(stats.zscore(df['column_name']))
+            df = df[z < 3]  # 去除Z-score⼤于3的异常值
+
+            # IQR⽅法
+            Q1 = df['column_name'].quantile(0.25)
+            Q3 = df['column_name'].quantile(0.75)
+            IQR = Q3 - Q1
+            df = df[(df['column_name'] > Q1 - 1.5 * IQR) & (df['column_name'] < Q3 + 1.5
+            # 丢掉旧索引、换新编号，并且直接修改原表，不产生新对象
+            df.reset_index(drop=True, inplace=True)
+
+        讲解：
+            Z-score（3-Sigma 原则）
+                核心原理：Z-score 衡量的是一个数据点距离平均值有多少个标准差。公式为：Z = (X - μ) / σ。
+                代码解释：
+                    - stats.zscore()：计算该列每个数据的 Z-score。
+                    - np.abs()：取绝对值。因为我们既关心“极大值”（正数），也关心“极小值”（负数），只要偏离均值太远就算异常。
+                    - z < 3：根据统计学中的 3-Sigma 原则，在正态分布中，99.7% 的数据都落在均值加减 3 个标准差的范围内。
+                            因此，绝对值大于 3 的数据被判定为异常值。
+                适用场景：数据近似正态分布（钟形曲线）。
+                弱点：Z-score 对异常值本身非常敏感！因为均值（μ）和标准差（σ）都会被极端异常值拉偏，导致异常值看起来“没那么异常”，从而漏检。
+
+            IQR（四分位距法）（基于箱线图）
+                核心原理：IQR（四分位距）是数据中间 50% 的范围。它通过寻找数据的“边界”来判定异常值，而不是依赖均值。
+                代码解释：
+                    - Q1 和 Q3：分别计算数据的第 25 百分位数和第 75 百分位数。
+                    - IQR = Q3 - Q1：计算中间 50% 数据的跨度。
+                    - Q1 - 1.5 * IQR 到 Q3 + 1.5 * IQR：这是箱线图（Boxplot）中定义正常数据范围的经典公式。
+                    - 最后一步使用 &（逻辑与）：筛选出同时满足“大于下限”且“小于上限”的数据，也就是剔除了两端的所有异常值。
+                适用场景：数据不满足正态分布，或者数据中存在大量极端值时。
+                优势：Q1、Q3 和 IQR 都是基于排序的“稳健统计量”（Robust Statistics），它们完全不受极端异常值的影响。
+                        因此，IQR 方法在实际业务中比 Z-score 更常用、更可靠。
+
+            对比维度	        Z-score (3-Sigma)	    IQR (箱线图法)
+            判定标准	        距离均值超过 3 个标准差	    超出 [Q1-1.5IQR, Q3+1.5IQR] 范围
+            数据分布要求	    必须近似正态分布	        无要求（非参数方法）
+            对异常值的敏感度	高（容易被异常值带偏）	    低（极其稳健）
+            实战推荐度	    2 仅限正态分布）	        5 首选方案
+
+        【文本数据清洗】
+            python
+            # 使用正则表达式替换非文本字符
+            import re
+            df['text_column'] = df['text_column'].str.replace(r'[^A-Za-z0-9\s]', '', regex=True)
+
+            # 使用str访问器进行文本处理
+            df['text_column'] = df['text_column'].str.strip()   去除前后空格
+            df['text_column'] = df['text_column'].str.lower()   转换为小写
+
+        讲解：
+            清洗文本数据，将指定列中除了“英文字母、数字、空格”之外的所有特殊字符全部剔除。
+            1. .str.replace() 函数
+                在 Pandas 中，普通的 .replace() 方法通常用于替换整个单元格的值（比如把 0 换成 NaN）。
+                而当需要替换字符串内部的某些字符时，必须加上 .str 访问器，调用 .str.replace() 方法。
+                它等价于 Python 内置的字符串替换或正则表达式模块中的 re.sub() 方法。
+
+            2. 参数解析
+                这行代码传递了三个参数：
+                    - r'[^A-Za-z0-9\s]'（pat）：即匹配模式（Pattern），告诉 Pandas 要去找什么样的字符。
+                            这里传入的是一个正则表达式（前面的 r 代表 raw string，即原始字符串，防止转义字符被 Python 提前解析）。
+                    - ''（repl）：即替换内容（Replacement）。
+                            这里是一个空字符串，意思是“把匹配到的字符替换为空”，也就是删除它们。
+                    - regex=True（参数）：显式地告诉 Pandas，第一个参数是一个正则表达式，而不是普通的字面量字符串。
+                            虽然这是默认值，但在写正则时显式加上它，代码的意图会更清晰。
+
+            3. 正则表达式 [^A-Za-z0-9\s] 深度拆解
+                这是这行代码的核心，属于正则表达式中的“字符类取反”语法：
+                    - [...]（字符类）：表示匹配括号内的任意一个字符。
+                    - ^（取反符号）：当 ^ 紧跟在左方括号 [ 后面时，表示“非”或“排除”。即匹配不在括号内的任何字符。
+                    - A-Za-z0-9（白名单范围）：
+                        A-Z：所有大写英文字母
+                        a-z：所有小写英文字母
+                        0-9：所有数字
+                    - \s（空白字符）：代表空格（Space）、制表符（Tab）、换行符等空白字符。
+                综合起来：[^A-Za-z0-9\s] 的意思就是：
+                    匹配任何“不是英文字母、不是数字、也不是空白字符”的字符（比如标点符号 !@#、特殊符号等）。
+                例如：
+                    “Hello, World! 123 @2024” to “Hello World 123 2024”
+
+        补充：
+            关于“正则表达式本身的匹配规则”和“字符串替换函数的执行机制”
+            .str.replace() 函数的底层机制：全局替换（Global Replacement）。
+            1. 正则表达式只负责“找”，不负责“找几次”
+                在 [^A-Za-z0-9\s] 这个正则表达式中，没有加任何量词，它的默认规则是：每次只匹配 1 个字符。
+                    - 遇到第一个特殊字符（比如 !），它匹配成功。
+                    - 遇到第二个特殊字符（比如 @），它再次匹配成功。
+            2. .replace() 函数自带“全局扫描”机制
+                在 Python 和 Pandas 中，字符串的替换函数（底层调用的是 re.sub()）默认就是全局替换的。
+                它的执行逻辑是：
+                    1. 从字符串的最左边开始，向右逐个字符扫描。
+                    2. 只要发现当前字符符合正则表达式的规则，就立刻把它替换成目标字符（这里是空字符串）。
+                    3. 替换完成后，继续向右扫描下一个字符，直到字符串的末尾。
+
+
+    4. 时间类型转换
+        【转换为datetime类型】
+            转换为datetime类型：
+            # 转换字符串为datetime
+            df['event_time'] = pd.to_datetime(df['event_time'], errors='coerce')
+            # 处理不同时间格式
+            df['event_time'] = pd.to_datetime(df['event_time'], format='%Y-%m-%d %H:%M:%S')
+            # 设置时区
+            df['event_time'] = pd.to_datetime(df['event_time'], unit='ms', errors='coerce').dt.tz_localize('UTC')\
+                                .dt.tz_convert('Asia/Shanghai')
+
+        讲解：
+            1. errors='coerce' 是什么意思？
+                在将字符串转换为日期时间时，数据中难免会包含格式错误、无法识别的“脏数据”（例如 "Unknown"、"2022-02-30" 等）。
+                errors 参数就是用来控制 Pandas 遇到这些错误时的行为的。
+                errors='coerce' 的含义是：强制转换。
+                当 Pandas 遇到无法解析的字符串时，它不会抛出异常中断程序，而是将其强制转换为 NaT（Not a Time，Pandas 中的时间缺失值，
+                        类似于数值中的 NaN）。
+                补充说明：该参数的默认值是 'raise'（遇到错误直接报错），另一个可选值是 'ignore'（遇到错误则保留原始字符串）。
+                在实际的数据清洗工程中，使用 'coerce' 是最常见、最安全的做法，它可以保证代码顺利跑完，
+                        后续再用 isnull() 检查并处理这些 NaT 值即可。
+
+            2. 若原始数据时间格式不统一（如有的精确到小时，有的仅精确到天），如何转换？
+                如果你显式指定了 format='%Y-%m-%d %H:%M:%S'，Pandas 会要求所有数据都必须严格匹配这个格式，一旦遇到仅精确到天
+                （如 "2022-01-01"）的数据，就会报错或变成 NaT。
+                针对格式不统一的情况，有以下几种最佳解决方案：
+                    方案一：直接省略 format 参数（推荐）。
+                            pd.to_datetime 默认具备强大的自动识别能力，能够自动推断并解析多种常见的混合日期格式。
+                    方案二：使用 format='mixed'。
+                            如果你的数据确实包含多种格式，可以显式传入 format='mixed'。
+                            这会告诉 Pandas 独立尝试解析每一行的格式，而不是仅根据第一行来推断，这是处理异构数据最稳健的选择。
+                    方案三：结合 errors='coerce'。
+                            无论使用哪种方案，都建议加上 errors='coerce'，这样即使有极少数完全无法识别的格式，也会被安全地转换为 NaT，
+                                    而不会导致整列转换失败。
+
+            3. 设置时区的代码中用到了哪些函数？
+                第三行代码 pd.to_datetime(...).dt.tz_localize('UTC').dt.tz_convert('Asia/Shanghai')
+                是一条非常经典的时区处理链式操作，涉及以下三个核心函数：
+                    - pd.to_datetime(..., unit='ms', errors='coerce')：
+                        首先将原始数据（这里假设是毫秒级的时间戳）转换为 Pandas 的日期时间对象。
+                        此时生成的是“朴素时间”（tz-naive），即只有时间数值，但没有时区标签。
+                    - .dt.tz_localize('UTC')：
+                        作用是“贴标签”。
+                        它告诉 Pandas：“这些没有时区的时间，原本就是属于 UTC 时区的”。
+                        这一步不会改变时间的具体数值，只是给它打上了 UTC 的时区标识，使其变成“感知时间”（tz-aware）。
+                    - .dt.tz_convert('Asia/Shanghai')：
+                        作用是“换算数值”。
+                        在已经拥有时区标签的基础上，将时间从 UTC 转换到目标时区（上海，即 UTC+8）。
+                        这一步会改变时间的显示数值（例如自动加上 8 小时），但底层的绝对时间点保持不变。
+                数据转换的顺序是 “朴素时间” -> “感知时间” -> “数值换算”
+
+        补充：
+            关于 .dt 和 .str 和其他访问器（Accessors）
+            在 Pandas 中，当我们需要对某一列（Series）中的元素内部进行批量操作时，不能直接对整个列使用 Python 原生的方法。
+            为了解决这个问题，Pandas 设计了“访问器”机制，它们就像是给 Series 加装的“专用工具箱”。
+            1. .dt (Datetime Properties)
+                作用：专门用于处理日期和时间数据。
+                常用功能：提取年、月、日、星期，或者进行时区转换。
+                示例：df['date_col'].dt.year（提取年份），df['date_col'].dt.day_name()（提取星期几）。
+            2. .str (String Methods)
+                作用：专门用于处理字符串数据。
+                常用功能：大小写转换、正则替换、截取、分割等。
+                示例：df['text_col'].str.upper()（转大写），df['text_col'].str.contains('abc')（是否包含某子串）。
+            3. .cat (Categorical)
+                作用：专门用于处理类别型（Categorical）数据。类别型数据通常用于存储那些只有固定几个选项的列（如性别、省份、订单状态）。
+                常用功能：查看类别、重命名类别、修改类别的顺序。
+                示例：df['status_col'].cat.categories（查看有哪些类别），
+                        df['status_col'].cat.rename_categories({'old': 'new'})（重命名类别）。
+            4. .sparse (Sparse)
+                作用：专门用于处理稀疏数据（Sparse）。当一列数据中绝大部分都是同一个值（比如 99% 都是 0，只有 1% 是 1）时，
+                        使用稀疏数组可以极大地节省内存。
+                常用功能：获取稀疏数据的密度、填充值等。
+                示例：df['sparse_col'].sparse.density（计算非零值的比例）。
+            5. .plot (Plotting)
+                作用：专门用于数据可视化。
+                常用功能：快速绘制折线图、柱状图、散点图等。
+                示例：df['value_col'].plot.hist()（画直方图），df['value_col'].plot.bar()（画柱状图）。
+            6. .list (List-like / Extension Arrays)
+                作用：在较新的 Pandas 版本中，用于处理包含列表（List）的列。
+                常用功能：计算列表长度、获取列表中的特定元素。
+                示例：df['list_col'].list.len()（计算每行列表中元素的个数）。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
