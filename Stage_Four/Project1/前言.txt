@@ -587,15 +587,53 @@
                     这是非常严谨的做法，防止当 T日没有任何新增用户时，分母为 0 导致代码抛出 ZeroDivisionError（除零错误）。
 
 
+    3. 其他留存率计算
+        【次日留存率】
+            # T+1日留存率
+            retained_users_t1 = df[(df['user_id'].isin(t0_users['user_id'])) & (df['days_diff'] == 1)]['user_id'].unique()
+            retention_rate_t1 = len(retained_users_t1) / len(t0_users) if len(t0_users) > 0 else 0
+
+        【30日留存率】
+            # T+30日留存率
+            retained_users_t30 = df[(df['user_id'].isin(t0_users['user_id'])) & (df['days_diff'] == 30)]['user_id'].unique()
+            retention_rate_t30 = len(retained_users_t30) / len(t0_users) if len(t0_users) > 0 else 0
 
 
+四、漏⽃分析与可视化
 
+    1. 7⽇留存率计算
+        计算逻辑： 7⽇留存率是指⽤⼾在⾸次使⽤产品后，第七天再次使⽤的⽤⼾⽐例。计算时需明确：
+            初始⽤⼾：T⽇⾸次使⽤产品的⽤⼾
+            后续活跃：T+7⽇再次使⽤产品的⽤⼾
+            计算公式：
+                7⽇留存率 = (T+7⽇活跃的新⽤⼾数 / T⽇新⽤⼾总数) × 100%
 
+        【Python 实现】
+            import pandas as pd
+            from datetime import datetime, timedelta
 
+            # 读取数据并转换为datetime类型
+            df = pd.read_csv('user_activity.csv')
+            df['event_time'] = pd.to_datetime(df['event_time'])
 
+            # 统计用户首次活跃日期
+            first_login = df.groupby('user_id')['event_time'].min().reset_index()
+            first_login.columns = ['user_id', 'first_login_date']
 
+            # 合并首次登录日期到原始数据
+            df = pd.merge(df, first_login, on='user_id')
 
+            # 设置分析周期
+            start_date = datetime(2026, 8, 1)
+            end_date = datetime(2026, 8, 31)
 
+            # 筛选分析周期内的用户
+            df_animated = df[(df['first_login_date'] >= start_date) & (df['first_login_date'] <= end_date)]
+
+            # 统计每个首次登录日的7日留存率
+            retention_rate_7d = df_animated.groupby('first_login_date').apply(lambda x:
+                (x[x['days_diff'] == 7]['user_id'].nunique() * 1.0 / x['user_id'].nunique())
+            ).reset_index(name='retention_rate_7d')
 
 
 
