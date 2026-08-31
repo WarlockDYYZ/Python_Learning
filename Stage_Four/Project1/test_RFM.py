@@ -6,6 +6,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 import plotly.express as px
 import streamlit as st
+import plotly.graph_objects as go
 
 
 # 创建模拟用户行为数据
@@ -62,32 +63,58 @@ rfm.loc[(rfm['R_score'] >= 4) & (rfm['F_score'] < 4) & (rfm['M_score'] < 4), 'de
 rfm.loc[(rfm['R_score'] < 4) & (rfm['F_score'] < 4) & (rfm['M_score'] < 4), 'detailed_segment'] = '沉默用户'
 
 
-# 标准化RFM指标
-scaler = StandardScaler()
-rfm_scaled = scaler.fit_transform(rfm[['R', 'F', 'M']])
+# 引入轮廓系数评估指标
+from sklearn.metrics import silhouette_score
 
-# 使用肘部法则选择最佳簇数
+# 1. Log变换处理极端值（在标准化前进行，应对长尾分布）
+rfm_log = np.log1p(rfm[['R', 'F', 'M']])
+
+# 2. 标准化RFM指标（对Log变换后的数据进行标准化）
+scaler = StandardScaler()
+rfm_scaled = scaler.fit_transform(rfm_log)
+
+# 3. 使用肘部法则结合轮廓系数选择最佳簇数
 sse = []
-for k in range(1, 11):
+sil_scores = []
+for k in range(2, 11):  # 轮廓系数要求K>=2，因此从2开始
     kmeans = KMeans(n_clusters=k, random_state=42)
     kmeans.fit(rfm_scaled)
     sse.append(kmeans.inertia_)
+    # 计算并记录轮廓系数
+    sil_scores.append(silhouette_score(rfm_scaled, kmeans.labels_))
 
-# 绘制SSE曲线
-fig = px.line(x=range(1, 11), y=sse, title='肘部法则选择最佳簇数')
+# 4. 绘制SSE与轮廓系数双重验证曲线（双Y轴）
+fig = go.Figure()
+
+# 左 Y 轴：SSE 曲线（寻找拐点）
+fig.add_trace(go.Scatter(x=list(range(2, 11)), y=sse, name='SSE (肘部法则)',
+ line=dict(color='royalblue', width=2)))
+
+# 右 Y 轴：轮廓系数曲线（寻找最高点）
+fig.add_trace(go.Scatter(x=list(range(2, 11)), y=sil_scores, name='轮廓系数',
+ line=dict(color='crimson', width=2), yaxis='y2'))
+
+# 配置双 Y 轴布局
+fig.update_layout(
+    title='K值寻优：双重验证',
+    xaxis_title='簇数 (K)',
+    yaxis_title='SSE',
+    yaxis2=dict(title='轮廓系数', overlaying='y', side='right'),
+    template='plotly_white'
+)
 st.plotly_chart(fig)
 
-# 拟合K-means模型（假设选择4个簇）
+# 5. 拟合K-means模型（假设选择4个簇）
 kmeans = KMeans(n_clusters=4, random_state=42)
 kmeans.fit(rfm_scaled)
 
-# 添加聚类标签
+# 6. 添加聚类标签
 rfm['cluster_label'] = kmeans.labels_
 
-# 分析聚类中心
-cluster_Centers = pd.DataFrame(kmeans.cluster_centers_, columns=['R', 'F', 'M'])
+# 7. 分析聚类中心（注意：此时中心点为Log变换并标准化后的值）
+cluster_centers = pd.DataFrame(kmeans.cluster_centers_, columns=['R', 'F', 'M'])
 
-# 可视化聚类结果
+# 8. 可视化聚类结果
 fig = px.scatter(rfm, x='F', y='M', color='cluster_label', title='RFM聚类可视化（F vs M）')
 st.plotly_chart(fig)
 
@@ -95,18 +122,25 @@ st.plotly_chart(fig)
 from sklearn.semi_supervised import LabelPropagation
 from sklearn.metrics.pairwise import cosine_similarity
 
-# 构建用户行为相似性矩阵
-user_behavior_matrix = df.pivot_table(index='user_id', columns='event_type', values='count', aggfunc='sum').fillna(0)
+# 1. 构建用户行为矩阵
+user_behavior_matrix = df.pivot_table(
+    index='user_id', columns='event_type', values='count', aggfunc='sum'
+).fillna(0)
 
-# 计算余弦相似度矩阵
+# 2. 计算余弦相似度矩阵
 similarity_matrix = cosine_similarity(user_behavior_matrix)
 
-# 初始化标签传播模型
-lp = LabelPropagation(gamma=20, max_iter=1000)
-lp.fit(similarity_matrix)
+# 3. 【关键补充】构造初始标签 (y)
+# 假设我们有 1000 个用户，其中前 10 个是已知的高价值用户(标签1)，
+# 第 11-20 个是已知的流失用户(标签2)，其余 980 个用户标签设为 -1（代表未知，等待算法预测）
+y = np.full(len(user_behavior_matrix), -1)
+y[:10] = 1   # 种子标签：高价值用户
+y[10:20] = 2 # 种子标签：流失用户
 
-# 获取标签
+# 4. 初始化并拟合标签传播模型（传入相似度矩阵和初始标签）
+lp = LabelPropagation(max_iter=1000)
+lp.fit(similarity_matrix, y=y)
+
+# 5. 获取预测标签并拼接
 cluster_labels = lp.labels_
-
-# 添加标签到用户数据
 user_behavior_matrix['cluster_label'] = cluster_labels
