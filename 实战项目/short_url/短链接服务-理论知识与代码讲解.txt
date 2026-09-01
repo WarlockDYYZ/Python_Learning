@@ -1,0 +1,102 @@
+1. 项目架构设计 + 环境搭建 + 数据库设计
+
+    （一）项目整体架构
+        短链接服务的核心流程： - 用户提交长链接 → 生成短码 → 存入数据库 → 返回短链接 - 用户访问短链接 → 解析短码 → 查询原始URL → 302重定向
+        项目采用经典的分层架构，目录结构如下：
+            short_url/
+            ├── app/
+            │   ├── __init__.py          # FastAPI 应用工厂
+            │   ├── main.py              # 应用入口
+            │   ├── config.py            # 配置管理（Pydantic BaseSettings）
+            │   ├── models/              # 数据模型层
+            │   │   ├── __init__.py
+            │   │   ├── schemas.py       # Pydantic 请求/响应模型
+            │   │   └── db.py            # SQLAlchemy ORM 模型
+            │   ├── api/                 # 接口层（路由）
+            │   │   ├── __init__.py
+            │   │   ├── deps.py          # 依赖注入（数据库会话等）
+            │   │   └── routes/
+            │   │       ├── __init__.py
+            │   │       ├── shortener.py # 短链生成/重定向接口
+            │   │       └── stats.py     # 统计接口
+            │   ├── services/            # 业务逻辑层
+            │   │   ├── __init__.py
+            │   │   ├── shortener.py     # 短码生成与查询逻辑
+            │   │   └── stats.py         # 统计逻辑
+            │   ├── repository/          # 数据访问层
+            │   │   ├── __init__.py
+            │   │   └── url_repo.py      # URL 数据库操作
+            │   ├── middleware/           # 中间件
+            │   │   ├── __init__.py
+            │   │   ├── logging.py       # 日志中间件
+            │   │   └── rate_limit.py    # 限流中间件
+            │   └── core/                # 核心工具
+            │       ├── __init__.py
+            │       ├── hash.py          # 短码生成算法
+            │       ├── exceptions.py    # 自定义异常
+            │       └── security.py      # 认证鉴权
+            ├── tests/                   # 测试
+            ├── docker-compose.yml       # 容器编排
+            ├── Dockerfile
+            ├── requirements.txt
+            ├── .env
+            └── pyproject.toml
+
+        “为什么不用一个文件写完”。
+        分层的核心目的是解耦：
+            接口层只负责接收请求和返回响应，业务逻辑层处理核心算法，数据访问层负责与数据库交互。
+            当你要把 MySQL 换成 PostgreSQL，或者把 Redis 缓存策略换掉时，只需要改对应层，不影响其他层。
+
+
+    （二）环境搭建
+        安装核心依赖命令：
+            pip install fastapi uvicorn[standard] sqlalchemy alembic
+            pip install redis[hiredis] pydantic-settings python-dotenv
+            pip install python-jose[cryptography] passlib[bcrypt]
+            pip install httpx
+
+        其实，前面的练习中许多库都是装过的，实际用到又没有时候再单独装吧。
+
+
+    （三）配置管理（Pydantic BaseSettings）
+        app/config.py
+
+        BaseSettings 会自动从环境变量和 .env 文件中读取配置，优先级为：
+            环境变量 > .env 文件 > 代码中的默认值这样生产环境通过环境变量注入敏感信息，开发环境用 .env 文件，实现配置与代码分离。
+
+
+    （四）数据库设计
+        app/models/db.py
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
