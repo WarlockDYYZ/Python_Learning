@@ -287,6 +287,51 @@ Q：短链接是如何实现跨平台适配的？
                 	BIGINT DEFAULT 0 NOT NULL，完全一致
 
 
+    （五）异步数据库连接
+        app/models/database.py
+
+        解析；
+            短链接服务的异步数据库连接层，基于 SQLAlchemy 2.0+ 的异步引擎构建。
+            解决传统同步 ORM 在高并发 Web 服务中“阻塞事件循环”的致命问题。
+            1. 声明式基类
+                所有数据模型（如之前的 UrlMapping）都必须继承这个类，SQLAlchemy 才能识别并管理它们。
+                单独定义：将 Base 放在独立的 database.py 中，避免模型文件和引擎配置互相导入导致的循环引用。
+            2. 异步引擎创建
+                参数	                    值	                    设计意图
+                DATABASE_URL	        mysql+aiomysql://...	必须使用 aiomysql 异步驱动，而非默认的 pymysql（同步）
+                pool_size=20	        20	                    连接池保持 20 个常驻连接，避免频繁创建/销毁连接的开销
+                max_overflow=10	        10	                    当 20 个连接都被占用时，允许临时多创建 10 个连接应对突发流量，用完即释放
+                pool_pre_ping=True	    True	                关键生产配置：每次从池中取连接前先发一个轻量级 ping，自动剔除已断开的死连接，
+                                                                避免“MySQL server has gone away”错误
+                echo=settings.DEBUG	    False/True	            开发时设为 True 可看到所有生成的 SQL，生产环境关闭避免日志爆炸
+                连接池总容量 = pool_size + max_overflow = 30，这意味着服务最多同时处理 30 个数据库操作，超过的请求会排队等待。
+                对于小项目来说这个值足够，若 QPS 超过 1000 再考虑调大。
+            3. 异步会话工厂
+                - async_sessionmaker：线程安全的会话工厂，每次调用 async_session() 返回一个新的独立会话。
+                - expire_on_commit=False：极其重要的配置。
+                    默认情况下，commit() 后 SQLAlchemy 会将对象属性标记为“过期”，下次访问时会自动查库刷新。
+                    但在异步场景中，这种隐式查询会导致 MissingGreenlet 错误（因为不能在非 await 上下文中执行 IO）。
+                    设为 False 后，commit 后对象属性仍然可用，避免意外触发同步查询。
+            4. 依赖注入生成器
+                FastAPI 依赖注入的标准写法，实现了三个核心保障：
+                    自动事务管理：业务代码只需关注 CRUD 操作，无需手动 commit/rollback/close
+                    异常安全：任何未捕获的异常都会触发回滚，不会产生脏数据
+                    连接泄漏防护：finally 块确保连接一定被归还到池中，即使发生未知错误
+                使用：
+                    @router.get("/{short_code}")
+                    async def redirect(short_code: str, db: AsyncSession = Depends(get_db)):
+                        # db 已经是一个可用的、带事务管理的异步会话
+                        result = await db.execute(select(UrlMapping).where(...))
+                        ...
+            整体架构意义
+                这段代码构成了整个应用的数据访问基础设施：
+                    异步非阻塞：配合 aiomysql，数据库 IO 不会阻塞事件循环，单进程即可支撑数百并发
+                    连接复用：连接池避免了 TCP 握手和 MySQL 认证的重复开销
+                    生产就绪：pre_ping + 自动回滚 + 连接泄漏防护，三重保险
+                    解耦设计：业务代码完全不感知连接池、事务管理等底层细节
+            注意事项：get_db 中的 commit 是“请求级别”的事务边界。
+                    如果一个路由需要多个独立事务（比如先写日志再写业务数据），不应依赖此处的自动 commit，而应在业务代码中手动控制事务。
+                    但对于短链接服务这种“一次请求一次写入”的场景，当前设计完全适用。
 
 
 
@@ -297,3 +342,8 @@ Q：短链接是如何实现跨平台适配的？
 
 
 
+
+
+
+
+‘
