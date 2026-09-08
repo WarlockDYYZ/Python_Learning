@@ -1371,4 +1371,103 @@ Q：短链接是如何实现跨平台适配的？
 
 4. 接口校验 + 限流
 
-今天做了个心理辅导，早睡早起
+    （一）参数校验深入
+        1. Pydantic 高级校验
+
+            app/models/schemas.py
+
+            要点简述：
+                - field_validator：校验单个字段，适合格式验证。
+                - model_validator：校验整个模型，适合跨字段业务规则。
+                - SSRF 防护：阻止内网地址注入，防止服务端被利用访问内部资源。
+
+            解析：
+                - validate_url
+                    基于 Pydantic V2 的短链接服务请求参数校验模型，主要用于在接收用户输入时做数据验证和安全防护。
+                    1. 数据导入部分
+                        - datetime：用于 expires_at 字段的类型声明，表示过期时间是一个日期时间对象。
+                        - Pydantic
+                            BaseModel：Pydantic 的核心基类，所有数据模型都继承它。继承后，模型会自动对传入的数据做类型校验和转换。
+                            Field：用于给字段添加元信息，如 description（描述）、default（默认值）、gt/le（数值约束）等。
+                                    这里用它给每个字段加了中文描述。
+                            field_validator：Pydantic V2 的单字段自定义校验装饰器（替代了 V1 的 @validator），
+                                    用于对某个字段编写自定义校验逻辑。
+                            model_validator：Pydantic V2 的模型级校验装饰器（替代了 V1 的 @root_validator），用于跨字段的联动校验，
+                                    比如比较两个字段之间的关系。
+                        - urlparse：Python 标准库函数，用于解析 URL 字符串，提取出协议（scheme）、主机名（hostname）、路径等组成部分。
+                        - ipaddress：Python 标准库，用于处理 IP 地址，这里用来判断一个地址是否是内网/私有地址，实现 SSRF 防护。
+
+                    2. validate_url 函数详解
+                        函数用 @field_validator("url") 装饰，意味着当 url 字段被赋值时，会自动调用此函数进行校验。
+                        @classmethod 表示这是一个类方法，cls 是类本身，v 是传入的 URL 字符串值。
+                        第一步：协议校验
+                            用 urlparse 解析 URL，然后检查协议头是否只允许 http 或 https。
+                            如果用户传入 ftp://、file://、javascript: 等协议，直接拒绝。
+                            这是防止协议走私攻击的基础安全措施。
+                        第二步：主机名校验
+                            确保 URL 中包含有效的主机名，像 http:///path 这种没有域名的畸形 URL 会被拦截。
+                        第三步：SSRF 防护（核心安全逻辑）
+                            SSRF（Server-Side Request Forgery，服务端请求伪造）防护的关键部分：
+                                - ipaddress.ip_address() 尝试将主机名解析为 IP 地址对象
+                                - 如果主机名本身就是一个 IP 地址（如 http://127.0.0.1、http://192.168.1.1），则进一步检查：
+                                    is_private：是否为私有地址（如 10.x.x.x、172.16.x.x、192.168.x.x）
+                                    is_loopback：是否为回环地址（127.0.0.1）
+                                    is_link_local：是否为链路本地地址（169.254.x.x）
+                                - 如果命中以上任何一种，抛出异常拒绝请求
+                                - except ValueError: pass 表示如果主机名不是 IP 格式（而是域名如 example.com），则跳过这一步
+                            已知缺陷：
+                                对于域名形式的 URL（如 http://internal-server.local），这里没有做 DNS 解析后再判断。
+                                攻击者可以注册一个域名指向内网 IP 来绕过此校验。
+                                生产环境中应该先做 DNS 解析，再对解析出的 IP 做同样的内网判断。
+                        整体数据流总结
+                            当客户端提交数据时，触发顺序如下：
+                                1. field_validator("url") → 校验 URL 格式 + SSRF 防护
+                                2. field_validator("custom_code") → 校验自定义短码格式
+                                3. model_validator(mode="after") → 校验过期时间是否晚于当前时间
+                            所有字段校验通过后，才会生成一个合法的 UrlCreate 实例供后续业务逻辑使用。如果任何一步校验失败，
+                            Pydantic 会抛出 ValidationError，包含详细的错误位置和提示信息。
+                - validate_custom_code
+                    自定义短码的格式校验，单字段格式校验
+                    1. 装饰器与签名
+                        - @field_validator("custom_code")：绑定到 custom_code 字段，当该字段被赋值时自动触发。
+                        - @classmethod：Pydantic V2 的 field_validator 要求必须是类方法。
+                        - 返回值类型 str | None：因为 custom_code 字段定义为可选（None 默认值），所以校验函数必须能处理并返回 None。
+                    2. 逐行逻辑解析
+                        代码	                            作用	            设计意图
+                        if v is None: return v	        空值直通	        custom_code 是可选字段，用户不传时值为 None，直接放行，
+                                                                        不做后续校验
+                        if not v.isalnum()	            字符白名单	    isalnum() 只允许 [a-zA-Z0-9]，拦截特殊字符（如 /、?、#、
+                                                                        空格等），防止短码注入 URL 路径导致路由混乱或 XSS
+                        if len(v) < 3 or len(v) > 20	长度约束	        下限 3 避免与系统保留短码冲突（如 api、css）；
+                                                                        上限 20 控制数据库索引长度和 URL 可读性
+                        return v	                    返回清洗后的值	    field_validator 的返回值会替换原始输入值，这里原样返回，
+                                                                        但也可以在此处做标准化（如统一转小写）
+                    3. ⚠️ 潜在改进点
+                        保留词过滤：没有检查短码是否与系统路由冲突（如 admin、login、static），生产环境应维护一个黑名单。
+                        正则替代方案：isalnum() 对 Unicode 字符（如中文、全角数字）也返回 True。
+                                如果严格要求 ASCII 字母数字，应改用正则 re.fullmatch(r'[a-zA-Z0-9]{3,20}', v)。
+
+                - validate_expires_at
+                    过期时间的业务逻辑校验，模型级联动校验
+
+
+            app/core/exceptions.py
+
+            解析：
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
