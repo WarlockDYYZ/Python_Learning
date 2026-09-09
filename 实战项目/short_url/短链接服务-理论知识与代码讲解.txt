@@ -992,6 +992,44 @@ Q：短链接是如何实现跨平台适配的？
             - maxsize 控制内存占用上限，防止内存溢出（OOM）。
             - 本地缓存适合热点数据，访问速度极快，但需注意多实例间的数据一致性。
 
+        解析：
+            基于内存的本地 TTL（Time-To-Live）缓存，用于缓存热点数据，减少重复计算或数据库查询。
+            1. 核心依赖
+                - TTLCache：来自 cachetools 库，是一个自带过期时间的字典。当 key 超过设定的 TTL 后，再次访问时会自动失效（懒删除）。
+                - Lock：Python 线程锁，保证多线程环境下对缓存的读写操作是线程安全的。
+
+            2. 类结构解析
+                初始化 __init__
+                    - maxsize=10000：最多缓存 10000 条数据，超过后会按 LRU（最近最少使用）策略淘汰旧数据，防止内存溢出（OOM）。
+                    - ttl=300：默认每条缓存 300 秒（5 分钟）后过期。
+                    - _lock：一把互斥锁，确保并发安全。
+                get 方法
+                    - 加锁后从缓存取值。如果 key 不存在或已过期，返回 None。
+                    - TTLCache 的过期是懒删除机制：不会主动清理，而是在访问时检查是否过期。
+                set 方法
+                    将 key-value 写入缓存。
+                    注意：这里虽然接收了 ttl 参数，但实际并没有使用它。
+                        因为 cachetools.TTLCache 不支持单个 key 设置不同的 TTL，所有 key 共用初始化时设定的全局 TTL。
+                        代码中的 if/else 分支逻辑完全一样，属于冗余代码。
+                delete 方法 和 clear 方法
+                    简单的功能和代码实现
+                全局单例
+                    创建一个全局共享的缓存实例，项目中任何模块都可以 from xxx import local_cache 直接使用。
+
+            优缺点：
+                优点	                            缺点
+                轻量、无外部依赖（不需要 Redis）	    仅单进程有效，多进程/多实例间缓存不共享
+                线程安全	                        不支持单 key 自定义 TTL
+                自动过期 + 容量上限，防 OOM	        进程重启后缓存丢失
+                适合读多写少的热点数据场景	        过期是懒删除，不精确
+
+            适用场景总结
+                这种本地 TTL 缓存适合：
+                    - 单机部署的服务
+                    - 高频读取、低频更新的热点数据（如配置信息、用户信息、字典数据）
+                    - 不想引入 Redis 等外部组件的轻量级场景
+                如果需要分布式缓存或多进程共享，建议换用 Redis。
+
     （三）缓存三大问题的实战解决
         1. 缓存穿透——布隆过滤器
             问题：攻击者用大量不存在的短码发起请求，每次都穿透缓存打到数据库。
@@ -1449,15 +1487,156 @@ Q：短链接是如何实现跨平台适配的？
 
                 - validate_expires_at
                     过期时间的业务逻辑校验，模型级联动校验
+                    1. 为什么用 model_validator 而不是 field_validator？
+                        这是理解这个函数的关键。
+                        虽然表面上只校验了 expires_at 一个字段，但它依赖了外部状态（当前系统时间），并且需要访问整个模型实例：
+                            - field_validator 只接收单个字段的值 v，无法访问 self，也无法感知其他字段的状态。
+                            - model_validator(mode="after") 在所有字段级校验通过之后执行，接收完整的模型实例 self，
+                                    适合做跨字段校验或依赖外部状态的校验。
+                    补充：
+                        mode="after" vs mode="before"：
+                            after 表示在 Pydantic 完成所有类型转换和字段校验之后再执行，此时 self.expires_at 已是合法 datetime 对象，
+                            可以直接比较。
+                            如果用 before，拿到的还是原始字符串，需要手动解析。
+                    2. 逐行逻辑解析
+                        - self.expires_at：先判空，因为该字段是可选的。如果用户没传过期时间，跳过校验（表示永不过期）。
+                        - datetime.utcnow()：获取当前 UTC 时间作为基准。
+                        - <=：使用"小于等于"而非"小于"，意味着恰好等于当前时刻也被拒绝，避免创建出"刚创建就过期"的无效链接。
+                        model_validator(mode="after") 必须返回模型实例本身（或修改后的实例），不能像 field_validator 只返回字段值。
+                        如果返回了其他类型，Pydantic 会报错。
 
+                    三个校验器的对比总结：
+                        特性	            validate_url	    validate_custom_code	validate_expires_at
+                        校验器类型	    field_validator	    field_validator	        model_validator(mode="after")
+                        输入	            单字段值 v	        单字段值 v	            完整模型实例 self
+                        返回值	        字段值 str	        字段值 str | None	    模型实例 self
+                        校验性质	        安全 + 格式	        格式 + 业务规则	        业务逻辑 + 外部状态
+                        执行顺序	        第 1 批（并行）	    第 1 批（并行）	        第 2 批（所有字段校验之后）
+                        可否访问其他字段	F	                F	                    T
+
+                    分层校验的设计确保了：格式问题在字段层快速失败，业务逻辑在模型层统一把关，既保证了安全性，又让错误信息精确定位到具体字段。
 
             app/core/exceptions.py
 
             解析：
+                实现了一套标准化的全局异常处理机制，是构建生产级 FastAPI 应用的核心基础设施。
+                它解决了 API 开发中一个关键痛点：确保所有错误响应格式统一、机器可读、对前端友好。
+
+                1. 整体架构设计思路
+                    业务代码抛出具体异常 → FastAPI 捕获 → 匹配全局处理器 → 返回统一 JSON 格式
+                    这套设计遵循了三个核心原则：
+                        1. 关注点分离：业务逻辑只负责"抛异常"，不关心"怎么返回给客户端"
+                        2. 契约一致性：无论什么错误，客户端收到的响应结构永远相同
+                        3. 可扩展性：新增错误类型只需继承基类，无需修改处理器
+
+                2. 异常类体系详解
+                    a. 基类 AppException：定义错误契约
+                        - 整个异常体系的根节点，定义了每个错误必须携带的三个元数据：
+                            字段	            用途	                        示例
+                            message	        展示给用户或开发者的自然语言描述	"短链接 'abc' 不存在"
+                            error_code	    前端用于条件判断的稳定字符串标识	"URL_NOT_FOUND"
+                            status_code	    HTTP 语义状态码	404
+                        - 为什么需要 error_code 而不能只用 status_code？
+                            同一个 HTTP 状态码可能对应多种业务错误。
+                            例如 400 可能是"参数缺失"、"格式错误"、"余额不足"等。
+                            前端用 error_code 做精确分支判断，用 message 做用户提示，用 status_code 做通用拦截（如 401 跳登录页）。
+                            三者各司其职。
+                    b. 具体异常子类：业务语义封装
+                        - 每个子类将错误细节内聚在构造函数中，调用方无需记忆 error_code 和 status_code：
+                            # 业务代码只需这样写：
+                            raise UrlNotFoundException("abc123")
+                            # 而不是这样写（容易出错且分散）：
+                            raise AppException("短链接不存在", "URL_NOT_FOUND", 404)
+                        - 三个预定义子类的职责划分：
+                            - UrlNotFoundException (404)：资源级错误，短码对应的记录不存在。
+                                    注意 short_code 被嵌入 message 中，方便调试定位。
+                            - RateLimitExceededException (429)：基础设施级错误，触发限流。
+                                    无参构造，因为限流不需要额外上下文。
+                            - ValidationException (422)：输入校验级错误。
+                                    与 Pydantic 的 422 保持一致，但将 Pydantic 复杂的嵌套错误结构简化为统一的扁平格式。
+                        子类构造函数中硬编码了 error_code 和 status_code，防止调用方传错。
+                        只有 message 是动态的，这保证了同一类错误的标识码永远一致。
+                    c. 全局异常处理器
+                        - 工作机制
+                            这个函数本身不会自动生效，需要在 FastAPI 应用中显式注册：
+                                app.add_exception_handler(AppException, app_exception_handler)
+                            注册后，FastAPI 的异常处理链变为：
+                                请求进入 → 路由处理函数执行
+                                    ↓ 抛出异常
+                                FastAPI 查找匹配的 exception_handler
+                                    ↓ 匹配到 AppException（含所有子类）
+                                调用 app_exception_handler
+                                    ↓
+                                返回统一 JSONResponse
+                        - 关键设计决策
+                            1. 参数类型是 AppException 而非具体子类：利用 Python 的继承机制，一个处理器覆盖所有自定义异常。
+                                    新增 PaymentRequiredException 等子类时无需修改此处。
+                            2. 接收 Request 参数：虽然当前未使用，但保留了扩展能力。
+                                    后续可基于 request 做日志记录、链路追踪 ID 注入、多语言 message 切换等。
+                            3. 返回 JSONResponse 而非 dict：显式控制响应的 Content-Type 和序列化行为，避免 FastAPI 默认的响应处理干扰。
+                        - 统一响应格式示例
+                            无论触发哪种异常，客户端收到的响应结构始终一致：
+                                // 404
+                                {"error_code": "URL_NOT_FOUND", "message": "短链接 'abc123' 不存在"}
+                                // 429
+                                {"error_code": "RATE_LIMIT_EXCEEDED", "message": "请求过于频繁，请稍后再试"}
+                                // 422
+                                {"error_code": "VALIDATION_ERROR", "message": "自定义短码长度需在 3-20 之间"}
+                            前端可以用一套通用的错误拦截器处理：
+                                axios.interceptors.response.use(null, (error) => {
+                                  const { error_code, message } = error.response.data;
+                                  if (error_code === 'RATE_LIMIT_EXCEEDED') showRateLimitToast();
+                                  else if (error_code === 'URL_NOT_FOUND') router.push('/404');
+                                  else showErrorBanner(message);
+                                });
+                    d. 与之前 Pydantic 校验代码的衔接
+                        与 UrlCreate 模型形成了完整的输入校验闭环：
+                            客户端提交数据
+                                ↓
+                            Pydantic validate_url / validate_custom_code / validate_expires_at
+                                ↓ 校验失败
+                            FastAPI 默认抛出 RequestValidationError (422)
+                                ↓ 可选：捕获并转换为 ValidationException
+                            app_exception_handler 统一格式化输出
+                        建议：FastAPI 默认的 Pydantic 校验错误格式是嵌套的 detail 数组，结构与代码中统一格式不一致。
+                            建议额外注册一个 RequestValidationError 处理器，将其转换为 ValidationException 格式：
+
+                3. 解决的问题
+                    没有这套机制时	                    有了这套机制后
+                    每个接口自己拼错误响应，格式五花八门	全局统一，一处定义处处生效
+                    前端要为每种错误格式写适配逻辑	    一套拦截器搞定所有错误
+                    新增错误类型要改多处代码	        继承基类 + 注册即可
+                    错误信息散落在业务代码中	        错误语义内聚在异常类中
+                    HTTP 状态码与业务错误码混用	        三层元数据各司其职
 
 
+    （二）限流——算法原理与实现
+
+        1. 四种限流算法对
+            算法  	原理	                        优点	                缺点	            适用场景
+            固定窗口	固定时间窗口内计数	            实现简单	            临界点突发流量问题	精度要求不高的场景
+            滑动窗口	将窗口细分为多个小格	        平滑流量，无临界问题	内存开销稍大	    通用限流
+            令牌桶	固定速率生成令牌，有令牌才处理	允许一定突发流量	    实现稍复杂	    需要允许突发的 API
+            漏桶	    请求以恒定速率流出	            流量绝对平滑	        无法处理突发      严格匀速场景
+
+        2. 滑动窗口限流实现（基于 Redis Lua 脚本）
+
+            app/middleware/rate_limit.py
+
+            要点简述：
+                - 为什么用 Lua 脚本：保证 Redis 操作的原子性，避免并发竞态。
+                - 为什么用 ZSET：score 存时间戳，ZREMRANGEBYSCORE 高效清除过期记录。
+                - 限流的粒度：可按 IP、用户 ID、API Key 等维度灵活控制。
+
+            解析：
 
 
+        3. 限流与降级的关系
+            - 限流：保护系统——当请求量超过系统承载能力时，拒绝多余的请求。
+            - 降级：保护核心——当系统压力大时，关闭非核心功能，保核心链路。
+
+
+5、日志 + 错误上报
 
 
 
