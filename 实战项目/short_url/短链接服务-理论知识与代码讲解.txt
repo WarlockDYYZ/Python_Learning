@@ -1629,7 +1629,97 @@ Q：短链接是如何实现跨平台适配的？
                 - 限流的粒度：可按 IP、用户 ID、API Key 等维度灵活控制。
 
             解析：
+                1. 依赖声明层
+                    a. import time
+                        用途：提供 time.time() 函数，用于获取当前 Unix 时间戳（毫秒级）。
+                        设计意图：在 Python 应用层生成时间戳并传入 Lua 脚本，而非在 Redis 内部调用 redis.time()。
+                                为了避免 Redis Cluster 环境下的时钟不一致问题——集群各节点时间可能微秒级偏移，若由 Redis 生成时间戳，
+                                同一请求在不同节点执行 Lua 时可能得到不同的 now，导致窗口边界抖动。
+                                应用层单点生成时间戳可保证全局一致性。
+                    b. from fastapi import Request, Response
+                        - Request：ASGI 请求对象封装。
+                                中间件通过它提取 client.host（客户端 IP）作为限流键的维度标识，也可扩展读取 Header、Path、User
+                                等信息实现多维限流。
+                        - Response：ASGI 响应对象封装。
+                                call_next(request) 返回的就是 Response 实例，中间件需要在其上注入 X-RateLimit-*
+                                响应头后再返回给客户端。
+                        注意：虽然 FastAPI 基于 Starlette，但这里直接从 fastapi 导入而非 starlette.datastructures，
+                            是为了保持与框架生态的一致性，且 FastAPI 的 Request/Response 是对 Starlette 的同名类的直接重导出，
+                            功能完全等价。
+                    c. from starlette.middleware.base import BaseHTTPMiddleware
+                        用途：Starlette 提供的 HTTP 中间件基类，封装了 ASGI 协议细节，开发者只需重写 dispatch(request, call_next)
+                                即可拦截请求/响应。
+                        为什么从 Starlette 而非 FastAPI 导入：FastAPI 本身没有自己的中间件基类，它完全复用 Starlette 的中间件体系。
+                                这是 FastAPI "薄封装" 设计哲学的体现——路由、依赖注入等是 FastAPI 独有的，而中间件、异常处理等底层机制直接委托给 Starlette。
+                        注意：BaseHTTPMiddleware 存在已知性能问题（每个请求会创建额外的 Task，且不支持流式响应体）。
+                            高并发场景建议改用纯 ASGI 中间件或 Starlette 官方推荐的 @app.middleware("http") 装饰器写法，
+                            但对于限流这种轻量校验逻辑，当前写法在绝大多数业务场景中完全可用。
+                    d. from app.core.redis import redis_client
+                        用途：导入项目内封装的异步 Redis 客户端实例（通常是 redis.asyncio.Redis 或 aioredis）。
+                        设计意图：将 Redis 连接池的创建、配置、健康检查等逻辑收敛到 app/core/redis.py 单一模块中，中间件只消费实例而不关心连接细节。这保证了：
+                            - 全应用共享同一个连接池，避免重复建连
+                            - 切换 Redis 地址/密码/序列化方式时只需改一处
+                            - 单元测试时可轻松 Mock 该模块
+                    e. from app.core.exceptions import RateLimitExceededException
+                        用途：导入自定义的限流超限异常类。
+                        设计意图：中间件检测到超限时只负责抛出异常，不负责构造 JSON 响应。
+                                响应的格式（状态码 429、错误码、多语言消息等）由全局异常处理器统一处理。这种关注点分离使得：
+                            - 中间件逻辑纯粹，不耦合响应格式
+                            - 所有异常（限流、鉴权失败、参数校验等）的输出风格一致
+                            - 修改 429 响应体时无需触碰中间件代码
+                    总结：
+                        导入来源	                        职责域	        对应架构层
+                        time	                        时间基准	        基础设施层
+                        fastapi.Request/Response	    HTTP 协议抽象	接口层
+                        starlette.BaseHTTPMiddleware	请求拦截框架	    框架层
+                        app.core.redis	                数据存储客户端	    基础设施层
+                        app.core.exceptions	            业务异常定义	    领域层
 
+                2. Lua 脚本
+                    Redis 实现滑动窗口限流（Sliding Window Rate Limiting）的经典原子化方案。
+                    它利用 Redis 的有序集合（Sorted Set）和 Lua 脚本的单线程特性，完美解决了分布式环境下"检查-执行"操作的竞态条件问题。
+                    - 为什么选择 Sorted Set？
+                        滑动窗口的核心需求是：统计过去 N 毫秒内的请求数量，并自动淘汰过期请求。
+                            数据结构	        能否实现
+                            String + INCR	只能做固定窗口，无法精确滑动
+                            List	        删除过期元素需遍历，O(N) 复杂度
+                            Hash	        无法按时间范围高效查询和删除
+                            Sorted Set	    score=时间戳，ZREMRANGEBYSCORE O(logN+M)，ZCARD O(1)，天然适配
+                        Sorted Set 的 score 存时间戳，member 存唯一标识，使得"按时间范围清理"和"计数"都是原生高效操作。
+                    - 脚本逐行解析
+                        a. 参数接收
+                            now 由客户端传入而非在 Lua 内用 redis.call('TIME') 获取。原因有二：
+                                - TIME 命令在集群模式下可能因节点时钟不一致导致窗口漂移
+                                - 避免额外一次 Redis 调用，且便于测试时注入固定时间
+                        b. 清理过期记录（"滑"）
+                            这是滑动窗口的核心操作：
+                                语义：删除所有 score ≤ (now - window) 的成员
+                                效果：只保留 (now - window, now] 这个时间窗口内的请求
+                                复杂度：O(log(N) + M)，N 是集合大小，M 是被删除的元素数量
+                                边界：左闭右闭 [0, now-window]，即恰好等于窗口边界的记录也会被清除，保证窗口严格为 window 毫秒
+                        c. 计数与决策
+                            ZCARD 返回当前窗口内的请求数，O(1) 复杂度
+                            先清后数：确保 count 反映的是清理后的真实窗口内数量
+                            使用 < 而非 <=：因为接下来还要插入当前请求，插入后总数应为 count + 1 ≤ limit
+                        d. 未超限：记录请求并设置过期
+                            -ZADD 的 member 设计：now .. '-' .. math.random()
+                                - 为什么不能只用 now 作为 member？ Sorted Set 中相同 member 会去重。同一毫秒内多个请求会被合并为一个，
+                                        导致计数偏少、限流失效
+                                - 拼接随机数：保证每个请求的 member 唯一。
+                                        也可以用自增序列号或 UUID，但 math.random() 在 Lua 中零额外开销
+                                - score 仍用 now：排序和范围查询只依赖 score，member 的唯一性不影响窗口逻辑
+                            PEXPIRE 的作用：
+                                - 设置键的 TTL = window 毫秒
+                                - 兜底清理：即使 ZREMRANGEBYSCORE 因极端情况未完全清理，TTL 也能保证键最终被回收，防止内存泄漏
+                                - 每次请求都刷新 TTL，活跃键永不过期，只有停止请求后才会自动删除
+                            返回值 {1, limit - count - 1}：
+                                - 1：表示放行
+                                - limit - count - 1：剩余可用配额（插入当前请求后）。前端可用于展示"还剩 N 次"
+                        e. 已超限：拒绝请求
+                            - 0：表示拒绝
+                            - 0：剩余配额为 0
+                            注意：超限时不执行 ZADD，不会污染窗口数据；也不刷新 PEXPIRE，让不活跃的限流键自然过期
+                    - 原子性保障原理
 
         3. 限流与降级的关系
             - 限流：保护系统——当请求量超过系统承载能力时，拒绝多余的请求。
