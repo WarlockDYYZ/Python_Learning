@@ -1720,7 +1720,114 @@ Q：短链接是如何实现跨平台适配的？
                             - 0：剩余配额为 0
                             注意：超限时不执行 ZADD，不会污染窗口数据；也不刷新 PEXPIRE，让不活跃的限流键自然过期
                     - 原子性保障原理
+                        在 Python/Java 等应用层实现等价逻辑需要 4 步：
+                            ZREMRANGEBYSCORE → ZCARD → ZADD → PEXPIRE
+                        在非原子场景下，两个并发请求可能同时读到相同的 count，都判断未超限，都执行 ZADD，导致实际请求数超过 limit。
+                        Lua 脚本在 Redis 中的执行模型：
+                            - Redis 将 Lua 脚本作为一个不可分割的整体执行
+                            - 执行期间不会插入任何其他命令（包括其他客户端的请求）
+                            - 底层通过 EVAL / EVALSHA 命令触发，Redis 单线程模型天然保证串行化
+                            - 整个脚本的执行时间通常在 微秒级，不会阻塞其他请求
+                        这意味着"清理→计数→判断→写入→设过期"五步操作对外表现为一个原子事务，彻底消除竞态条件。
+                    - 生产环境注意事项
+                        风险点	            说明	                            应对策略
+                        math.random() 碰撞	Lua 的 math.random() 默认种子固定	在脚本开头加 math.randomseed(now) 或在应用层
+                                            ，重启后序列相同                   生成唯一 ID 传入
+                        大窗口内存膨胀	        window=1h, QPS=10k →    	    合理设置窗口大小；考虑分层限流（秒级+分钟级）
+                                            集合含 3600 万元素
+                        时钟回拨	            服务器 NTP 同步导致 now 变小，旧请	应用层校验 now 单调递增；或使用 Redis TIME（牺
+                                            求未被清理                        牲集群兼容性）
+                        脚本超时	            集合过大时 ZREMRANGEBYSCORE 耗时	监控脚本执行时间；设置 lua-time-limit；超大流量
+                                            过长                             改用令牌桶
+                        集群模式 KEYS 限制	多 KEYS 操作要求所有 key 在同一   	此脚本仅用 1 个 KEY，天然兼容集群
+                                            slot
+                        返回值类型	        Redis Lua 返回 table 在 Python	解包时注意索引：result[0], result[1]
+                                            中是 list，不是 tuple
+                    - 与其他限流算法对比
+                        算法	            精度	        内存	        突发容忍	适用场景
+                        固定窗口	        低（临界突刺）	O(1)	    差	    简单计数
+                        滑动窗口（本方案）	高	        O(limit)	好	    API 限流、防刷
+                        令牌桶	        高	        O(1)	    可控	    流量整形、平滑输出
+                        漏桶	            高	        O(1)	    无	    严格匀速处理
 
+                补充：
+                    - Sorted Set 集合
+                        脚本中没有直接出现 "Sorted Set" 这个单词，但它调用的三个核心 Redis 命令都是 Sorted Set 的专属命令：
+                            - ZREMRANGEBYSCORE：按分数（score）范围删除成员。这是滑动窗口“淘汰过期请求”的核心操作，
+                                    只有 Sorted Set 支持按 score 区间高效删除。
+                            - ZCARD：获取 Sorted Set 的成员总数。用于统计当前窗口内的请求数量，时间复杂度 O(1)。
+                            - ZADD：向 Sorted Set 中添加成员并设置分数。这里将 now（时间戳）作为 score，将 now-random 作为 member，
+                                    利用 Sorted Set 按 score 排序的特性实现时间窗口。
+                        这三个命令以 Z 开头，是 Redis 中 Sorted Set 操作的命名约定（类似 String 用 GET/SET，Hash 用 HGET/HSET）。
+                        整个限流算法正是依赖 Sorted Set “score 存时间戳 + 按 score 范围查询/删除” 这一特性来实现精确的滑动窗口语义的。
+
+                2. 滑动窗口限流算法在 FastAPI 中的工程化落地层
+                    将 Lua 脚本封装为 HTTP 中间件，实现了“请求拦截 → Redis 原子校验 → 异常拒绝/放行并注入响应头”的完整闭环。
+                    a. __init__：限流策略配置初始化
+                         - 继承与注册机制
+                            BaseHTTPMiddleware：Starlette/FastAPI 提供的中间件基类。
+                                    继承它意味着该类会被插入到 ASGI 应用的请求处理链中。
+                            super().__init__(app)：必须调用。
+                                    将下一层应用（可能是路由、其他中间件或最终的业务处理器）保存为 self.app，后续通过 call_next 触发。
+                                    如果遗漏此调用，请求链会断裂，所有请求返回 500。
+                        - 参数设计语义
+                            参数  	默认值	单位	    设计意图
+                            limit	100	    次	    单个窗口内允许的最大请求数
+                            window	60	    秒	    滑动窗口的时间跨度
+                            单位转换陷阱：window 对外暴露为秒（人类可读），但 Lua 脚本内部使用毫秒（高精度）。
+                                这个转换在 dispatch 中完成，避免了调用方手动换算出错。
+                                生产环境中建议在注释或类型别名中明确标注单位，例如 WindowSeconds = int。
+                                生产环境中建议在注释或类型别名中明确标注单位，例如 WindowSeconds = int。
+                        - 可扩展性预留
+                            当前 limit 和 window 是全局固定的。生产环境通常需要按路由/用户分级限流，可改造为：
+                                # 支持按路径动态配置
+                                rate_limits = {"/api/create": (10, 60), "/api/query": (100, 60)}
+                    b. dispatch：请求级限流执行引擎
+                        中间件的核心入口，每个 HTTP 请求都会经过此函数。
+                        - 限流键生成
+                            - request.client.host：获取客户端 IP。
+                                注意：如果服务部署在 Nginx/CDN 之后，这里拿到的是反向代理的 IP，需改用 X-Forwarded-For
+                                    或 X-Real-IP 头，并配合可信代理白名单校验，否则所有用户共享同一个限流桶。
+                            - Key 命名规范：rate_limit:{维度}:{标识}。
+                                当前按 IP 限流，也可扩展为 rate_limit:user:{uid} 或 rate_limit:ip:path:{ip}:{path}
+                                    实现多维度组合限流。
+                        - Lua 脚本调用
+                            参数位置	    传入值	            对应 Lua 变量	说明
+                            ARGV[1]	    self.limit	        limit	        窗口上限
+                            ARGV[2]	    self.window * 1000	window	        秒→毫秒转换在此处完成
+                            ARGV[3]	    now	                now	            应用层时间戳，避免 Redis TIME 集群问题
+                            numkeys	    1	                KEYS 数量	    告诉 Redis 第一个参数是 key，其余是 argv
+                        建议：eval 每次传输完整 Lua 源码。应改为启动时 script_load 获取 SHA，运行时用 evalsha 调用，减少网络带宽消耗。
+                        - 结果解析与决策
+                            类型转换：Redis Lua 返回的 table 在 Python async-redis 中通常是 list[bytes] 或 list[int]，
+                                    显式 int() 转换确保安全。
+                            异常驱动：超限时直接抛出之前定义的 RateLimitExceededException，由全局异常处理器统一返回 429 + 标准 JSON。
+                                    不在中间件中手动构造 JSONResponse，保持错误处理的一致性。
+                            remaining 的价值：即使请求被允许，剩余配额也被保留，用于下一步注入响应头。
+                        - 4. 响应头注入（RFC 合规）
+                            限流中间件的可观测性出口，遵循 IETF RateLimit Headers 草案规范：
+                                响应头	                含义      	客户端用途
+                                X-RateLimit-Limit	    窗口内总配额	展示进度条分母
+                                X-RateLimit-Remaining	当前剩余配额	展示进度条分子；为 0 时前端主动禁用按钮
+                            响应头是在 call_next 之后注入的。这意味着：
+                                只有被放行的请求才会携带限流头，被拒绝的请求走异常处理器，不经过此处
+                                如果业务处理器修改了 response 对象，限流头仍然能被正确追加
+                                可选补充 X-RateLimit-Reset 头（窗口重置的 Unix 时间戳），帮助客户端精确计算重试等待时间
+                    c. 三层架构联动总结
+                        Layer 3: RateLimitMiddleware (本段代码)
+                            - 提取 IP → 生成 Key
+                            - 调用 Lua → 解析结果
+                            - 超限抛异常 / 放行注响应头
+                        Layer 2: SLIDING_WINDOW_LUA
+                            - ZREMRANGEBYSCORE 清理过期
+                            - ZCARD 计数 → ZADD 记录
+                            - 原子返回 [allowed, remaining]
+                        Layer 1: AppException + Handler
+                            - RateLimitExceededException → 429
+                            - 统一 JSON: {error_code, message}
+                    这种分层设计使得每一层职责单一：
+                        Lua 只管原子计数，中间件只管 HTTP 集成，异常处理器只管格式统一。
+                        任何一层的修改都不会波及其他层，是典型的高内聚低耦合实践。
 
         3. 限流与降级的关系
             - 限流：保护系统——当请求量超过系统承载能力时，拒绝多余的请求。
@@ -1728,7 +1835,26 @@ Q：短链接是如何实现跨平台适配的？
 
 
 5、日志 + 错误上报
+    （一）结构化日志体系
+        1. logging 模块深入配置
 
+            app/core/logger.py
+
+            要点简述：
+                - Logger/Handler/Formatter 三层架构：Logger 决定日志级别，Handler 决定输出目标，Formatter 决定输出格式。
+                - RotatingFileHandler：日志文件轮转，防止单文件过大。
+                - ContextVar：Python 3.7+ 异步安全上下文变量，确保协程间 request_id 隔离。
+
+            解析：
+                1. 标准库导入
+                    导入	                职责
+                    logging	            Python 标准日志框架，提供 Logger、Handler、Formatter 等核心类
+                    json	            将日志记录序列化为 JSON 字符串，便于 ELK/Loki 等日志系统解析
+                    ContextVar	        Python 3.7+ 提供的协程安全的上下文变量，用于在异步请求链路中传递 request_id
+                    RotatingFileHandler	日志文件轮转处理器，按文件大小自动切割，防止单文件无限膨胀
+                    datetime	        生成 UTC 时间戳，保证日志时间全局一致（不受本地时区影响）
+
+                2.
 
 
 
