@@ -2085,3 +2085,64 @@ Q：短链接是如何实现跨平台适配的？
             要点简述：
                 - P99 比平均值更重要：平均值会被大量快速请求拉低，掩盖少数用户遭遇的慢请求。P99 反映的是“最差体验”，是用户体验的底线。
                 - 压测结论示例：优化前 P99 = 850ms，加入 Redis 缓存后 P99 = 45ms，提升 18 倍。这种量化对比是面试和汇报中最有力的证据。
+
+            解析：
+
+
+        3. 运行压测命令
+            - Web UI 模式（适合观察实时图表）：
+                locust -f locustfile.py --host http://localhost:8000
+            - 无头模式（适合 CI/CD 或自动化回归）：
+                locust -f locustfile.py --host http://localhost:8000 --headless -u 500 -r 50 -t 60s
+                参数说明：-u 500 模拟 500 并发用户，-r 50 每秒新增 50 用户，-t 60s 持续 60 秒。
+
+        4. 关键指标解读
+            指标	        含义	                    健康范围
+            QPS（RPS）	每秒处理请求数	            越高越好，取决于业务预期
+            P50         延迟	50% 请求的响应时间	    < 50ms
+            P95         延迟	95% 请求的响应时间	    < 200ms
+            P99         延迟	99% 请求的响应时间	    < 500ms
+            错误率	    失败请求占比	            < 0.1%
+
+
+    （二）性能瓶颈定位工具
+        1. cProfile 函数级耗时分析
+
+            a_cprofile.py
+
+            解析：
+
+
+        2. py-spy 生产环境无侵入采样（不需要改代码）
+            pip install py-spy
+            py-spy top --pid <python进程PID>       # 实时查看函数耗时
+            py-spy record -o profile.svg --pid <PID>  # 生成火焰图
+
+            无需修改代码、无需重启服务，直接对运行中的 Python 进程采样，适合生产环境排查。
+
+
+    （三）Docker 容器化部署
+        1. Dockerfile（多阶段构建）
+
+            dockerfile
+
+            要点简述：
+                - 多阶段构建：构建阶段安装依赖，运行阶段只复制安装好的包，最终镜像不包含 pip、gcc 等构建工具，体积更小、攻击面更少。
+                - 非 root 用户：容器内以 root 运行时，一旦容器被攻破，攻击者拥有宿主机 root 权限。用普通用户运行是基本安全实践。
+                - Gunicorn worker 数量：一般设为 2 * CPU核心数 + 1。4 核机器设 4~9 个 worker。
+                - HEALTHCHECK：Docker 会定期执行这个命令，如果失败会标记容器为 unhealthy，配合编排工具可以自动重启。
+
+
+        2. Docker Compose 编排
+
+
+
+
+
+
+
+
+
+
+
+
