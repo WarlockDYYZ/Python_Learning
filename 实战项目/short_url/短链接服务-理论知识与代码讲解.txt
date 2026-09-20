@@ -2087,7 +2087,51 @@ Q：短链接是如何实现跨平台适配的？
                 - 压测结论示例：优化前 P99 = 850ms，加入 Redis 缓存后 P99 = 45ms，提升 18 倍。这种量化对比是面试和汇报中最有力的证据。
 
             解析：
+                基于 Locust 的 HTTP 压测脚本，用于对短链接服务进行负载测试。
+                1. 导入依赖
+                    - HttpUser：Locust 提供的 HTTP 客户端用户基类，封装了请求发送能力。
+                    - task：装饰器，标记某个方法为压测任务。
+                    - between：设置虚拟用户每次请求之间的等待时间（随机区间）。
+                    - events：Locust 事件系统，可用于注册自定义事件（此处导入但未使用）。
+                    - random / string：Python 标准库，用于生成随机路径和随机选择短码。
 
+                2. 用户类定义
+                    定义了一个名为 ShortUrlUser 的虚拟用户模型，继承自 HttpUser。
+                    - wait_time = between(0.1, 0.5)：每个虚拟用户在两次请求之间随机等待 0.1~0.5 秒，模拟真实用户的思考间隔，
+                            避免请求过于密集导致测试失真。
+
+                3. on_start 方法
+                    - on_start 是 Locust 的钩子方法，每个虚拟用户启动时自动执行一次。
+                    这里初始化了一个空列表 created_codes，用于存储该虚拟用户创建的短链接 code，供后续重定向任务使用。
+
+                4. 任务一：redirect（模拟访问短链接）
+                    - @task(3)：标记为压测任务，权重为 3。意味着在压测过程中，这个任务被执行的概率是 create_short_url 的 3 倍
+                            （总权重 = 3+1 = 4，redirect 占 75%）。这反映了短链接服务读多写少的典型场景。
+                    - if self.created_codes:：确保已有创建的短码才发起访问请求，避免空列表报错。
+                    - random.choice(self.created_codes)：随机选择一个已创建的短码，模拟用户访问不同的短链接。
+                    - self.client.get(f"/{code}", catch_response=True)：发送 GET 请求到 /{code} 路径，
+                            catch_response=True 表示手动控制成功/失败判定（而非自动根据状态码判断）。
+                    断言逻辑：期望服务器返回 302 重定向状态码（短链接的标准行为），返回 302 则标记为成功，否则标记为失败并记录原因。
+
+                5. 任务二：create_short_url（模拟创建短链接）
+                    - @task(1)：权重为 1，执行频率较低，符合写操作较少的场景特征。
+                    - random.choices(string.ascii_lowercase, k=20)：生成一个 20 位的小写字母随机字符串，模拟不同的目标 URL 路径。
+                    - self.client.post("/shorten", json={"url": url}, ...)：发送 POST 请求到 /shorten 接口，
+                            请求体为 JSON {"url": "https://example.com/xxx"}。
+                    断言逻辑：期望服务器返回 201 Created 状态码。成功后从响应 JSON 中提取 short_code 字段，
+                            追加到 self.created_codes 列表中，供 redirect 任务使用；否则标记为失败。
+
+                整体执行流程总结：
+                    虚拟用户启动：
+                        ├─ on_start() → 初始化 created_codes = []
+                        ├─ [75%概率] redirect() → 随机选一个已创建的code → GET /{code} → 验证302
+                        └─ [25%概率] create_short_url() → 生成随机URL → POST /shorten → 验证201 → 保存short_code
+
+                    核心设计要点：
+                        读写比例 3:1：模拟真实场景中短链接被访问的次数远大于创建的次数
+                        状态码断言：不依赖 Locust 默认判断，手动校验 302/201，压测结果更准确
+                        数据耦合：创建任务返回的 short_code 被存储并供重定向任务使用，保证了测试数据的可用性
+                        随机等待：between(0.1, 0.5) 避免所有虚拟用户同时发送请求，更接近真实流量
 
         3. 运行压测命令
             - Web UI 模式（适合观察实时图表）：
@@ -2111,7 +2155,64 @@ Q：短链接是如何实现跨平台适配的？
             a_cprofile.py
 
             解析：
+                使用 Python 内置库 cProfile 和 pstats 编写的代码级性能分析（Profiling）脚本。
+                主要目的是精确到“函数级别”，找出短链接服务中最耗时的代码（性能瓶颈/热点）。
+                1. 导入依赖
+                    - cProfile：Python 内置的 C 扩展性能分析器。它能在底层拦截函数调用，记录每个函数的执行次数和耗时，
+                            且对程序性能的影响相对较小。
+                    - pstats：用于格式化和分析 cProfile 收集到的原始数据，提供排序、过滤等统计功能。
+                    - StringIO：在内存中创建一个类似文件的字符串缓冲区。这里用于捕获 pstats 的打印输出，而不是直接输出到控制台
+                            （方便后续将结果写入日志文件或进行二次处理）。
 
+                2. 定义基准测试函数
+                    - 这个函数封装了需要被分析的核心业务逻辑：一次创建 + 一次重定向。
+                    - 延迟导入（在函数内部 from app.main import ...）：这是一种常见的 Profiling 技巧。如果把导入写在文件顶部，
+                            cProfile 会把模块加载和初始化的时间也算进去，从而干扰对核心业务逻辑的分析。
+                    注：这里 redirect_short_url 写死了 "abc123"，在实际运行中如果数据库里没有这个 code 可能会报错或走不到核心逻辑。
+                        严谨的做法是接收 create_short_url 的返回值作为入参。
+
+                3. 核心性能分析逻辑
+                    - 实例化一个 Profile 对象，并调用 enable() 开启性能监控。
+                            从这一刻起，Python 解释器会记录所有函数的调用和耗时。
+                    - 循环 100 次：单次请求的耗时可能在毫秒甚至微秒级，统计误差较大。
+                            循环执行 100 次可以放大耗时差异，让真正的性能瓶颈（热点函数）在统计数据中凸显出来，同时平滑掉偶发的系统抖动。
+                    - 调用 disable() 停止性能监控。确保后续的数据处理代码不会被统计进去。
+
+                4. 结果格式化与输出
+                    - stream = StringIO()：创建一个内存字符串流，用来接收 pstats 的输出。
+                    - pstats.Stats(...)：将 profiler 收集到的原始数据交给 pstats 进行统计处理，并指定输出目标为 stream。
+                    - stats.sort_stats("cumulative")：核心排序规则。按累计耗时（cumulative） 降序排列。
+                            这是定位瓶颈最常用的排序方式，因为它能找出“自身耗时 + 调用子函数耗时”总和最高的函数（即整个调用链路上的最大瓶颈）。
+                    - stats.print_stats(20)：只打印排名前 20 的函数，过滤掉大量无关紧要的底层函数，聚焦核心问题。
+                    - print(stream.getvalue())：将内存中格式化好的统计报表打印到控制台。
+
+                5. 输出的报表
+                    运行代码后，会看到类似的表格输出：
+                           ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+                              100    0.500    0.005    2.500    0.025 app/main.py:10(create_short_url)
+                              100    1.200    0.012    1.800    0.018 db/redis.py:45(set_ex)
+                              100    0.600    0.006    0.600    0.006 {built-in method time.sleep}
+                              100    0.100    0.001    0.200    0.002 utils/hash.py:12(generate_code)
+                        ...
+                    关键列名词解释：
+                        列名	        含义	                排查瓶颈时的指导意义
+                        ncalls	    函数被调用的总次数   	如果次数远超预期（如循环 100 次，某函数却调用了 10000 次），
+                                                        说明存在隐蔽的循环或递归。
+                        tottime	    函数自身执行的耗时（   	如果 tottime 很高，说明这个函数本身的代码逻辑太重（如复杂的计算、大循环），
+                                    不包含它内部调用需要
+                                    优化该函数内部的代码
+                                    的其他子函数的耗时）
+                        cumtime	    累计耗时（函数自身耗   	如果 cumtime 很高但 tottime 很低，说明瓶颈在它调用的子函数里，
+                                    时 + 它调用的所有子   	需要顺着调用链往下看。
+                                    函数的耗时）
+                        filename:lineno(function)	函数所在的文件、行号和函数名。	直接告诉你去哪里改代码。
+
+                注意事项：
+                    适用场景：这段脚本非常适合分析 CPU 密集型（如复杂的哈希计算、加解密、序列化）或同步 I/O 的代码瓶颈。
+                    异步代码的局限：如果你的短链接服务是基于 asyncio（如 FastAPI、Sanic）的异步框架，cProfile 无法准确测量
+                            await 挂起时的真实耗时，此时应改用 pyinstrument 或 austin 等支持异步的 Profiler。
+                    性能开销：cProfile 本身会带来一定的性能损耗（通常会慢 2~5 倍），因此它只能用于线下压测和瓶颈分析，
+                            绝对不能在生产环境的真实流量上开启。
 
         2. py-spy 生产环境无侵入采样（不需要改代码）
             pip install py-spy
@@ -2132,6 +2233,47 @@ Q：短链接是如何实现跨平台适配的？
                 - Gunicorn worker 数量：一般设为 2 * CPU核心数 + 1。4 核机器设 4~9 个 worker。
                 - HEALTHCHECK：Docker 会定期执行这个命令，如果失败会标记容器为 unhealthy，配合编排工具可以自动重启。
 
+            解析：
+                Python Web 应用（FastAPI/Starlette）Dockerfile。
+                采用了多阶段构建（Multi-stage Build）、非 Root 用户运行以及 Gunicorn + Uvicorn Worker 等关键设计。
+                1. 构建阶段 (Builder Stage) - FROM to RUN
+                    AS builder：定义了一个名为 builder 的临时构建阶段。这个阶段的唯一目的是安装依赖，最终不会被打包进生产镜像。
+                    python:3.11-slim：使用精简版基础镜像，去除了编译工具、文档等无关组件，大幅减小镜像体积。
+                    --no-cache-dir：禁止 pip 缓存下载的包，避免将无用的缓存文件带入镜像。
+                    --prefix=/install：核心技巧。将依赖安装到自定义目录 /install 而不是默认的 /usr/local。
+                            这样在后续阶段可以精准地只复制依赖文件，而不会把构建阶段产生的其他临时文件污染到运行镜像中。
+                    分层优化：先 COPY requirements.txt 再 RUN pip install。只要 requirements.txt 不变，
+                            Docker 就会利用缓存跳过耗时的依赖安装步骤，极大加速 CI/CD 构建速度。
+
+                2. 运行阶段 (Runtime Stage) - FROM to USER
+                    全新基础镜像：再次使用 slim 镜像作为运行时环境，确保最终镜像不包含任何构建工具（如 gcc、make），既减小体积又减少攻击面。
+                    创建非 Root 用户：groupadd -r 和 useradd -r 创建了系统级用户 appuser。这是容器安全的核心原则，
+                            防止容器被攻破后攻击者获得宿主机的 root 权限。
+                    COPY --from=builder：跨阶段复制。仅将构建阶段安装在 /install 下的纯净依赖复制到运行时的 /usr/local，
+                            实现了构建环境与运行环境的彻底隔离。
+                    USER appuser：切换执行身份。此后容器内的所有进程（包括 CMD）都将以低权限的 appuser 身份运行
+
+                3. 健康检查与端口暴露 - HEALTHCHECK to EXPOSE
+                    HEALTHCHECK：让 Docker（或 K8s）能够自动检测容器是否存活。
+                        --interval=30s：每 30 秒检查一次。
+                        --timeout=5s：单次检查超时时间为 5 秒。
+                        --retries=3：连续失败 3 次才标记为 unhealthy。
+                        检查逻辑：使用 Python 标准库发起 HTTP 请求访问 /docs 端点。
+                                选择 /docs 是因为它是 FastAPI 自动生成的文档页，通常轻量且能验证整个应用栈（路由、模板引擎等）是否正常。
+                                使用标准库而非 curl 避免了在 slim 镜像中额外安装 curl。
+                    EXPOSE 8000：声明容器监听 8000 端口（仅作文档说明，实际映射需在 docker run 时指定）。
+
+                4. 启动命令 (CMD) - CMD
+                    FastAPI/ASGI 应用的生产级标准启动方式：
+                        参数	作用	为什么需要
+                        gunicorn	进程管理器	Uvicorn 单进程无法利用多核 CPU，Gunicorn 负责管理多个 worker 进程、优雅重启、信号处理等生产级需求
+                        app.main:app	ASGI 应用入口	指向 app/main.py 文件中名为 app 的 FastAPI 实例
+                        --worker-class uvicorn.workers.UvicornWorker	Worker 类型	告诉 Gunicorn 使用 Uvicorn 作为 ASGI worker，而非默认的 WSGI worker
+                        --workers 4	并发进程数	启动 4 个 worker 进程。生产环境推荐值为 (CPU核心数 × 2) + 1
+                        --bind 0.0.0.0:8000	监听地址	绑定所有网络接口，使容器外部可访问
+                        --timeout 120	Worker 超时	Worker 超过 120 秒无响应将被 Gunicorn 强制杀死并重启，防止死锁或内存泄漏导致服务假死
+                        --access-logfile "-"	访问日志输出	- 表示输出到 stdout，符合容器日志收集规范（12-Factor App）
+                        --error-logfile "-"	错误日志输出	同上，确保所有日志都可通过 docker logs 查看
 
         2. Docker Compose 编排
 
