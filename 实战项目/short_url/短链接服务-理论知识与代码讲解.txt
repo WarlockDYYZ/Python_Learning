@@ -2316,8 +2316,12 @@ Q：短链接是如何实现跨平台适配的？
 
         2. Docker Compose 编排
 
+            Redis 启动参数解读：
+                --appendonly yes：开启 AOF 持久化
+                --maxmemory 256mb：限制最大内存为 256MB
+                --maxmemory-policy allkeys-lru：内存满时，淘汰最近最少使用的 key（适合缓存场景）
 
-
+        3. Nginx 反向代理配置
 
 
 

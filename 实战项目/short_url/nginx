@@ -1,0 +1,35 @@
+# nginx.conf
+events {
+    worker_connections 1024;
+}
+
+http {
+    # 限流区域定义（Nginx 层限流，作为应用层限流的前置防线）
+    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=50r/s;
+
+    upstream short_url_backend {
+        # 如果有多个 app 实例，这里可以做负载均衡
+        server app:8000;
+        # least_conn;  # 最少连接数策略
+    }
+
+    server {
+        listen 80;
+        server_name localhost;
+
+        # 应用层限流：每个 IP 每秒最多 50 个请求，突发允许 100 个排队
+        location / {
+            limit_req zone=api_limit burst=100 nodelay;
+            proxy_pass http://short_url_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Request-ID $request_id;  # 传递请求 ID
+        }
+
+        # 健康检查端点（不经过限流）
+        location /health {
+            proxy_pass http://short_url_backend/docs;
+        }
+    }
+}
