@@ -2322,7 +2322,56 @@ Q：短链接是如何实现跨平台适配的？
                 --maxmemory-policy allkeys-lru：内存满时，淘汰最近最少使用的 key（适合缓存场景）
 
         3. Nginx 反向代理配置
+            4. 一键启动命令
+            # 构建并后台启动所有服务
+            docker compose up -d --build
+            # 实时查看应用日志
+            docker compose logs -f app
+            # 停止所有服务（保留数据卷）
+            docker compose down
+            # 停止并删除数据卷（⚠️ 慎用，会清空数据库和 Redis 数据）
+            docker compose down -v
 
+
+八、Day 7：知识总结 + 面试准备
+    （一）知识点全景图
+        短链接服务项目
+        ├── 架构设计
+        │   ├── 分层架构（Router → Service → Repository）
+        │   ├── 异步全链路（async/await + SQLAlchemy async）
+        │   └── 配置管理（pydantic-settings + .env）
+        ├── 核心算法
+        │   ├── Base62 编码（62 进制压缩短码）
+        │   ├── 发号器（Redis INCR 原子递增）
+        │   └── 302 重定向（统计访问，不缓存）
+        ├── 缓存策略
+        │   ├── 多级缓存（本地 LRU → Redis → DB）
+        │   ├── Cache-Aside 模式
+        │   ├── 缓存穿透 → 布隆过滤器 / 空值缓存
+        │   ├── 缓存击穿 → SETNX 分布式锁 + 双重检查
+        │   └── 缓存雪崩 → TTL 随机偏移 + 熔断降级
+        ├── 接口校验 + 限流
+        │   ├── Pydantic 模型校验
+        │   ├── SSRF 防护（IP 黑名单 + 协议白名单）
+        │   ├── 统一错误响应格式
+        │   ├── 滑动窗口限流（Redis ZSET + Lua）
+        │   └── 多级限流（Nginx + 应用层）
+        ├── 日志 + 错误上报
+        │   ├── 结构化日志（JSON 格式）
+        │   ├── 链路追踪（request_id + ContextVar）
+        │   ├── 日志中间件（自动注入 request_id）
+        │   ├── 分级策略（DEBUG/INFO/WARNING/ERROR）
+        │   └── Sentry 集成（聚合告警 + 堆栈追踪）
+        ├── 压测 + 优化
+        │   ├── Locust 压测（读写比 3:1）
+        │   ├── cProfile / py-spy 瓶颈定位
+        │   └── 量化结论（P99、QPS 提升倍数）
+        └── 部署
+            ├── Docker 多阶段构建
+            ├── Docker Compose 编排
+            ├── Gunicorn + UvicornWorker
+            ├── Nginx 反向代理 + 限流
+            └── HEALTHCHECK 健康检查
 
 
 
