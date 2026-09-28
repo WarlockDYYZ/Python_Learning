@@ -7,7 +7,7 @@ db_config = {
     "port": 3306,             # MySQL默认端口
     "user": "root",           # 用户名
     "password": "123456", # 密码
-    "database": "data_analysis",    # 数据库名
+    "database": "mc_oawr",    # 数据库名
     "charset": "utf8mb4"      # 字符集，推荐使用utf8mb4支持emoji
 }
 

@@ -7,7 +7,7 @@ import numpy as np
 
 
 # 创建数据库连接引擎
-engine = create_engine("mysql+pymysql://root:123456@localhost:3306/data_analysis")
+engine = create_engine("mysql+pymysql://root:123456@localhost:3306/mc_oawr")
 
 # 从数据库读取数据到DataFrame
 df = pd.read_sql("SELECT * FROM income_data2", engine)

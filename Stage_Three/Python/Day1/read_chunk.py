@@ -7,7 +7,7 @@ def process_data(chunk):
 
 
 # 创建数据库连接引擎
-engine = create_engine("mysql+pymysql://root:123456@localhost:3306/data_analysis")
+engine = create_engine("mysql+pymysql://root:123456@localhost:3306/mc_oawr")
 
 # 分批读取大表数据（每次读取1000条）
 chunk_size = 1000
