@@ -1,0 +1,31 @@
+= D1 模拟生成数据
+= D2 数据清洗及筛选
+= D3 指标计算、图表渲染
+= D4 异常值检测
+= D5 报表汇总、导出、分析
+= D6 美化及部署
+= D7 演示及交付
+
+
+D1、搭建项目环境生成模拟数据
+
+    1. 搭建项目骨架
+        创建虚拟环境：
+            # 退出当前虚拟环境
+            conda deactivate
+            # 创建 3.11 版本 python 环境
+            conda create -n mc_oawr_activate python=3.11
+            # 激活虚拟环境
+            conda activate mc_oawr_activate
+            # (依据情况选择，当前我的目录是需要的)进入需求所在目录
+            cd ./mc_oawr
+            # 安装需求
+            pip install -r requirements.txt
+
+        常用配套命令：
+            查看所有环境	conda env list
+            删除环境	conda remove -n mc_oawr_activate --all
+            查看当前环境已安装包	conda list
+
+    2. 生成模拟数据(包含缺失值、异常值、重复行，保证生成数据可复现)
+

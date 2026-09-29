@@ -1,0 +1,23 @@
+channel_rules:
+  小红书:
+    k: 3
+    method: mad
+  微信:
+    k: 3
+    method: mad
+  抖音:
+    k: 3
+    method: mad
+  淘宝:
+    k: 3
+    method: mad
+  自然流量:
+    k: 3
+    method: mad
+
+global:
+  k: 1.5
+  method: iqr
+
+log_file: logs/run.log
+log_level: INFO
