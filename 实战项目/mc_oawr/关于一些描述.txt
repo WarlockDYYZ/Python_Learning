@@ -301,6 +301,144 @@ D2：数据清洗 + 日期/渠道筛选 + 筛选联调
             【17 两个优化点】
 
         4. 日志
+            在 pipeline 末尾打一条汇总日志，方便追踪数据量变化。
+            可修改未同时记录输入行数，形成"输入 → 输出"的对比，比如：【18】
+                logger.info(f"筛选完成: {len(df)} → {len(result)} 行")
+
+        【19 三个改进点】
+
+
+    六、三个函数的协作关系
+
+        df (原始数据)
+          ▼
+        filter_by_date()   ← 切时间窗口
+          ▼
+        filter_by_channel() ← 切渠道子集
+          ▼
+        drop_duplicates()   ← 兜底去重（建议移除）
+          ▼
+        assert / ValueError ← 空结果拦截
+          ▼
+        result (干净子集)
+
+        filter_by_date 和 filter_by_channel 是原子操作，各自独立可复用；filter_df 是组合操作，提供一键筛选的便利接口。
+        这种"原子 + 组合"的分层设计是工程上的好习惯——下游如果只需要按日期筛，直接调 filter_by_date 就行，不用被迫带上渠道参数。
+
+
+
+    test_filters.py
+
+    一、三方库、测试框架导入及生成测试数据
+        1. 三方库与测试框架导入
+            导入	            作用
+            sys	            修改 Python 模块搜索路径 sys.path，解决测试文件导入 src/ 下模块的问题
+            os	            拼接路径，配合 sys.path.insert 把项目根目录加入搜索路径
+            pytest	        提供 @pytest.fixture、pytest.raises、pytest.main 等测试能力
+            pandas as pd	构造 DataFrame、做日期/渠道筛选、断言结果
+            numpy as np	    通常配合数据生成、随机种子、数值断言使用
+
+        2. 模块导入路径处理
+            测试文件里非常常见的一段路径配置：
+                __file__：当前测试文件的路径。
+                os.path.dirname(__file__)：当前测试文件所在目录，也就是 tests/。
+                os.path.join(..., "..")：回到上一级，也就是项目根目录。
+                sys.path.insert(0, ...)：把这个目录插到模块搜索路径的最前面。
+            这样，后面才能正常执行：
+                from src.filters import filter_df, filter_by_date, filter_by_channel
+                from src.clean import clean_sales_data
+                from src.generate_data import generate_sales_data
+            如果没有这段 sys.path 配置，Python 可能找不到 src/ 下的模块，报 ModuleNotFoundError。
+            不过这种写法更适合临时测试或小型项目。【20 更规范的做法通常有三个改进点】
+
+        3. sample_df fixture 的作用
+            pytest 的 fixture。
+            它的职责是：为后面的测试用例准备一份干净、可复用的 DataFrame。
+            执行流程是：
+                ①.调用 generate_sales_data(n_days=30, seed=42) 生成 30 天的模拟销售数据。
+                ②.用 clean_sales_data(df) 做清洗，比如处理缺失值、类型转换、列名规范等。
+                ③.把清洗后的 DataFrame 返回给测试函数。
+            后面所有测试类里的方法只要声明参数 sample_df，pytest 就会自动调用这个 fixture：
+                def test_full_range(self, sample_df):
+                    result = filter_by_date(sample_df, start_date="2025-09-01", end_date="2025-09-30")
+            这里 sample_df 不是普通参数，而是 pytest 通过 fixture 注入的测试数据。
+
+        【21 两个优化点】
+
+        从导入到 sample_df 这一段已经搭好了测试基础设施：
+            能导入项目模块、能生成稳定测试数据、能让后续测试函数直接复用 sample_df。
+
+
+    二、日期筛选函数测试类 TestFilterByDate
+        1. test_full_range：正常日期范围筛选
+            最常见的使用场景：给定一个完整的月份区间，筛选结果应该满足：
+                - 结果非空：len(result) > 0，说明数据里确实有 9 月的记录。
+                - 下边界正确：最小日期 ≥ 2025-09-01，没有漏掉起始日之前的数据。
+                - 上边界正确：最大日期 ≤ 2025-09-30，没有超出结束日。
+            三条断言合起来就是：结果严格落在 [start_date, end_date] 闭区间内。
+
+        2. test_single_day：单日边界测试
+            专门测起止日期相同的边界情况：
+                - start_date == end_date 时，区间退化为一个点，语义上应该只保留这一天的数据。
+                - all(result["date"] == pd.Timestamp("2025-09-15")) 确保所有行的日期都精确等于这一天，不会混入相邻日期的数据。
+            这个用例能暴露一个常见 bug：如果实现里用了 > 或 < 而非 >= / <=，单日筛选就会返回空表。
+            【22 可选优化项】
+
+        3. test_no_overlap：无交集筛选
+            筛选区间与数据完全不重叠的情况。
+                - 数据是 2025 年 9 月生成的，筛选 2020 年 1 月，显然不会有匹配行。
+                - 断言结果为空，确保函数在这种情况下不会报错、不会返回脏数据，而是干净地返回一个空 DataFrame。
+            这里有一个设计上的取舍：
+                filter_by_date 本身允许返回空表（它不抛异常），但上层的 filter_df 会在最后用 assert 拦截空结果。
+                所以这个用例测的是底层函数的宽容行为——它只负责按条件筛选，不负责判断"空结果是否合理"。
+
+        4. 这个测试类的覆盖情况
+            用例	                覆盖场景	        关键断言
+            test_full_range	    正常区间	        结果在 [start, end] 内
+            test_single_day	    起止同日边界	    所有行日期精确等于单日
+            test_no_overlap	    区间与数据无交集	返回空表
+            覆盖了日期筛选的正常路径 + 两个关键边界。
+
+        【23 两个优化点】
+
+
+    三、渠道筛选函数测试类 TestFilterByChannel
+        1. test_single_channel：单渠道筛选
+            最基础的使用场景：
+                - 传入单个渠道名 ["抖音"]，结果非空。
+                - all(result["channel"] == "抖音") 确保每一行的 channel 列都是 "抖音"，没有混入其他渠道的数据。
+            这是最直接的"筛选后数据纯净性"校验。
+
+        2. test_multiple_channels：多渠道筛选
+            验证传入多个渠道时：
+                - 结果非空。
+                - set(result["channel"].unique()).issubset({"抖音", "淘宝"}) 用集合的 issubset 断言：
+                    结果中出现的所有渠道必须是请求渠道的子集。
+            这里用 issubset 而不是 == 是更稳妥的写法——因为数据里可能只有 "抖音" 没有 "淘宝"，结果集是 {"抖音"}，
+            它仍然是 {"抖音", "淘宝"} 的子集，用例不会误报失败。
+
+        3. test_nonexistent_channel：不存在的渠道应报错
+            验证请求的渠道在数据中完全不存在时，函数应抛出 ValueError。
+                - pytest.raises(ValueError) 是 pytest 的上下文管理器，断言代码块内必须抛出指定异常，否则测试失败。
+                - 这里故意传了一个带空格的 " nonexistent_channel "，既测试了"渠道不存在"的分支，也顺带验证了空格不会意外匹配到真实渠道
+                    （如果实现里有 strip() 处理，这个用例可能会因为匹配不到而抛错，取决于具体实现）。
+
+        4. test_none_channels：不传渠道应原样返回
+            验证 channels=None 的语义是"不筛选"：
+                - 返回的 DataFrame 行数与输入完全一致，说明函数直接透传了原始数据，没有做任何过滤。
+            这是对 guard clause（提前返回分支）的测试，确保"不传参数"不会误触发后续逻辑。
+
+        5. 测试类的覆盖情况
+            用例	                        覆盖场景	    关键断言
+            test_single_channel	        单渠道	    结果全是目标渠道
+            test_multiple_channels	    多渠道	    结果渠道是请求的子集
+            test_nonexistent_channel	渠道不存在	抛出 ValueError
+            test_none_channels	        不传渠道	    原样返回，行数不变
+
+        【24 两个优化项】
+
+
+
 
 
 
