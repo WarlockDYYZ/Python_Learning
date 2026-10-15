@@ -438,6 +438,163 @@ D2：数据清洗 + 日期/渠道筛选 + 筛选联调
         【24 两个优化项】
 
 
+    四、组合筛选函数测试类 TestFilterDF
+        三个用例分别覆盖了组合筛选正常流程、空结果拦截、去重功能。
+        1. test_combined_filter：组合筛选正常流程
+            最核心的集成测试，验证日期和渠道两个条件同时生效：
+                - 传入日期区间 2025-09-01 ~ 2025-09-15 和渠道 ["抖音"]。
+                - 断言结果非空。
+                - 断言所有行的日期 ≥ 起始日。
+                - 断言所有行的渠道都是 "抖音"。
+            【25 应该添加一条断言 date <= end_date，补全一条上边界校验】
+
+        2. test_empty_result_raises：空结果应抛异常
+                - 验证 filter_df 的空结果拦截机制：
+                - 传入一个与数据完全不重叠的日期区间（2020年1月），筛选结果必然为空。
+            pytest.raises(AssertionError) 断言函数会抛出 AssertionError。
+            这里测的是 filter_df 里那行 assert not result.empty。但正如之前分析的，用 assert 有两个隐患：
+                一是 python -O 优化模式下会被跳过，
+                二是 AssertionError 不是面向业务的异常类型。
+            更规范的写法应该抛 ValueError，对应的测试也要改成 pytest.raises(ValueError)。
+            【26 上面讲的一条待优化点】
+
+        3. test_duplicate_removal：去重功能
+            验证 filter_df 末尾的 drop_duplicates() 是否生效：
+                - 先用 pd.concat 把原始数据和前 5 行拼接，制造出 5 个重复行。
+                - 调用 filter_df(df_with_dups)，不传任何筛选条件（相当于只走一遍去重流程）。
+                - result.duplicated().sum() == 0 断言结果中没有任何重复行。
+            这个用例能确认去重逻辑在工作。
+            但要注意：drop_duplicates() 默认按所有列去重，如果数据里有唯一标识列（如 id），去重会完全失效。
+            所以这个用例能过，前提是 sample_df 里没有这样的唯一列。
+
+        4. 这个测试类的覆盖情况
+            用例	                        覆盖场景	        关键断言
+            test_combined_filter	    日期+渠道组合筛选	结果同时满足两个条件
+            test_empty_result_raises	空结果拦截	    抛出 AssertionError
+            test_duplicate_removal	    去重功能	        无重复行
+
+        【27 两个可选的优化点，添加可以完善测试用例】
+
+
+
+    metrics.py
+    指标计算模块
+
+    一、calc_channel_summary 渠道维度聚合及衍生指标计算
+        1. 核心聚合：groupby + 命名聚合
+            pandas 的命名聚合语法（Named Aggregation），是 0.25 版本之后推荐的写法：
+                - groupby("channel")：按渠道分组，每个渠道变成结果中的一行。
+                - total_gmv=("gmv", "sum")：语义是"对 gmv 列求和，结果列名叫 total_gmv"。
+                - days=("date", "nunique")：用 nunique（去重计数）算出该渠道在数据中覆盖了多少个不同的日期，后面算日均 GMV 要用。
+                - .reset_index()：把 channel 从索引变回普通列，方便后续计算和展示。
+            一步到位，不用先 agg 再 rename，代码可读性很好。
+
+        2. 衍生指标：用 np.where 做除零保护
+            四个衍生指标：
+                指标	            公式	                    含义
+                ctr	            点击量 / 曝光量 × 100	    点击率（%）
+                cpc	            花费 / 点击量	            单次点击成本
+                gmv_per_user	GMV / 新用户数	        单用户贡献 GMV
+                avg_daily_gmv	总 GMV / 天数	        日均 GMV
+            关键在于除零保护：np.where(分母 > 0, 分子/分母, 0)。
+            如果分母为 0（比如某个渠道没有曝光），直接除会得到 inf 或 NaN，用 np.where 兜底成 0，避免下游计算炸掉。
+            np.where 是向量化操作，比逐行 apply 快得多，在数据量大时优势明显。
+
+        【28 一个优化点及两个改进点】
+
+        3. 输出示例
+            假设输入数据有 3 个渠道（抖音、淘宝、微信），输出大概是：
+                channel	total_gmv	total_exposure	total_clicks	total_cost	total_new_users	days	ctr	cpc	gmv_per_user
+                    avg_daily_gmv
+                抖音	500000	1000000	50000	25000	2000	30	5.0	0.5	250.0	16666.67
+                淘宝	300000	800000	30000	18000	1500	30	3.75	0.6	200.0	10000.00
+            此时可以用来拿去画柱状图或者做渠道对比。
+
+
+    二、calc_weekly_comparsion 计算周环比并对比
+        先把数据按“周 + 渠道”聚合，再用 shift(1) 拿到每个渠道上一周的 GMV，最后算环比。
+        1. 函数整体流程
+            s1:df.copy()：避免修改原始 DataFrame，符合数据分析函数的好习惯。
+            s2:生成两个周维度列：
+                - week：ISO 周数，1–53。
+                - year_week：形如 2025-W39，方便按自然周分组展示。
+            需要注意的是，isocalendar().week 和 strftime("%U") 的周划分规则不完全一样。
+            前者是 ISO 周，后者是“以周日为起始的周数”。如果数据跨年，可能会出现 year_week 和 ISO 周不一致的情况。
+            生产环境里更推荐统一用 ISO 年周，比如：
+                【29 一个待优化项】
+
+        2. 按周和渠道聚合
+            把原始明细数据压缩成周度渠道表：
+                - 每个 (year_week, channel) 组合变成一行。
+                - weekly_gmv 是该渠道该周的 GMV 总和。
+                - weekly_clicks、weekly_cost 同理。
+
+        3. shift(1)
+            shift(1) 是 pandas 里非常常用的错位取值方法。
+            它的含义是：把当前列的值整体向下移动 1 行。
+            groupby("channel") 保证了每个渠道内部独立错位。
+            排序后的数据可能是这样的：
+                year_week	channel	weekly_gmv
+                2025-W38	抖音	    100
+                2025-W39	抖音	    150
+                2025-W40	抖音	    130
+                2025-W38	淘宝	    80
+                2025-W39	淘宝	    90
+            执行 groupby("channel")["weekly_gmv"].shift(1) 后：
+                year_week	channel	weekly_gmv	prev_gmv
+                2025-W38	抖音	    100	        NaN
+                2025-W39	抖音	    150	        100
+                2025-W40	抖音	    130	        150
+                2025-W38	淘宝	    80	        NaN
+                2025-W39	淘宝	    90	        80
+            可以看到：
+                - 每个渠道的第一周，prev_gmv 是 NaN，因为没有“上一周”的数据。
+                - 第二周开始，prev_gmv 就是该渠道上一周的 weekly_gmv。
+                - 淘宝的 prev_gmv 不会误取到抖音的数据，因为 groupby("channel") 做了隔离。
+            如果不加 groupby("channel")，直接 shift(1)，就会把抖音的上一周错配到淘宝上，结果完全错误。
+
+        4. 环比计算
+            环比 = (本周GMV - 上周GMV) / 上周GMV × 100
+            np.where 做了两层保护：
+                - prev_gmv.notna()：排除第一周没有上周数据的情况。
+                - prev_gmv > 0：排除上周 GMV 为 0 的情况，避免除零。
+            不满足条件时返回 None，表示“无法计算环比”。
+
+        【30 一个优化点关于计算后的类型统一】
+
+        5. 总结
+            步骤	        代码	                                        作用
+            生成周列	    dt.isocalendar().week / strftime	        把日期映射到自然周
+            周度聚合	    groupby(["year_week", "channel"]).agg(...)	每个渠道每周一条汇总
+            取上周值	    groupby("channel")["weekly_gmv"].shift(1)	每个渠道独立错位取上一周 GMV
+            算环比	    np.where(...)	                            有上周数据且上周 GMV > 0 时才计算
+            shift(1) 本质就是“取上一行”，配合 groupby 就变成了“取同组上一行”，是做环比、同比、移动平均时最常用的工具之一。
+
+
+    三、calc_top_channels 排序取 Top N 及 calc_daily_trend 按天汇总趋势
+        1. calc_top_channels
+            流程为：
+                a. groupby("channel")["gmv"].sum()：按渠道汇总 GMV，得到一个 Series，索引是渠道名，值是 GMV 总和。
+                b. sort_values(ascending=False)：按 GMV 从高到低排序。
+                c. head(top_n)：取前 top_n 个，默认是 3。
+            返回值是一个 Series，不是 DataFrame。如果下游需要表格形式，可以加一步：
+                return channel_gmv.head(top_n).reset_index(name="total_gmv")
+            这样会变成两列：channel 和 total_gmv，更方便画图或导出。
+
+        2. calc_daily_trend
+            按日期维度做汇总：
+                a. groupby("date")：每天一行。
+                b. 聚合出当天的 GMV、点击、花费、曝光。
+                c. 最后算一个日度点击率 daily_ctr，同样用 np.where 做了除零保护。
+            函数返回的表很适合画折线图：x 轴是 date，y 轴可以选 daily_gmv 或 daily_ctr，一眼就能看出趋势波动。
+
+        3. 对比
+            函数	                分组维度	    返回类型	    典型用途
+            calc_top_channels	渠道	        Series	    找贡献最大的几个渠道
+            calc_daily_trend	日期	        DataFrame	画时间趋势图
+
+        【31 三个优化点】
+
 
 
 
