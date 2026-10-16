@@ -596,6 +596,323 @@ D2：数据清洗 + 日期/渠道筛选 + 筛选联调
         【31 三个优化点】
 
 
+    charts.py
+
+    一、加载样式配置 及 _get_colors 获取配色方案 及 plot_daily_gmv_trend 绘制每日 GMV 趋势折线图
+        1. 加载样式
+            把图表样式从代码里抽离出来，放到 style.json 里统一管理：
+                - os.path.dirname(__file__)：当前脚本所在目录。
+                - os.path.join(..., "..", "config", "style.json")：往上退一层，再进入 config/style.json。
+                - 用 json.load 读成字典，后面所有图表都从 STYLE 里取字号、宽高、DPI、配色等参数。
+            好处是：改样式不用动绘图函数。比如要统一把 DPI 从 100 改成 200，只改 JSON 就行，所有图表自动生效。
+            这段代码在模块导入时就执行。如果 style.json 不存在或格式错误，整个模块会直接报错。
+
+        2. 循环取色
+            这是一个内部工具函数（以下划线开头），负责按数量取配色：
+                - STYLE.get("colors", [...])：优先用 JSON 里的配色，没有就用默认五色调。
+                - i % len(colors)：取模循环。比如只有 5 个颜色但需要 8 个，第 6 个会回到第 1 个颜色，不会越界。
+                - 返回值是颜色列表，供 ax.plot、ax.barh、ax.scatter 使用。
+            这种设计让渠道数量变化时配色仍然稳定，不会因为渠道从 3 个变成 7 个而报错。
+
+        3. plot_daily_gmv_trend：每日 GMV 折线图
+            先创建画布，宽高从配置里取，保证所有图表尺寸一致。
+            a. 主折线 + 填充
+                - ax.plot：画日 GMV 折线，取第一个颜色，线宽 2，无标记点。
+                - ax.fill_between：在折线下方做浅色填充（alpha=0.1），增强视觉层次，让趋势更"饱满"。
+            b. 日移动平均线
+                - rolling(7).mean()：7 日滑动平均，平滑掉单日波动，更容易看出趋势方向。
+                - 虚线样式 -- + 第二个颜色，和主折线区分开。
+                - if len(daily_df) > 7 是保护：数据不足 7 天时 rolling(7) 会产生大量 NaN，画出来没意义。
+            c. 日期轴格式化
+                这是时间序列图的关键部分：
+                    - WeekdayLocator(interval=1)：每个工作日放一个刻度（周一到周五）。
+                    - DateFormatter("%m-%d")：刻度标签显示为"月-日"，如 09-15。
+                    - rotation=45：日期标签旋转 45°，避免重叠。
+            d. 标题、标签、图例、网格
+                - fontweight="bold"：标题加粗。
+                - legend：显示"日GMV"和"7日移动平均"两个图例。
+                - grid(alpha=0.3)：浅灰色网格，辅助读值但不抢眼。
+                - plt.tight_layout()：自动调整边距，防止旋转后的日期标签被裁掉。
+            e. 保存与关闭
+                - plt.savefig：保存到指定路径，DPI 从配置取。
+                - bbox_inches="tight"：裁剪多余白边，确保标签不被裁掉。
+                - plt.close(fig)：非常重要。批量生成多张图时，不 close 会持续占用内存，最终导致 OOM。
+                - 返回 save_path，方便调用方知道保存到了哪里。
+
+        【32 两个待优化点，中文配置 和 Agg 非交互式后端调用顺序】
+
+
+    二、plot_channel_comparison 绘制 GMV 对比图
+        横向柱状图，用来对比各渠道的总 GMV。横向的好处是渠道名再长也不会挤在一起，比纵向柱状图更适合渠道名较长的场景。
+        1. 排序
+            先按 total_gmv 升序排列。
+            matplotlib 的 barh 是从下往上画的，升序排列后，GMV 最高的渠道会出现在最上面，符合阅读习惯。
+
+        2. 创建画布与配色
+            画布尺寸从 JSON 配置读取，保持项目内所有图表统一。
+            len(df) 个渠道就取几个颜色，_get_colors 内部用取模循环，渠道超过 5 个也不会报错。
+
+        3. 绘制横向柱状图
+            barh：横向柱状图，第一个参数是 y 轴（渠道名），第二个参数是柱子长度（GMV）。
+            edgecolor="white"：柱子之间加白色缝隙，视觉上更清爽。
+            height=0.6：柱子粗细，0.6 是默认值，留 0.4 的间隙。
+
+        4. 添加数值标签
+            逐个柱子标注具体数值：
+                bar.get_width()：柱子右边缘的 x 坐标（即 GMV 值）。
+                + df["total_gmv"].max() * 0.02：在柱子右侧再偏移最大 GMV 的 2%，让标签和柱子之间留一点空隙，不会紧贴。
+                bar.get_y() + bar.get_height() / 2：y 方向居中。
+                f"{val:.0f}"：不保留小数，显示整数。
+                va="center"：垂直居中对齐。
+
+        5. 标题、标签、网格
+            axis="x"：只画垂直网格线（沿 x 轴方向），横向柱状图通常只需要纵向网格辅助读值。
+            不画 y 轴网格，避免和柱子本身重叠显得杂乱。
+
+        6. 保存与关闭
+            紧凑布局 → 保存 → 关闭画布释放内存 → 返回路径。
+
+        【33 一个待优化点，关于偏移量的量级调整】
+
+
+    三、plot_channel_ctr_bar CTR 对比图绘制
+        结构几乎一样，只是把 GMV 换成了 CTR，一下仅注释差异部分。
+        1. 按 CTR 升序排序
+            sort_values("ctr", ascending=True) 按点击率从小到大排。
+            同样是升序 + barh，所以 CTR 最高的渠道会出现在最上面，视觉上更容易一眼看到“最优渠道”。
+
+        2. 绘图与配色
+            和 GMV 对比图一致：
+                - 横向柱状图 barh。
+                - y 轴是渠道名。
+                - x 轴是 ctr，单位是百分比。
+                - 每个渠道一个颜色，edgecolor="white" 让柱子之间有白色间隙。
+
+        3. 数值标签
+            几个细节：
+                ax.patches：当前坐标轴里所有绘制对象的列表。因为前面只画了一组 barh，所以 ax.patches 就是这些柱子。
+                bar.get_width()：柱子长度，也就是该渠道的 CTR 值。
+                + df["ctr"].max() * 0.02：在柱子右侧再偏移最大 CTR 的 2%，让标签不紧贴柱子。
+                f"{val:.1f}%"：保留一位小数，并加上 %，例如 3.2%。
+                va="center"：文字在柱子高度方向垂直居中。
+            和上一个函数相比，这里用的是 ax.patches，而上一个函数用的是 bars。
+            两种写法都可以，bars 更明确，ax.patches 更通用。
+
+        4. 标题、标签、网格
+            标题强调这是 CTR 对比。
+            x 轴标签写成 CTR (%)，配合 f"{val:.1f}%"，单位更清楚。
+            axis="x"：只画垂直网格线，方便横向读 CTR 数值。
+
+        5. 保存与关闭
+            与上方相同
+
+        【34 三个待优化的点，ax.patches 不够安全、CTR 接近 0 时标签可能重叠、CTR 单位计算口径可能不一致】
+
+
+    四、plot_weekly_trend 周 GMV 趋势图绘制
+        分渠道的周度 GMV 折线图，和之前的日趋势图相比，多了“按渠道分线”这一层。
+        1. 提取渠道与配色
+            weekly_df["channel"].unique()：拿到所有渠道名列表。
+            _get_colors(len(channels))：按渠道数量取对应数量的颜色，保证每个渠道一条独立颜色的线。
+
+        2. 循环绘制各渠道折线
+            逐渠道处理：
+                先按渠道名筛选出该渠道的子集 sub。
+                sort_values("year_week")：必须按周次排序，否则折线会乱跳。
+                ax.plot：x 轴是 year_week（如 2024-W35），y 轴是 weekly_gmv。
+                marker="o"：每个数据点画一个圆点标记，周度数据点不多，加标记点更容易看清每个周次的值。
+                linewidth=2：线宽 2，比日趋势图的主线略粗一点，因为这里没有填充区域。
+                label=ch：用渠道名作为图例标签。
+                color=color：每个渠道一个颜色。
+
+        3. 标题、标签、图例
+            x 轴标签是"周次"，因为 year_week 是字符串（如 2024-W35），matplotlib 会把它当分类轴处理，自动等间距排列。
+            legend 放在右上角，显示各渠道对应的颜色。
+            grid(True, alpha=0.3)：全方向浅网格，方便同时读 x 和 y。
+
+        4. 旋转 x 轴标签
+            rotation=45：周次标签（如 2024-W35）比较长，旋转 45° 避免重叠。
+            这里用的是 plt.xticks 而不是 ax.tick_params，效果一样，都是旋转 x 轴刻度。
+
+        5. 保存与关闭
+
+        【35 三个壳优化点，year_week 排序问题、渠道过多时图例“爆炸”、缺少数据平均】
+
+
+    五、plot_cost_gmv_scatter 花费-GMV 散点图绘制
+        花费 vs GMV 散点图，用来直观看各渠道的投入产出比（ROI）。
+        每个点代表一个渠道，横轴是花费，纵轴是 GMV，点离左上越远（GMV 高、花费低）说明 ROI 越好。
+        1. 循环绘制散点
+            逐行遍历渠道表：
+                row["total_cost"]：x 坐标（花费）。
+                row["total_gmv"]：y 坐标（GMV）。
+                s=200：点的大小，200 像素²，比默认大一些，更容易看清。
+                color=colors[i]：每个渠道一个颜色，和前面柱状图、折线图保持一致的配色体系。
+                label=row["channel"]：用渠道名作为图例标签。
+                edgecolors="white", linewidth=2：白色描边，让重叠的点更容易区分。
+                zorder=5：把散点画在网格线之上，避免被遮挡。
+
+        2. 添加 ROI 趋势线
+            这是本函数的亮点：
+                np.polyfit(x, y, 1)：对花费和 GMV 做一元线性回归（一次多项式拟合），返回斜率和截距。
+                    斜率本质上就是整体平均 ROI（每花 1 元带来多少 GMV）。
+                np.poly1d(z)：把拟合系数转成可调用的多项式函数。
+                np.linspace(..., 100)：在花费的最小值和最大值之间生成 100 个均匀点，用来画一条平滑的直线。
+                ax.plot(..., "--", alpha=0.5, color="gray")：灰色虚线，半透明，不抢散点的视觉焦点。
+            这条趋势线的作用是：
+                点在趋势线上方 → 该渠道 ROI 高于平均水平。
+                点在趋势线下方 → 该渠道 ROI 低于平均水平。
+                一眼就能看出哪些渠道"花钱多但产出少"。
+
+        3. 标题、标签、图例、网格
+            图例放在左上角（upper left），和日趋势图的右上角错开，避免遮挡高 GMV 的点。
+            全方向网格，方便同时读花费和 GMV 数值。
+
+        4. 保存与关闭
+
+        【36 四个待优化点，趋势线位置、图例“爆炸”、缺少 ROI 等值参考线、点重叠问题】
+
+
+    六、generate_all_charts 批量生成入口函数
+        整个图表模块的统一入口：
+            它负责准备输出目录、调用前面几个绘图函数、收集生成的文件路径，最后返回一份“本次都生成了哪些图”的清单。
+        1. 准备输出目录
+            output_dir 是图表保存目录，默认 output/charts。
+            exist_ok=True 表示目录已存在时不会报错，适合自动化反复运行。
+
+        2. 逐个调用绘图函数
+            每个绘图函数都接收两个参数：
+                参数	        含义
+                数据      	daily_df、weekly_df、channel_summary
+                save_path	具体保存路径，例如 output/charts/daily_gmv_trend.png
+            daily_gmv_trend.png：日度 GMV 趋势
+            channel_gmv_comparison.png：渠道 GMV 对比
+            channel_ctr_comparison.png：渠道 CTR 对比
+            weekly_gmv_trend.png：周度 GMV 趋势
+            cost_gmv_scatter.png：花费-GMV 散点图
+            后面如果需要嵌入报表、PPT，或者按文件名加载图片，都会比较方便。
+
+        3. 收集返回路径
+            每个绘图函数最后都会返回 save_path：
+                chart_files.append(plot_daily_gmv_trend(...))
+            如果某个函数因为数据为空、异常等原因没有生成图片，可能会返回 None。所以后面会做一次过滤：
+                chart_files = [p for p in chart_files if p]
+            这一步保证返回的列表里都是真实存在的文件路径。
+
+        4. 返回结果
+            调用方拿到这个列表后，可以做几件事：
+                打印日志：确认本次生成了哪些图。
+                嵌入报告：把图片路径传给 PDF、Word、Excel 或前端页面。
+                继续加工：比如压缩图片、重命名、上传到对象存储。
+
+        【37 三个优化点，增加开关控制、增加异常保护、返回结构化结果】
+
+        整体看，这个函数的价值不在于复杂逻辑，而在于把前面 5 个绘图函数串成一条可复用的出图流水线：
+            数据 → 绘图函数 → 保存 PNG → 返回路径列表
+        上层只需要准备 daily_df、weekly_df、channel_summary，调用一次 generate_all_charts，就能拿到整套渠道分析图。
+
+
+
+    anomaly.py
+
+    一、设置日志 和 load_rules 加载规则配置
+        异常检测模块的基础设施：日志记录和规则配置加载。
+        1. 设置日志
+            Python 标准库 logging 的初始化配置，核心做了三件事：
+                a.日志级别
+                    level=logging.INFO：只记录 INFO 及以上级别（INFO、WARNING、ERROR、CRITICAL）的日志。
+                    DEBUG 级别的日志会被过滤掉。
+                    生产环境通常设 INFO，调试时改成 DEBUG。
+                b. 日志格式
+                    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+                    定义了每条日志的模板：
+                        占位符	            含义	            示例输出
+                        %(asctime)s	        时间戳	        2025-09-15 14:32:01,123
+                        %(levelname)s	    级别名	        INFO、WARNING
+                        %(name)s	        logger 名称	    __main__、anomaly_detector
+                        %(message)s	        日志内容	        已加载异常检测规则: [...]
+                    组合起来长这样：
+                        2025-09-15 14:32:01,123 [INFO] __main__: 已加载异常检测规则: ['抖音', '淘宝', '快手']
+                c. 双输出目的地（handlers）
+                        FileHandler：把日志同时写入 logs/run.log 文件，方便事后审计和排查。
+                        StreamHandler：把日志输出到标准输出（控制台/终端），方便运行时实时观察。
+                    这就是所谓的双写——文件存档 + 控制台实时看，调试和生产都能用。
+                    注意：
+                        basicConfig 只在日志系统第一次配置时生效。
+                        如果前面已经有 handler 被添加过，再调用 basicConfig 不会重复添加。
+                        另外 FileHandler 的 logs/ 目录需要提前存在，否则文件写入会抛 FileNotFoundError。
+                        更稳妥的写法是：
+                            os.makedirs("logs", exist_ok=True)
+                        放在 basicConfig 之前。
+
+        2. load_rules：加载异常检测规则配置
+            这个函数的职责很明确：从 YAML 配置文件里读异常检测规则，返回一个字典。
+            参数设计
+                config_path=None 用了 Python 常见的可选路径模式：
+                    - 不传参数时：自动根据当前文件路径推导默认路径 config/rules.yaml（项目根目录下的 config 文件夹）。
+                    - 传参时：可以指定任意路径，方便单元测试用内存中的假配置覆盖。
+            文件读取
+                - 用 yaml.safe_load 而不是 yaml.load，这是安全规范——safe_load 不会执行 YAML 中的任意 Python 对象，
+                    防止配置文件被注入恶意代码。
+                - 编码指定 utf-8，避免 Windows 上默认编码不一致导致乱码。
+            日志记录
+                加载成功后打一条 INFO 日志，把渠道规则的关键打印出来，方便确认配置是否生效。
+                用了 .get('channel_rules', {}) 做兜底，即使配置里没写 channel_rules 键也不会报错。
+            典型的 rules.yaml:
+                global:
+                  method: iqr
+                  k: 1.5
+
+                channel_rules:
+                  抖音:
+                    method: mad
+                    k: 3
+                  淘宝:
+                    method: iqr
+                    k: 1.5
+                  快手:
+                    method: mad
+                    k: 2.5
+            好处：
+                调整检测阈值不需要改代码，改 YAML 就行。
+                配合前面可视化模块的 style.json，整个项目的"配置与代码分离"原则就贯穿了数据清洗、异常检测、图表样式三个环节。
+
+            【38 两个可改进点，文件不存在时没有兜底、配置校验缺失】
+
+    二、detect_anomaly_mad 中位数绝对偏差异常检测 和 detect_anomaly_iqr 四分位距异常检测
+        两个函数都是稳健异常检测：不用均值和标准差，而是用中位数、四分位数，避免被极端值带偏。
+        1. detect_anomaly_mad：中位数绝对偏差
+            逻辑是：
+                a.找中心：center = series.median()，用中位数而不是均值。
+                b.算偏差：abs(Xi - median)，看每个点离中位数有多远。
+                c.取典型偏差：对这些绝对偏差再取中位数，得到 MAD。
+                d.校正尺度：乘以 1.4826，让 MAD 在正态分布下近似标准差。
+                e.判定异常：如果某点偏离中位数超过 k * MAD，就判为异常。
+            max(mad, 1e-6) 是为了防止 MAD 为 0。比如数据全是同一个值，MAD 就是 0，不保护一下就会除以 0 或阈值失效。
+            MAD 的优点是抗污染能力强：即使数据里有不少极端值，中位数和中位数绝对偏差也不会被轻易拉偏。
+
+        2. detect_anomaly_iqr：四分位距
+            逻辑是：
+                a.算 Q1、Q3：25% 分位数和 75% 分位数。
+                b.算 IQR：IQR = Q3 - Q1，表示中间 50% 数据的跨度。
+                c.定边界：
+                    下界：Q1 - k * IQR
+                    上界：Q3 + k * IQR
+                d.判定异常：低于下界或高于上界的点视为异常。
+            这就是箱线图里识别离群点的经典规则，k=1.5 是 Tukey 提出的常用标准。
+
+        对比：
+            维度	        MAD	                IQR
+            中心估计	    中位数	            Q1/Q3
+            离散度量	    绝对偏差的中位数	    四分位距
+            抗极端值能力	更强	                较强
+            适用场景	    数据可能有少量剧烈尖峰	通用异常筛查、箱线图思路
+            参数含义	    k=3 类似 3σ 规则	    k=1.5 是箱线图默认
+
+        在模块中给 detect_anomalies 提供了两种检测引擎：
+            配置里写 method: mad 就走 MAD，写 method: iqr 就走 IQR。
+            这样不同渠道可以用不同敏感度，比如波动大的渠道用更严格的 MAD，波动小的渠道用默认 IQR。
+
 
 
 
