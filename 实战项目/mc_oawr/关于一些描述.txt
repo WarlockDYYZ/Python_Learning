@@ -1239,60 +1239,177 @@ D2：数据清洗 + 日期/渠道筛选 + 筛选联调
             它负责回答“这段时间整体怎么样、哪个渠道最强”。
 
 
+        二、周度趋势、异常预警、业务建议
+            将把前面算好的数据转成“能直接读”的结论。
+            1. 周度趋势分析
+                这里先看 weekly_df 是否为空，只有有数据才输出。
+                recent_weeks = weekly_df.sort_values("year_week").tail(3) 的意思是：
+                    - 先按 year_week 排序，保证时间从早到晚；
+                    - 再取最后 3 周，也就是最近三周。
+                然后逐行输出：
+                    - 2025-W03: GMV=123,456，环比 +5.2%
+                    - 2025-W04: GMV=130,000，环比 +5.3%
+                    - 2025-W05: GMV=118,000，环比 -9.2%
+                环比处理比较关键：
+                    woq = f"{wrow.get('gmv_woq', 0):+.1f}%" if pd.notna(wrow.get('gmv_woq', None)) else "N/A"
+                    - 如果 gmv_woq 有值，就格式化成 +5.2%、-9.2% 这种带符号的形式；
+                    - 如果是 NaN，比如第一周没有上一周可对比，就显示 N/A。
+                这里用 wrow.get('gmv_woq', None) 是防御性写法，避免列不存在时报错。
+
+            2. 异常数据预警
+                这里把异常检测结果逐条列出。
+                每一行输出类似：
+                    - 2025-01-15 | 抖音电商 | GMV=980,000 | 方法=MAD | 偏离度=4.3x
+                注意：
+                    - 全部用 .get('字段', '?')，防止某个字段缺失；
+                    - 偏离度 用 :.1f 保留一位小数，后面加 x，表示“偏离了正常水平多少倍”；
+                    - 如果 anomalies 为空，这一整段就不会输出，报告里不会出现空的“异常预警”。
+
+                【一个优化点，关于非数字类型时的显示问题】
+
+            3. 业务建议
+                先找出 GMV 最高和最低的渠道，作为建议的依据。
+                建议 a：加大优质渠道投入
+                    既然某个渠道 GMV 占比最高，说明它目前转化效率或流量规模最好，所以建议继续加码。
+                    业务表达瑕疵：“预计可带来 X% 的 GMV 贡献”其实只是当前占比，不是“增加预算后预计新增”的贡献。
+                    更严谨的说法可以是：
+                        该渠道当前贡献了 X% 的 GMV，建议适当增加预算，观察边际效果。
+                建议 b：优化低效渠道
+                    idxmin() 找到 GMV 最低的渠道。
+                    注意：GMV 最低不一定代表“效率最差”。
+                        一个渠道可能 GMV 低，但 CPC 也低、ROI 还不错；另一个渠道 GMV 高，但花费巨大，实际 ROI 很差。
+                        所以如果只看 GMV 排最后就建议优化，可能会误判。
+                    更合理的做法是结合多个指标，比如：
+                        ROI 最低的渠道；
+                        CPC 最高但转化率低的渠道；
+                        CTR 低且花费高的渠道。
+                建议 c：排查异常数据
+                    只在有异常时才输出，逻辑是对的。
+                    它的作用是把“数据层面的异常”翻译成“业务动作”：不要急着下结论，先确认是真实波动还是数据问题。
+                建议 d：持续监控
+                    通用建议，不依赖具体数据，属于“流程建设”层面的提醒。
+
+            4. 返回
+                把所有行用换行符拼接成完整文本。
+                因为前面每段末尾都加了 \n 或空行，所以最终输出的 Markdown 段落之间会有合理间距。
+
+            结构清晰、可读性强，从概览到排名，再到趋势、异常、建议，层层递进，很像一个标准的数据分析报告。
+
+        【算上 第一部分，大概 5个 改动点，还可以加一些其他的优化项，使报告更完善】
 
 
 
+    main.py 入口函数
 
+        是整个项目的总调度入口：把前面讲过的所有模块（生成、清洗、筛选、指标、图表、异常、导出、洞察）串成一条可命令行运行的流水线。
+        一、入口配置 + 数据加工
+            1. 模块顶部的三件"开场配置"
+                a. sys.path.insert(0, os.path.dirname(__file__))
+                    让 from src.xxx import ... 能找到包，是整个脚本能跑起来的关键。
+                    - os.path.dirname(__file__)：拿到当前脚本 run_pipeline.py 所在的目录（绝对路径）。
+                    - sys.path.insert(0, ...)：把这个目录插到 Python 模块搜索列表的最前面。
+                因为导入写的是 from src.clean import ...，Python 默认只在"当前工作目录"和 site-packages 里找 src。
+                如果从别的目录用 python run_pipeline.py 启动，当前工作目录就不是脚本所在目录，src 就找不到，会报：
+                    ModuleNotFoundError: No module named 'src'
+                先把自己所在目录塞进 sys.path，就能保证无论从哪运行都能定位到 src 包。
+                用 insert(0, ...) 而不是 append(...) 是为了优先级最高——万一环境里也有一个叫 src 的包，优先用自己的。
+                前提：src/ 目录下最好有 __init__.py（哪怕是空文件），否则某些 Python 版本下它不被识别为包。
 
+            2. 一组 from src.xxx import
+                把所有模块的函数平铺导入到当前命名空间。
+                好处是 main() 里调用时直接写函数名（clean_sales_data(...)），不用写 src.clean.clean_sales_data(...)，代码更短。
+                代价是命名冲突风险：
+                    如果两个模块导出同名函数，后导入的会覆盖先导入的。
+                    这里函数名都不同（clean_sales_data、filter_df、calc_channel_summary……）。
 
+            3. 日志配置
+                这是整个流水线可观测性的基础，比 print 更清晰：
+                    配置项	                        作用
+                    level=logging.INFO	            只记录 INFO 及以上（INFO/WARNING/ERROR），DEBUG 被忽略
+                    format=...	                    每条日志带时间、级别、来源模块名、内容
+                    FileHandler("logs/run.log")	    写一份到文件，便于事后排查
+                    StreamHandler()	                同时打到控制台，运行时能实时看到
+                    encoding="utf-8"	            文件日志用 UTF-8，防止中文乱码
 
+                logging.StreamHandler()（不带参数默认写 stderr）和文件 handler 同时挂上，实现控制台 + 文件双路输出——一边跑一边看，
+                跑完还有 logs/run.log 存档。
+                logging.getLogger(__name__)：__name__ 在这里是 "__main__"（因为脚本直接运行），所以日志里 %name 会显示 __main__。
 
+                【一个优化项，关于目录的导入顺序】
 
+        二、parse_args()：命令行参数解析
+            用 argparse 把流水线做成可配置的命令行工具，不用改代码就能换参数：
+                参数	                类型	        默认	                        说明
+                --start / --end	    str	        2025-09-01 / 2025-12-31	    分析日期区间，传给 filter_df
+                --channels	        nargs="+"	None	                    接收多个值，如 --channels 抖音 淘宝，解析成 list；
+                                                                            不传则 None（表示不筛选渠道）
+                --output-dir	    str	        output	                    所有产物的根目录
+                --generate-data	    store_true	False	                    开关型参数，命令行出现即 True，用于强制重新生成模拟数据
 
+            细节：
+                - nargs="+"：+ 表示"至少一个"，所以 --channels 后面可以跟任意多个渠道名，自动收集成列表。
+                        default=None 很关键——后面 filter_df(channels=None) 约定为"不限制渠道"。
+                - action="store_true"：这种参数不需要写值，命令里出现 --generate-data 就是 True，不出现就是 False，是典型的"模式开关"。
+            调用示例：
+                python run_pipeline.py --start 2025-10-01 --channels 抖音 淘宝 --generate-data
 
+        三、main() 开场：日志横幅 + 建目录
+            os.makedirs(..., exist_ok=True)：递归创建目录，exist_ok=True 表示目录已存在时不报错。
+            这里一次性把输出根目录、图表子目录、日志目录都建好，避免后面写文件时各自 FileNotFoundError。
 
+            【一个优化项，还是关于上面目录的导入顺序】
 
+        四、Step 1：准备数据（生成 or 加载）
+            这是"有则用、无则造"的缓存模式，判断条件是一个"或"：
+                - args.generate_data 为 True（用户传了 --generate-data）→ 强制重新生成；
+                - 或 not os.path.exists(data_path)（本地还没有数据文件）→ 首次运行自动生成。
+            两种情况都会调 generate_sales_data() 造一份模拟数据并存盘。
+            index=False 不写入多余的行索引列，encoding="utf-8-sig" 带 BOM，保证用 Excel 直接打开 CSV 时中文不乱码。
+            否则（数据已存在且没强制重造）→ 什么都不做，后面 Step 2 直接从文件读。
+            这样重复跑流水线时不用每次都重新造数据，既快又保证数据一致（不会因为每次随机生成导致结果对不上）。
 
+        五、Step 2~3：清洗 + 筛选
+            Step 2 清洗：
+                - 注意 import pandas as pd 写在了函数内部。【优化点】
+                - df_raw = pd.read_csv(data_path)：无论上一步是生成还是加载，都重新从 CSV 读一遍。
+                    所以 Step 1 里 generate_sales_data() 返回的 df_raw 其实在这里被覆盖了——生成那一步的真正作用是"把数据落盘"，
+                    读盘动作统一交给 Step 2。
+                    这个设计让"生成"和"使用"解耦，逻辑上没问题，变量名 df_raw 被复用了两次。【改代码时要注意】
+                - clean_sales_data(df_raw)：把原始脏数据（缺失值、重复、类型、日期格式等）洗干净，产出 df_clean。
+            Step 3 筛选：
+                filter_df 接收三个过滤维度，正好对应命令行参数：
+                    - start_date / end_date：日期区间；
+                    - channels=args.channels：渠道白名单，注意这里直接传 None 也是合法的——约定 None 表示不按渠道过滤，全渠道都保留。
+                筛完打一行 筛选后数据: X 行，方便肉眼确认过滤条件是否生效（比如筛完只剩几行，往往说明日期写错了）。
+                数据流到这里完成了从原始 → 干净 → 按需筛选的三级加工：
+                    df_raw → df_clean → df_filtered。
+                后面所有分析都基于 df_filtered。
 
+        六、Step 4：指标计算
+            基于筛选后的 df_filtered，一次性算出三张下游要用的中间表：
+                变量	                函数	                    粒度	                                    下游谁在用
+                channel_summary	    calc_channel_summary	一行一个渠道（总GMV/曝光/点击/花费/CTR/CPC…）	汇总概览 Sheet、
+                                                                                                    洞察报告排名与建议
+                weekly_df	        calc_weekly_comparison	渠道×周 + 环比 gmv_woq	                周度趋势 Sheet、趋势分析
+                daily_df	        calc_daily_trend	    日期×渠道的日粒度	                        可视化折线图
 
+            这三张表就是前面所有 Sheet 和图表的数据底座：
+                export_report_内部技能 的入参是 channel_summary, weekly_df, anomalies；
+                generate_insights 的入参是 channel_summary, weekly_df, anomalies, daily_df。
+                入参对得上，说明这条流水线的数据契约是通的。
+            最后 logger.info(f"渠道汇总:\n{channel_summary.to_string()}") 把汇总表整个打进日志，
+            to_string() 保证 DataFrame 完整打印（不被默认的列省略号截断），方便运行时直接核对指标。
 
+        小结：
+            流水线的上半程把数据从原料加工成了可分析的指标表：
+                命令行参数 (parse_args)
+                        ↓
+                [Step1] 准备数据  generate_sales_data / read_csv   → datasales_daily.csv
+                        ↓
+                [Step2] 数据清洗  clean_sales_data                 → df_clean
+                        ↓
+                [Step3] 数据筛选  filter_df(日期/渠道)              → df_filtered
+                        ↓
+                [Step4] 指标计算  calc_*                            → channel_summary / weekly_df / daily_df
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    【注意最后修改优化点】
