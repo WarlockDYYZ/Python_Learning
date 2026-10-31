@@ -1,1 +1,315 @@
-新的小节，关于 python程序设计
+D1.py
+
+一、三方库导入与获取数据库连接
+    搭建了一个轻量化的数据管道，可用来做可视化项目的本地数据持久化（简单实现）。
+    1. 模块导入部分
+        - sqlite3：Python 内置的轻量级关系型数据库模块，无需额外安装，非常适合本地数据分析和项目原型开发。
+        - logging：Python 标准日志库，用于替代 print 记录程序运行状态、错误或警告信息，方便后期排查问题。
+        - contextlib.contextmanager：用于将普通函数装饰为上下文管理器（即可以配合 with 语句使用），
+            这是实现自动化资源管理（如自动关闭数据库连接）的关键。
+        - from app.config import DB_PATH：从项目的配置文件中导入数据库文件的路径常量。
+            实现配置与业务逻辑的解耦，方便后续维护。
+
+    2. Logger 定义
+        - logging.getLogger(__name__)：获取一个以当前模块名（__name__）命名的 Logger 实例。
+        作用：在大型项目中，不同模块使用各自的 Logger 可以清晰地知道日志出自哪个文件。
+            配合日志格式化配置，能输出类似 [2026-10-30 10:00:00] [app.db_utils] INFO: 数据库初始化完成 的信息。
+
+    3. get_conn() 函数
+        - sqlite3.connect(DB_PATH)：连接指定路径的 SQLite 数据库。
+            如果该文件不存在，SQLite 会自动在当前路径创建一个新的 .db 文件。
+        - conn.row_factory = sqlite3.Row：这是一个非常实用的设置。
+            默认情况：查询返回的结果是元组（tuple），只能通过下标访问，如 row[0]。
+            设置后：查询返回的结果类似于字典，可以通过列名访问，如 row["day"] 或 row["gmv"]，极大提高了代码的可读性。
+        - return conn：返回配置好的数据库连接对象，供后续操作使用。
+
+
+二、db_cursor() 数据库游标
+    是用 @contextmanager 把数据库连接管理封装成了上下文管理器，让 with 语句能自动完成“打开连接 → 执行SQL → 关闭连接”的完整生命周期。
+    1. @contextmanager 装饰器原理
+        @contextmanager 是 Python 标准库 contextlib 提供的装饰器，它能把一个生成器函数转换成上下文管理器，
+        免去了手动实现 __enter__ 和 __exit__ 方法的繁琐。
+        它的核心规则是：
+            - yield 之前的代码 → 相当于 __enter__（进入上下文时执行）
+            - yield 语句本身 → 将资源传递给 with ... as 后面的变量
+            - yield 之后的代码 → 相当于 __exit__（离开上下文时执行）
+        底层实现上，装饰器会把生成器包装成一个内部类（_GeneratorContextManager），进入 with 时调用 next(gen) 执行到 yield，
+        退出时再调用 next(gen) 或 gen.throw() 继续执行 yield 之后的代码。
+
+    2. db_cursor() 函数
+        进入阶段（__enter__）
+            - conn = get_conn()：调用前面定义的 get_conn()，创建一个新的数据库连接。
+            - cur = conn.cursor()：从连接中创建游标对象，用于执行 SQL 语句。
+            - yield cur：将游标对象"交出去"，此时 with db_cursor() as cur: 中的 cur 就拿到了这个游标，with 块内的代码开始执行。
+        退出阶段（__exit__）
+            - conn.commit() if commit else None：如果调用时传了 commit=True，就提交事务；否则不提交。这是一个条件表达式，相当于：
+                if commit:
+                    conn.commit()
+            - finally: conn.close()：无论 with 块内是否发生异常，都会关闭数据库连接，防止连接泄漏。
+
+    3. 为什么用 try/finally 包裹 yield？
+        因为 with 块内的代码可能抛出异常（比如 SQL 语法错误、数据类型不匹配等），如果不把 yield 放在 try/finally 中，一旦异常发生，
+        yield 之后的 conn.close() 就不会执行，导致数据库连接泄漏。
+        finally 保证了清理代码（关闭连接）一定会被执行，这是资源管理的铁律。
+
+    4. 实际使用示例
+        # 只读查询，不需要提交
+        with db_cursor() as cur:
+            cur.execute("SELECT * FROM sales WHERE day = ?", ("2026-09-01",))
+            rows = cur.fetchall()
+
+        # 写入操作，需要提交
+        with db_cursor(commit=True) as cur:
+            cur.execute("INSERT INTO sales(day, channel, gmv) VALUES(?, ?, ?)",
+                        ("2026-09-01", "抖音", 1500.0))
+
+    * 代码实现中的一些要点的意义：
+        1. db_cursor 用 contextmanager 统一管理连接与提交
+            意义：把"资源生命周期管理"从业务代码中彻底剥离，消除重复样板代码和泄漏风险。
+            不使用：
+                conn = get_conn()
+                try:
+                    cur = conn.cursor()
+                    cur.execute("...")
+                    conn.commit()
+                finally:
+                    conn.close()
+            使用：
+                with db_cursor(commit=True) as cur:
+                    cur.execute("INSERT ...", params)   # 只写 SQL，不关心连接和提交
+            如果在代码中多次调用，一旦某处遗漏，就会造成连接泄漏 ——
+                SQLite 虽然轻量，但每个连接都占用文件句柄，泄漏积累到一定程度会触发 OperationalError: database is locked。
+
+            设计上的两个关键细节：
+                - yield 放在 try 块内：保证无论 with 块内是否抛异常，finally 中的 conn.close() 都会执行。
+                    这是上下文管理器的铁律。
+                - commit 作为参数控制：读操作不需要提交，写操作需要。
+                    把提交权交给调用方，而不是在函数内部硬编码，既灵活又避免了"只读查询也触发 commit"的无意义开销。
+
+            从工程视角看，这本质上是一种关注点分离（Separation of Concerns）：
+                连接管理是基础设施层的职责，SQL 执行是业务层的职责，两者不应耦合。
+
+    * 代码实现逻辑的一些补充点
+        1. logging 设置后，如何代替 print 记录运行状态
+            print 只是把字符串输出到终端；logging 则是一个完整的日志系统。
+            它通过 Logger、Handler、Formatter、Level 四个组件，把“记录什么、输出到哪里、以什么格式、什么级别才输出”分开管理。
+            典型配置可以这样写：
+                import logging
+                logging.basicConfig(
+                    level=logging.INFO,
+                    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                    filename="app.log",       # 同时写文件
+                    filemode="a",
+                )
+                logger = logging.getLogger(__name__)
+            原来写 print("数据库初始化完成") 的地方，可以改成：
+                logger.info("数据库初始化完成: %s", DB_PATH)
+            修改后可能的输出格式：
+                2026-10-30 10:15:23,456 - __main__ - INFO - 数据库初始化完成: app.db
+
+            补充：
+                与 print 的对比：
+                    能力	        print	    logging
+                    分级输出	    无	        DEBUG / INFO / WARNING / ERROR / CRITICAL
+                    输出位置	    只能终端	    终端、文件、日志轮转文件等
+                    结构化信息	无	        自动带时间、模块名、级别、行号
+                    生产控制	    很难	        调级别即可关闭调试信息
+                    性能	        每次都会执行	低级别日志可被过滤，配合 %s 惰性格式化更省开销
+
+                占位符之间的对应关系：
+                    占位符	含义	示例
+                    %(asctime)s	时间戳	2026-10-30 10:15:23,456
+                    %(name)s	Logger 名称，这里来自 __name__	__main__ 或模块名
+                    %(levelname)s	日志级别	INFO
+                    %(message)s	日志内容	数据库初始化完成: app.db
+
+                    如果 DB_PATH = "app.db"，最终消息就是：
+                        数据库初始化完成: app.db
+                    如果配置了 filename="app.log"，这条日志还会写入 app.log 文件，而不是只出现在终端。
+                    如果后续把级别改成 logging.WARNING，logger.info(...) 就不会输出；
+                    只有 logger.warning(...)、logger.error(...) 这类更高级别的日志才会显示。
+
+        2. 装饰器配合 with 实现上下文管理的例子
+            @contextmanager 会把一个生成器函数变成上下文管理器。
+            计时上下文管理器：
+                @contextmanager
+                def timer(name="Task"):
+                    start = time.time()
+                    try:
+                        yield
+                    finally:
+                        elapsed = time.time() - start
+                        print(f"{name} 耗时 {elapsed:.4f} 秒")
+            使用时：
+                with timer("数据写入"):
+                    save_records(rows)
+
+            文件管理：
+                @contextmanager
+                def open_file(path, mode="r"):
+                    f = open(path, mode)
+                    try:
+                        yield f
+                    finally:
+                        f.close()
+            使用：
+                with open_file("data.txt") as f:
+                    content = f.read()
+
+        3. 如何用连接池解决“每次新建连接再关闭”的问题
+            当前 get_conn() 每次都会调用 sqlite3.connect(DB_PATH)，用完再 conn.close()。
+            单线程本地项目没问题；但如果后续做成 Flask/FastAPI 后端，并发请求增多，频繁创建和关闭连接就会带来额外开销。
+            连接池的思路是：预先创建若干连接，放在池子里；需要时从池中取，用完后归还，而不是真正关闭。
+
+
+三、init_db() 初始化函数
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
