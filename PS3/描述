@@ -163,13 +163,41 @@ D1.py
 
 
 三、init_db() 初始化函数
+    数据管道的基础设施搭建环节，确保数据库表和索引在使用前已经就绪。
+    1. 函数整体结构
+        - with db_cursor(commit=True) as cur:：
+            复用了上下文管理器，自动完成"获取连接 → 创建游标 → 提交事务 → 关闭连接"的全流程。
+        - commit=True：
+            因为 CREATE TABLE 和 CREATE INDEX 都是 DDL（数据定义语言）操作，SQLite 中 DDL 也需要显式提交才能持久化生效。
+        - logger.info(...)：
+            在 with 块结束后执行，此时事务已提交、连接已关闭，记录初始化成功的日志。
+            使用 %s 占位符而非 f-string 是 logging 的最佳实践，可以避免在日志级别被过滤时仍进行字符串格式化带来的性能开销。
 
+    2. 建表语句详解
+        字段/约束	                类型/说明	                            设计意图
+        id	                    INTEGER PRIMARY KEY AUTOINCREMENT	SQLite 自增主键，作为每行记录的唯一标识
+        day	                    TEXT NOT NULL	                    日期字段，用 ISO 格式字符串存储（如 2026-09-01），
+                                                                    NOT NULL 保证数据完整性
+        channel	                TEXT NOT NULL	                    渠道名称，与 day 共同构成业务唯一键
+        gmv	                    REAL NOT NULL	                    交易金额，浮点型，NOT NULL 防止空值污染分析结果
+        orders	                INTEGER	                            订单数，允许为 NULL（某些场景下可能只有 GMV 没有订单数）
+        UNIQUE(day, channel)	复合唯一约束	                        核心设计：确保同一天同一渠道只有一条记录，
+                                                                    后续 INSERT OR REPLACE 实现幂等写入的前提
+        【有一个可优化点】
 
+    3. 创建索引语句
+        IF NOT EXISTS：与建表语句配合，保证 init_db() 可以安全地重复调用而不会报错，这是初始化函数的基本契约。
+        在数据分析场景中，按日期范围查询（如 WHERE day BETWEEN ? AND ?）是最频繁的操作。
+        索引能将这类查询从全表扫描 O(n) 优化为 B-Tree 查找 O(log n)。
+        单独的渠道筛选通常选择性不高（只有几个渠道值），SQLite 优化器可能不会使用低选择性的单列索引。
+        而 (day, channel) 的组合已经被 UNIQUE 约束隐式创建了唯一索引，无需额外添加。
 
-
-
-
-
+    4. 总结
+        幂等性：所有 DDL 都带 IF NOT EXISTS，无论调用多少次都不会出错或重复创建。
+        资源安全：通过 db_cursor 上下文管理器，即使建表过程中发生异常，连接也会被正确关闭。
+        写入友好：UNIQUE(day, channel) 约束直接为后续的 INSERT OR REPLACE 幂等写入铺平了道路，
+                避免了应用层手动查重再决定 INSERT/UPDATE 的复杂逻辑。
+        配置解耦：数据库路径来自 DB_PATH 常量，切换环境只需改配置文件，无需修改函数代码。
 
 
 
