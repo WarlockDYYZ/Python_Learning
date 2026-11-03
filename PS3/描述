@@ -200,20 +200,36 @@ D1.py
         配置解耦：数据库路径来自 DB_PATH 常量，切换环境只需改配置文件，无需修改函数代码。
 
 
+四、save_records()
+    数据管道的写入终端，它的核心设计目标是实现幂等写入 ——
+        即无论同一批数据被写入多少次，数据库中的最终结果都保持一致，不会产生重复记录或报错。
 
+    1. 函数整体结构
+        - with db_cursor(commit=True) as cur:：复用上下文管理器，自动管理连接生命周期，并在 with 块结束时提交事务。
+        - cur.executemany(...)：批量执行 SQL，比循环调用 execute() 性能高出一个数量级。
+        - logger.info(...) + return len(rows)：记录写入条数并返回，方便上游调用方确认写入结果。
 
+    2. 核心机制：INSERT OR REPLACE
+        SQLite 特有的冲突解决策略，也是实现幂等写入的关键。它的完整执行逻辑是：
+        a. 尝试执行 INSERT；
+        b. 如果触发 UNIQUE 约束冲突（即 (day, channel) 组合已存在）；
+        c. 先 DELETE 旧行，再 INSERT 新行（注意：不是 UPDATE）。
+        【一个优化点】
 
+    3. 为什么用 executemany 而不是循环 execute？
+        方式	            原理	                            性能差异
+        循环 execute()	每条 SQL 独立解析、编译、执行	    O(n) 次 SQLite 内部开销
+        executemany()	SQL 只解析编译一次，参数批量绑定执行	仅 1 次解析开销，吞吐量提升 10~100 倍
+        对于 fetch_source() 返回的 90 条数据（30天 × 3渠道），差异可能不明显；
+        但当数据量增长到数万条时，executemany 的优势会非常显著。
 
+    4. 幂等性的完整保障链
+        save_records() 的幂等性并非孤立实现，而是依赖前面所有环节的协同：
+        a. init_db() 中的 UNIQUE(day, channel)：提供了冲突检测的基础，没有这个约束，INSERT OR REPLACE 永远不会触发替换逻辑。
+        b. fetch_source() 的数据结构：返回的元组顺序 (day, channel, gmv, orders) 与 SQL 占位符严格对应，避免字段错位导致的"误覆盖"。
+        c. db_cursor(commit=True)：确保整批写入要么全部成功提交，要么在异常时全部回滚（SQLite 默认事务行为），不会出现"写了一半"的中间状态。
 
-
-
-
-
-
-
-
-
-
+    【进一步使用有两点优化】
 
 
 
