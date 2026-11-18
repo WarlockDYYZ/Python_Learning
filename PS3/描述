@@ -756,38 +756,79 @@ D6.py
     三、 register_access_log 注册访问日志
         应用级横切逻辑注册器：它不注册任何路由，只做两件事——修正 WSGI 层的请求元数据、给每个请求装上「计时 + 追踪 + 落日志」的钩子。
         三个钩子通过 g 传递状态，配合 ProxyFix 完成真实 IP 还原。
-        1. 执行顺序：四个环节的协作关系
-            WSGI 请求进来
-                ↓ ProxyFix（中间件，最外层）：改写 REMOTE_ADDR / SERVER_PROTOCOL / HTTP_HOST
-                ↓ before_request → _start()：打时间戳、生成 request_id
-                ↓ 视图函数（可能被 @require_api_key 拦截，写入 g.api_owner）
-                ↓ after_request → _capture_status()：抓真实状态码、把 X-Request-ID 塞进响应头
-                ↓ 响应发给客户端
-                ↓ teardown_request → _log()：无论成功失败都执行，输出访问日志
-            after_request 和 teardown_request 的分工：
-                响应头必须在响应发出前修改，所以放 after_request；
-                「一定要记到日志」的诉求只能放 teardown_request，因为它是唯一在异常路径下也保证执行的钩子。
+        1. 生命周期
+            WSGI 请求 → ProxyFix 改写 environ
+                ↓ RequestContext 入栈（g 变为“本次请求专属”的空对象）
+                ↓ before_request  → _start()          ← 造 _t0 / request_id / _resp_status
+                ↓ 路由匹配 + 装饰器（require_api_key 可能写 g.api_owner）
+                ↓ 视图函数
+                ↓ after_request   → _capture_status(resp)  ← 抓状态码、注入 X-Request-ID
+                ↓ 响应字节发给客户端
+                ↓ teardown_request → _log(exception)   ← 消费上面两个函数写入的所有字段
+            时机不可互换：
+                - 计时起点必须在业务执行前，所以放 before_request；
+                - 响应头必须在字节发出前修改，所以只能放 after_request（teardown_request 执行时响应已经发出去了，改头无效）；
+                - 而「无论如何都要记一条日志」只能靠 teardown_request。
+            三者靠 g 传数据，彼此不传参，这就是它们唯一的耦合方式。
 
-        2. ProxyFix：修正代理失真
-            包装而非替换：把原 wsgi_app 作为参数交给 ProxyFix，形成洋葱式中间件链，不破坏原有行为。
-            三个参数各自的作用：
-                    x_for=1 表示信任 1 层代理，从 X-Forwarded-For 取最后一个值改写 REMOTE_ADDR；
-                    x_proto=1 用 X-Forwarded-Proto 修正 request.scheme（HTTPS 判断）；
-                    x_host=1 用 X-Forwarded-Host 修正 request.host。
-            不做的话，日志里所有 IP 都是 Nginx 的 IP，安全审计、限流、封禁全部失效；request.url 也会错成 http。
+        2. _start 请求级上下文的初始化
+            g._t0 = time.perf_counter()
+                - perf_counter：它是单调递增的高精度时钟，只用于测量「间隔」，不受 NTP 校时、时区变更、系统时间回拨影响。
+                    用 time.time() 测耗时，一旦发生时钟回拨就会算出负数，把监控曲线打穿。
+                - g 是请求级对象，每个请求一份、请求结束随上下文弹出而销毁。
+                    并发（gunicorn 多进程 / 多线程 / gevent）下天然隔离，不需要加锁，也不会串数据。
+                - 下划线前缀 _t0：约定为「模块内部字段」，降低与业务代码往 g 上挂同名属性的冲突概率。
+            g.request_id = uuid.uuid4().hex[:12]
+                作用：给本次请求一个唯一标识，把「同一次请求」产生的多条日志（DENY、access、业务日志、异常堆栈）串起来，是并发排查的核心抓手。
+                - uuid4().hex 是 32 位十六进制，截 12 位约 48 bit 熵。
+                    请求级 ID 只要求在「日志保留窗口内、单机/单集群内」不碰撞，不需要全局唯一，截短能明显节省日志体积和响应头长度。
+                - uuid4 无需共享计数器，多进程/多实例下零协调成本，且不可预测（不会泄露请求量信息）。
+            g._resp_status = None
+                目的：显式声明「本请求的状态码尚未知」，把 _capture_status 与 _log 之间的契约写清楚。
+                这行在功能上并非必需。
+                _log 里用的是 getattr(g, "_resp_status", None)，即使 _start 没跑、属性不存在，也会安全拿到 None。
+                而且 g 是请求级对象，不会残留上一个请求的值。
+                这行的价值主要是可读性与防御性 ——
+                    它让「谁写、谁读、初值是什么」一目了然，也避免以后有人把 getattr 改成直接 g._resp_status 时踩空。
+            before_request 的隐含语义
+                如果 _start 自身抛异常，视图和 after_request 都会被跳过，但 teardown_request 仍会执行。
+                这正是 _log 里所有取值都要兜底的原因。
+                如果项目里还有别的 before_request（如鉴权、租户解析）且注册在 _start 之前并抛了异常，_start 根本不会执行
+                → 此时 request_id 缺失、耗时为 -1.0ms，日志会呈现「未知 ID + 计时失败」，这本身就是有价值的异常信号。
 
-        3. before_request：请求级上下文初始化
-            perf_counter() 而非 time.time()：单调递增时钟，不受 NTP 校时、时区调整影响，不会算出负耗时。
-                    这是测「耗时」的标准选择（测「时间点」才用 time.time()）。
-            uuid4().hex[:12]：取 12 位十六进制短 ID（约 48 bit 熵），既能在并发日志里串联同一请求，又比完整 36 位 UUID 更省日志空间。
-            下划线前缀 _t0：约定为内部字段，避免和业务代码往 g 上挂的属性撞名。
+        3. _capture_status 状态码捕获与追踪头回写
+            g._resp_status = resp.status_code
+                - teardown_request 只能拿到 exception，拿不到响应对象。
+                    而 _log 需要精确状态码（200/401/404/500），所以必须在能拿到 resp 的地方先存进 g。
+                - 正常路径下 _log 读到的就是这个真实值，500 if exception else "-" 只是兜底分支。
+                - 鉴权失败时 teardown_request 的 exception 是 None（装饰器是正常返回响应，不是抛异常），
+                    如果没有这里抓取，401 会被兜底逻辑误判。
+            resp.headers["X-Request-ID"] = ...
+                - 客户端（前端、调用方 SDK）拿到这个 ID，报障时提供它，就能在海量日志里精确定位这一次请求，不需要靠时间戳+路径模糊匹配。
+                - getattr(g, "request_id", "") 的兜底：应对 _start 未执行的极端情况，避免抛 AttributeError 把整个响应搞崩。
+                    不过要注意，兜底成空串会写出一个空的响应头，语义上略脏——更干净的做法是「有 ID 才写头」。
+            return resp 是硬性要求
+                after_request 的返回值会作为下一个 after_request 的输入。
+                漏写 return resp（或返回 None）会让响应对象变成 None，直接导致请求失败。
+                同时这个钩子里不要读取/消费 resp 的 body（尤其是流式响应），只做元数据层面的修改。
+            after_request 的执行条件
+                - 视图正常返回 → 执行。
+                - 视图抛 HTTPException（404、405、主动 abort(400)）
+                    → 由错误处理器生成响应，会执行，且 teardown_request 收到的 exception 是 None。
+                - 视图抛未处理的普通异常（如 ValueError）
+                    → 异常穿透，after_request 被跳过，_resp_status 保持 None，teardown_request 收到真实异常对象
+                    → 日志走 500 + exception 分支。
+                三条路径正好解释了为什么 _start 要初始化、_capture_status 要抓码、_log 要兜底。
 
-        4. teardown_request：兜底日志
-            getattr 兜底：万一 _start() 没执行（更早的中间件/钩子抛异常），退化为「当前时间减当前时间」≈ 0ms，
-                    而不是抛 AttributeError 把日志彻底弄丢。
-            两级取值策略：先按「有没有异常」给一个粗判，再用 after_request 抓到的真实状态码覆盖。
-                    意图：正常路径用精确值，异常路径（after_request 被跳过）用 500 兜底。
-
+        4. 两个函数在三种路径下的实际表现
+            场景	            _start 写入          _capture_status 是否执行	_log 最终输出
+            正常请求	        _t0、request_id、	执行，覆盖为 200	        rid=abc GET /api/x -> 200 12.3ms owner=team_a
+                            _resp_status=None
+            鉴权失败 401	    同上	                执行，覆盖为 401	        rid=abc POST /api/y -> 401 3.1ms owner=-
+            视图抛未处理异常	同上	                跳过，仍为 None	        rid=abc GET /api/z
+                                                                        -> 500 8.7ms owner=team_a error=ValueError(...)
+                                                                        + 堆栈
+        【严格来说还有四个优化点，很正式的场合运行代码时才考虑优化，目前先不涉及】
 
 
 
