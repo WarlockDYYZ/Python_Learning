@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>荧光飞船 Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            color: #fff;
+        }
+
+        #gameCanvas {
+            display: block;
+            background: #000;
+        }
+
+        #score {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            color: #0ff;
+            text-shadow: 0 0 10px #0ff;
+            z-index: 10;
+        }
+
+        #tip {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+<div id="score">分数：0</div>
+<canvas id="gameCanvas"></canvas>
+<div id="tip">← / → 或点击屏幕左右控制方向</div>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const scoreEl = document.getElementById("score");
+
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    window.addEventListener("resize", () => {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+    });
+
+    const player = {
+        x: width / 2,
+        y: height * 0.75,
+        angle: 0,
+        speed: 260,
+        turnSpeed: 2.2,
+        radius: 18,
+        size: 24
+    };
+
+    const keys = {
+        left: false,
+        right: false
+    };
+
+    let score = 0;
+    let shapes = [];
+    let particles = [];
+    let lastTime = performance.now();
+    let spawnTimer = 0;
+    let spawnInterval = 0.8;
+
+    const shapeColors = [
+        "#00ffff",
+        "#ff00ff",
+        "#00ff88",
+        "#ffcc00",
+        "#ff5577",
+        "#77aaff"
+    ];
+
+    function random(min, max) {
+        return Math.random() * (max - min) + min;
+    }
+
+    function createShape() {
+        const sides = Math.floor(random(3, 7));
+        const color = shapeColors[Math.floor(Math.random() * shapeColors.length)];
+
+        shapes.push({
+            x: random(40, width - 40),
+            y: random(40, height - 40),
+            radius: random(14, 26),
+            sides,
+            color,
+            angle: random(0, Math.PI * 2),
+            rotateSpeed: random(-1.5, 1.5),
+            value: sides * 10,
+            life: random(4, 8)
+        });
+    }
+
+    function createParticles(x, y, shape) {
+        // 生成 8~12 个碎片粒子，随机出现
+        const particleCount = Math.floor(random(8, 12));
+
+        for (let i = 0; i < particleCount; i++) {
+            const angle = random(0, Math.PI * 2);
+            const speed = random(60, 220);
+
+            particles.push({
+                x: x + random(-10, 10), // 在原位置附近随机出现
+                y: y + random(-10, 10),
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: random(0.4, 0.8),
+                maxLife: 0.8,
+                color: shape.color,          // 继承原图形颜色
+                sides: shape.sides,          // 继承原图形形状（边数）
+                radius: shape.radius / 3,    // 大小是原来的 1/3
+                angle: random(0, Math.PI * 2), // 随机初始旋转角度
+                rotateSpeed: random(-3, 3)     // 碎片随机旋转速度
+            });
+        }
+    }
+
+    function drawPlayer() {
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.rotate(player.angle);
+
+        ctx.strokeStyle = "#00ffff";
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 16;
+        ctx.shadowColor = "#00ffff";
+
+        ctx.beginPath();
+        ctx.moveTo(0, -player.size);
+        ctx.lineTo(player.size * 0.7, player.size * 0.8);
+        ctx.lineTo(0, player.size * 0.45);
+        ctx.lineTo(-player.size * 0.7, player.size * 0.8);
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, -player.size);
+        ctx.lineTo(0, player.size * 0.45);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    function drawShape(shape) {
+        ctx.save();
+        ctx.translate(shape.x, shape.y);
+        ctx.rotate(shape.angle);
+
+        ctx.strokeStyle = shape.color;
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 14;
+        ctx.shadowColor = shape.color;
+
+        ctx.beginPath();
+
+        for (let i = 0; i < shape.sides; i++) {
+            const angle = (Math.PI * 2 * i) / shape.sides;
+            const x = Math.cos(angle) * shape.radius;
+            const y = Math.sin(angle) * shape.radius;
+
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawParticles() {
+        particles.forEach(p => {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.angle); // 应用粒子的旋转
+
+            ctx.globalAlpha = p.life / p.maxLife; // 随生命周期逐渐透明
+            ctx.strokeStyle = p.color;
+            ctx.lineWidth = 1.5;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = p.color;
+
+            // 绘制与母体相同形状的几何碎片
+            ctx.beginPath();
+            for (let i = 0; i < p.sides; i++) {
+                const a = (Math.PI * 2 * i) / p.sides;
+                const px = Math.cos(a) * p.radius;
+                const py = Math.sin(a) * p.radius;
+
+                if (i === 0) {
+                    ctx.moveTo(px, py);
+                } else {
+                    ctx.lineTo(px, py);
+                }
+            }
+            ctx.closePath();
+            ctx.stroke();
+
+            ctx.restore();
+        });
+    }
+
+    function updatePlayer(dt) {
+        let turn = 0;
+
+        if (keys.left) turn -= 1;
+        if (keys.right) turn += 1;
+
+        player.angle += turn * player.turnSpeed * dt;
+
+        player.x += Math.sin(player.angle) * player.speed * dt;
+        player.y -= Math.cos(player.angle) * player.speed * dt;
+
+        if (player.x < 0) player.x = width;
+        if (player.x > width) player.x = 0;
+        if (player.y < 0) player.y = height;
+        if (player.y > height) player.y = 0;
+    }
+
+    function updateShapes(dt) {
+        shapes.forEach(shape => {
+            shape.angle += shape.rotateSpeed * dt;
+            shape.life -= dt;
+        });
+
+        shapes = shapes.filter(shape => shape.life > 0);
+    }
+
+    function updateParticles(dt) {
+        particles.forEach(p => {
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx *= 0.98; // 摩擦力减速
+            p.vy *= 0.98;
+            p.life -= dt;
+            p.angle += p.rotateSpeed * dt; // 新增：让碎片旋转
+        });
+
+        particles = particles.filter(p => p.life > 0);
+    }
+
+    function checkCollisions() {
+        for (let i = shapes.length - 1; i >= 0; i--) {
+            const shape = shapes[i];
+
+            const dx = player.x - shape.x;
+            const dy = player.y - shape.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < player.radius + shape.radius) {
+                score += shape.value;
+                scoreEl.textContent = "分数：" + score;
+
+                createParticles(shape.x, shape.y, shape);
+                shapes.splice(i, 1);
+            }
+        }
+    }
+
+    function update(dt) {
+        updatePlayer(dt);
+        updateShapes(dt);
+        updateParticles(dt);
+        checkCollisions();
+
+        spawnTimer += dt;
+
+        if (spawnTimer > spawnInterval) {
+            createShape();
+            spawnTimer = 0;
+        }
+    }
+
+    function draw() {
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, width, height);
+
+        shapes.forEach(drawShape);
+        drawParticles();
+        drawPlayer();
+    }
+
+    function loop(now) {
+        const dt = (now - lastTime) / 1000;
+        lastTime = now;
+
+        update(dt);
+        draw();
+
+        requestAnimationFrame(loop);
+    }
+
+    window.addEventListener("keydown", e => {
+        if (e.code === "ArrowLeft") keys.left = true;
+        if (e.code === "ArrowRight") keys.right = true;
+    });
+
+    window.addEventListener("keyup", e => {
+        if (e.code === "ArrowLeft") keys.left = false;
+        if (e.code === "ArrowRight") keys.right = false;
+    });
+
+    canvas.addEventListener("touchstart", e => {
+        const touch = e.touches[0];
+
+        if (touch.clientX < width / 2) {
+            keys.left = true;
+        } else {
+            keys.right = true;
+        }
+    });
+
+    canvas.addEventListener("touchend", () => {
+        keys.left = false;
+        keys.right = false;
+    });
+
+    for (let i = 0; i < 8; i++) {
+        createShape();
+    }
+
+    requestAnimationFrame(loop);
+</script>
+</body>
+</html>
