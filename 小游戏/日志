@@ -2,3 +2,145 @@
 AI 还是厉害出 demo 就是快啊，明天读代码，先在网页上跑然后移植
 11-22
 下载了抖音开发者小工具，研究了功能
+11-22
+    结构
+        html
+        head
+            meta*2
+            title
+            style
+                *
+                body
+                #gameCanvas
+                #score
+                #tip
+        body
+            div#score
+            canvas#gameCanvas
+            div#tip
+            script
+                参数定义与初始化
+                window.addEventListener("resize")
+                工具函数
+                    function random
+                游戏逻辑函数
+                    function createShape
+                    function createParticles
+                    function drawPlayer
+                    function drawShape
+                    function drawParticles
+                    function updatePlayer
+                    function updateShapes
+                    function updateParticles
+                    function checkCollisions
+                    function update
+                    function draw
+                    function loop
+                事件监听
+                    window.addEventListener("keydown")
+                    window.addEventListener("keyup")
+                    window.addEventListener("touchstart")
+                    window.addEventListener("touchend")
+                游戏启动初始化
+                    for
+                    requestAnimationFrame(loop)
+
+        代码拆解规则：
+            1、单行标签：直接用标签名指代内容（如 meta, title）。
+            2、嵌套标签：使用“元素名”指代内容，体现层级关系。
+            3、缩进规范：统一使用 4 个空格表示一层嵌套关系。
+            4、属性标识：如果标签有重要的 id 或 class 属性，用 #id名 或 .class名 加以区分（如 div#score、div.tip），避免同名标签混淆。
+            5、多标签简写：连续出现的相同标签，使用 标签名*数量 表示（如 meta*2）。
+            6、逻辑分组：在代码块（如 script）内部，不要只罗列函数，应按功能添加注释标签进行分组（如 参数定义与初始化、工具函数、事件监听等），
+                方便日后快速定位。
+        说明：
+            html 本来就是结构清晰的，所以这个拆解很容易，我为什么依然要做呐？是因为以后一定会阅读其他的代码，清晰的逻辑一定方便理解，
+            况且优秀的代码本来也应该是逻辑清晰的（高内聚、低耦合、见名知意）
+            前 3 条是我提的，在实际拆解的过程中不清晰的地方 AI 就行了一些补充，很好。
+
+
+    内容
+        复习：
+            <meta>
+                元数据（Metadata）是数据的数据信息。
+                标签提供了 HTML 文档的元数据。元数据不会显示在客户端，但是会被浏览器解析。
+                META元素通常用于指定网页的描述，关键词，文件的最后修改时间，作者及其他元数据。
+                元数据可以被使用浏览器（如何显示内容或重新加载页面），搜索引擎（关键词），或其他 Web 服务调用。
+                注意：
+                    <meta> 标签通常位于 <head> 区域内。
+                    元数据通常以 名称/值 对出现。
+                    如果没有提供 name 属性，那么名称/值对中的名称会采用 http-equiv 属性的值。
+
+            <style>
+                style 中使用了三种选择器（这个名字在嘴边一直想不起来，正好我记忆中学了三个这里正好有三个）
+                1. * （通配符选择器 / 通用选择器）
+                    代表页面中的所有元素。只要写在 * { ... } 里的样式，全都会生效。
+                    代码中：
+                        * {
+                            margin: 0;    /* 清除所有元素的外边距（浏览器默认会给body、h1、p等标签添加margin） */
+                            padding: 0;   /* 清除所有元素的内边距（浏览器默认会给ul、ol、button等标签添加padding） */
+                            box-sizing: border-box;
+                            /* 设置盒模型为 border-box：
+                                让元素的 width 和 height 属性包含 content（内容）、padding（内边距）和 border（边框）。
+                                这样在设置宽高时，不会因为加了 padding 或 border 而导致元素实际尺寸变大，布局计算更直观。 */
+                        }
+                    补充：
+                        box-sizing: border-box; 的核心意义在于让元素尺寸的计算方式更符合直觉，从而大幅简化网页布局的难度。
+                        浏览器默认模式：content-box（内容盒子）
+                            在这种模式下，你给元素设置的 width（宽度）仅仅是“内容区域”的宽度。
+                            实际占据的总宽度 = width + padding（内边距） + border（边框）
+                        设置的模式：border-box（边框盒子）
+                            元素设置的 width 就是元素在页面上实际占据的总宽度。
+                            实际占据的总宽度 = width（内容区会自动缩小，去容纳 padding 和 border）
+                        可以确保 移动端 和 PC端 元素贴合父容器。
+                2. 标签名 （元素选择器 / 类型选择器）
+                    代表页面中所有同名的 HTML 标签。批量给某一类标签设置统一的样式。
+                    代码中：
+                        body {
+                          background: #000;     /* 设置背景为黑色 */
+                          overflow: hidden;     /* 控制内容溢出元素框时显示的方式。hidden	内容会被修剪，并且其余内容不可见 */
+                        }
+                3. # （ID 选择器）
+                    代表页面中具有特定 id 属性的唯一元素。HTML 规定一个页面里 id 必须是独一无二的，# 选择器只会作用于那一个特定的元素。
+                    代码中：
+                        #gameCanvas {
+                            display: block;      /* 将画布元素设置为“块级元素” */
+                            background: #000;    /* 将画布的背景颜色设置为纯黑色 */
+                        }
+                        #score {
+                            position: fixed;          /* 定位方式：固定定位。元素会固定在浏览器窗口的某个位置 */
+                            top: 20px;                /* 距离浏览器窗口顶部 20 像素 */
+                            left: 20px;               /* 距离浏览器窗口左侧 20 像素 */
+                            font-size: 24px;          /* 字体大小设为 24 像素，比默认文字更大更醒目 */
+                            color: #0ff;              /* 文字颜色设为青色（#0ff 是 #00ffff 的简写），带有科技感/霓虹感 */
+                            text-shadow: 0 0 10px #0ff; /* 文字阴影：水平偏移0，垂直偏移0，模糊半径10px，颜色同为青色。
+                                                            效果是文字周围会有一圈发光的"霓虹光晕" */
+                            z-index: 10;              /* 层叠顺序设为 10。数值越大越靠上层，确保分数文字不会被其他页面元素遮挡 */
+                        }
+                        #tip {
+                            position: fixed;                    /* 固定定位，同样不随页面滚动 */
+                            bottom: 20px;                       /* 距离浏览器窗口底部 20 像素 */
+                            left: 50%;                          /* 距离左侧 50%，即元素左边缘定位到屏幕水平中心 */
+                            transform: translateX(-50%);        /* 沿 X 轴向左移动自身宽度的 50%。配合 left:50% 实现完美的水平居中 */
+                            font-size: 14px;                    /* 字体大小 14 像素，比分数小，作为辅助说明文字 */
+                            color: rgba(255, 255, 255, 0.7);   /* 文字颜色为白色，透明度 0.7（70%不透明），看起来比较柔和、不抢眼 */
+                            z-index: 10;                        /* 层叠顺序同样为 10，确保提示文字不会被遮挡 */
+                        }
+                    补充：
+                        块级元素：
+                            1. display: block; 的作用（重点）
+                                在 HTML 中，<canvas> 标签默认是行内元素（inline）。
+                                如果不加这行代码，画布可能会因为浏览器对行内元素的排版规则（比如像处理文字一样给它留出行间距），导致画布下方出现一条莫名其妙的空白缝隙。
+                                将其设置为 block（块级元素）后，画布就会独占一行，彻底消除这个底部缝隙，让游戏画面完美贴合页面。
+                            2. background: #000; 的作用
+                                #000 是纯黑色的十六进制颜色代码（#000000 的简写）。
+                                虽然 Canvas 默认是透明的，设置纯黑背景后，青色（#0ff）发光分数，能立刻营造出一种“赛博朋克”或“复古街机”的视觉氛围。
+                        当它们对同一个元素生效时，优先级高的会覆盖优先级低的：
+                            # (ID选择器) > 标签名 (元素选择器) > * (通配符选择器)
+                            - * 负责打地基（全局重置）。
+                            - 标签名 负责建骨架（统一某类元素的默认样式）。
+                            - # 负责精装修（单独定制某个特殊元素的样式）。
+
+
+
+
